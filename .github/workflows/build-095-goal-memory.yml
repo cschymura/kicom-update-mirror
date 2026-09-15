@@ -1,0 +1,126 @@
+name: Build KiCom 0.9.5 Goal Layer and Memory Archive
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.event.issue.title == 'BUILD_KICOM_0.9.5_GOAL_MEMORY'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Verify immutable installed 0.9.4 base
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip'
+          test -f "$BASE"
+          ACTUAL="$(sha256sum "$BASE" | awk '{print $1}')"
+          echo "0.9.4 base SHA-256: $ACTUAL"
+          test "$ACTUAL" = '88fa2502ff473f1477c16a215e99b1f36e2d7f57fb1f71adf5e4af2ebc158a58'
+
+      - name: Build 0.9.5 from immutable 0.9.4
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/build_095_goal_memory.py \
+            releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip \
+            /tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip
+          test -f /tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip
+
+      - name: PHP syntax and fresh-install seed verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT='/tmp/kicom095-goal-memory'
+          php -l "$ROOT/lib.php"
+          php -l "$ROOT/goals_memory.php"
+          php -l "$ROOT/living.php"
+          php -l "$ROOT/index.php"
+          php -l "$ROOT/api.php"
+          php -l "$ROOT/admin.php"
+          php -l "$ROOT/guardian.php"
+          php -l "$ROOT/recovery.php"
+          grep -q 'VERSION "0.9.5"' "$ROOT/memory/project_state.kcl"
+          rm -rf /tmp/kicom095-fresh
+          mkdir -p /tmp/kicom095-fresh
+          unzip -q /tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip -d /tmp/kicom095-fresh
+          php -r 'require "/tmp/kicom095-fresh/lib.php"; if (KICOM_VERSION !== "0.9.5") exit(1); if(!kicomEnsureStorage()) exit(2); $s=kicomLivingStatus(); if(empty($s["trusted"])||empty($s["lkg_ok"])) exit(3); $g=kicomGoals(true); $m=kicomMemoryArchiveStatus(); if(($g["policy"]??"")!=="archive-never-hard-delete"||($m["policy"]??"")!=="archive-never-hard-delete") exit(4); echo "FRESH_INSTALL_OK\n";'
+
+      - name: Functional Goal Layer and private archive test
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -r '
+            require "/tmp/kicom095-fresh/lib.php";
+            $g=kicomGoalUpsert("human","Test goal","Verify persistent goal semantics","low","CI","Goal remains permissionless","ci:test",true);
+            if(empty($g["ok"])) {fwrite(STDERR,json_encode($g));exit(1);}
+            $raw=json_encode(["schema"=>1,"kind"=>"full_snapshot","memory"=>["test"=>"ci"],"goal_hypotheses"=>[["title"=>"Memory-derived CI goal","description"=>"Verify approved memory can create a goal hypothesis","priority"=>"low","success_criteria"=>"Goal exists"]]],JSON_UNESCAPED_SLASHES);
+            $m=kicomMemoryArchiveSnapshotStore($raw,"chatgpt_memory","CI snapshot");
+            if(empty($m["ok"])||count($m["goals_ingested"]??[])!==1){fwrite(STDERR,json_encode($m));exit(2);}
+            $st=kicomMemoryArchiveStatus();if(($st["count"]??0)!==1)exit(3);
+            echo "GOAL_MEMORY_FUNCTIONAL_OK\n";
+          '
+
+      - name: Verify package with exact 0.9.4 verifier and require human attention
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/kicom094-verifier
+          mkdir -p /tmp/kicom094-verifier
+          unzip -q releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip -d /tmp/kicom094-verifier
+          PACKAGE='/tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip' php -r '
+            $p=getenv("PACKAGE");
+            require "/tmp/kicom094-verifier/lib.php";
+            $x=kicomSelfUpdateZipInspect($p);
+            if(empty($x["ok"])){fwrite(STDERR,"inspect ".($x["code"]??"UNKNOWN")."\n");exit(1);}
+            $r=kicomSelfUpdateRiskClass($x);
+            $class=(string)($r["class"]??"red");
+            if(($x["version"]??"")!=="0.9.5" || ($x["genome"]["id"]??"")!=="kicom-0.9.5-g6"){fwrite(STDERR,"identity mismatch\n");exit(2);}
+            if($class==="green"){fwrite(STDERR,"Capability expansion must not be classified green\n");exit(3);}
+            echo "INSPECT_OK version=0.9.5 risk=$class\n";
+            echo "REASONS=".json_encode($r["reasons"]??[])."\n";
+          '
+
+      - name: Publish immutable release, source snapshot and mirror feed
+        shell: bash
+        run: |
+          set -euo pipefail
+          PKG='/tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip'
+          SHA="$(sha256sum "$PKG" | awk '{print $1}')"
+          export SHA
+          mkdir -p releases/0.9.5
+          cp "$PKG" releases/0.9.5/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip
+          rm -rf source/0.9.5 /tmp/kicom095-source
+          mkdir -p source/0.9.5 /tmp/kicom095-source
+          unzip -q "$PKG" -d /tmp/kicom095-source
+          find /tmp/kicom095-source/var -mindepth 1 ! -name .htaccess -exec rm -rf {} + 2>/dev/null || true
+          find /tmp/kicom095-source/stage -mindepth 1 ! -name .htaccess -exec rm -rf {} + 2>/dev/null || true
+          cp -a /tmp/kicom095-source/. source/0.9.5/
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          sha=os.environ['SHA']
+          Path('source/0.9.5/SOURCE-SNAPSHOT.json').write_text(json.dumps({
+            'schema':1,'product':'kicom','version':'0.9.5','release_sha256':sha,
+            'source_of_truth':'releases/0.9.5/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip',
+            'runtime_state_removed':True,'policy':'immutable release-derived source snapshot'
+          },indent=2)+'\n')
+          p=Path('channel.json');d=json.loads(p.read_text());rels=[r for r in d.get('releases',[]) if r.get('version')!='0.9.5']
+          rels.insert(0,{'version':'0.9.5','url':'https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.5/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip','sha256':sha,'published_at':datetime.now(timezone.utc).isoformat()})
+          d['schema']=1;d['product']='kicom';d['releases']=rels;p.write_text(json.dumps(d,indent=2,ensure_ascii=False)+'\n')
+          PY
+          echo "0.9.5 package SHA-256: $SHA"
+          git config user.name 'kicom-mirror-bot'
+          git config user.email 'kicom-mirror-bot@users.noreply.github.com'
+          git add releases/0.9.5 source/0.9.5 channel.json
+          git commit -m 'Publish KiCom 0.9.5 Goal Layer and memory archive'
+          git push
