@@ -1,0 +1,2 @@
+trigger=2026-09-15T11:57:00+02:00
+purpose=resilient-autonomy-and-append-only-archive-fix
