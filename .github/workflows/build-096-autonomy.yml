@@ -1,0 +1,147 @@
+name: Build KiCom 0.9.6 Autonomy Bridge
+
+on:
+  push:
+    paths:
+      - '.github/triggers/build-096.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Build verify publish and persist report
+        shell: bash
+        run: |
+          set +e
+          BASE='releases/0.9.5/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip'
+          PKG='/tmp/KiCom-0.9.6-Autonomy-Bridge.zip'
+          ROOT='/tmp/kicom096-autonomy'
+          LOG='/tmp/kicom096.log'
+          STATUS='build/status/0.9.6.json'
+          mkdir -p build/status
+          : > "$LOG"
+          fail=0; failed_stage=''; risk='unknown'; pkg_sha=''
+
+          run_stage(){
+            local name="$1"; shift
+            echo "== $name ==" >>"$LOG"
+            "$@" >>"$LOG" 2>&1
+            local rc=$?
+            if [ $rc -ne 0 ]; then fail=$rc; failed_stage="$name"; echo "FAILED stage=$name rc=$rc" >>"$LOG"; fi
+            return $rc
+          }
+
+          if [ ! -f "$BASE" ]; then fail=1; failed_stage='base'; echo BASE_MISSING >>"$LOG"; fi
+          if [ $fail -eq 0 ]; then
+            bsha="$(sha256sum "$BASE" | awk '{print $1}')"; echo "base_sha256=$bsha" >>"$LOG"
+            if [ "$bsha" != 'a65f35786eb010c8ebf5bfca12db64125ff0829d0b56db4ee83a271a0fc34790' ]; then fail=2; failed_stage='base'; echo BASE_SHA_MISMATCH >>"$LOG"; fi
+          fi
+
+          if [ $fail -eq 0 ]; then
+            echo '== decode builder ==' >>"$LOG"
+            base64 --decode tools/build_096_autonomy_bridge.py.gz.b64 | gzip --decompress > /tmp/build_096.py
+            rc=$?; if [ $rc -ne 0 ]; then fail=$rc; failed_stage='decode-builder'; fi
+          fi
+          if [ $fail -eq 0 ]; then
+            bldsha="$(sha256sum /tmp/build_096.py | awk '{print $1}')"; echo "builder_sha256=$bldsha" >>"$LOG"
+            if [ "$bldsha" != 'b6a5c3dcab6a2bb69cf7e7bd1cf753270cd5485e926136d8d3ff58a2654f93d8' ]; then fail=3; failed_stage='builder-sha'; echo BUILDER_SHA_MISMATCH >>"$LOG"; fi
+          fi
+          if [ $fail -eq 0 ]; then run_stage builder python /tmp/build_096.py "$BASE" "$PKG"; fi
+
+          if [ $fail -eq 0 ]; then
+            echo '== php syntax ==' >>"$LOG"
+            for f in lib.php living.php index.php api.php admin.php guardian.php recovery.php; do
+              php -l "$ROOT/$f" >>"$LOG" 2>&1 || { fail=$?; failed_stage="syntax:$f"; break; }
+            done
+          fi
+
+          if [ $fail -eq 0 ]; then
+            echo '== package policy ==' >>"$LOG"
+            if unzip -Z1 "$PKG" | grep -qx 'autonomy_bridge.php'; then fail=41; failed_stage='allowlist'; echo UNEXPECTED_ROOT_EXECUTABLE >>"$LOG"; fi
+          fi
+
+          if [ $fail -eq 0 ]; then
+            echo '== fresh install + FreeOTP/autonomy functional ==' >>"$LOG"
+            rm -rf /tmp/kicom096-fresh && mkdir -p /tmp/kicom096-fresh && unzip -q "$PKG" -d /tmp/kicom096-fresh
+            cat >/tmp/test096.php <<'PHP'
+          <?php
+          require '/tmp/kicom096-fresh/lib.php';
+          if(KICOM_VERSION!=='0.9.6')exit(11);
+          if(!kicomEnsureStorage())exit(12);
+          $ls=kicomLivingStatus();if(empty($ls['trusted'])||empty($ls['lkg_ok']))exit(13);
+          $setup=kicomTotpSetupBegin('CI');if(empty($setup['ok']))exit(14);
+          $counter=intdiv(time(),30);$code=kicomTotpCodeForCounter($setup['secret'],$counter,6);if($code===null)exit(15);
+          $confirm=kicomTotpSetupConfirm($code);if(empty($confirm['ok']))exit(16);
+          // Setup confirmation intentionally consumes its TOTP step. Move the CI clock-state marker back
+          // one counter only inside this disposable fresh-install tree to test session mechanics immediately.
+          $cfg=kicomAuthJsonRead(kicomTotpFile());$cfg['last_counter']=$counter-1;if(!kicomAuthJsonWrite(kicomTotpFile(),$cfg))exit(17);
+          $session=kicomAutonomySessionOpen($code);if(empty($session['ok']))exit(18);
+          $s1=kicomAutonomySessionConsume($session['session_id'],$session['token']);if(empty($s1['ok']))exit(19);
+          $replay=kicomAutonomySessionConsume($session['session_id'],$session['token']);if(!empty($replay['ok'])||($replay['code']??'')!=='SESSION_TOKEN_REJECTED')exit(20);
+          $s2=kicomAutonomySessionConsume($session['session_id'],$s1['next_token']);if(empty($s2['ok']))exit(21);
+          $u=kicomAutonomyUploadBegin($session['session_id'],'workspace',['path'=>'ci/autonomy.txt','base_sha256'=>'NEW']);if(empty($u['ok']))exit(22);
+          $payload="autonomy-ci\n";$c=kicomAutonomyUploadChunk($session['session_id'],$u['upload_id'],0,kicomEncodeBase64Url($payload));if(empty($c['ok']))exit(23);
+          $f=kicomAutonomyUploadFinish($session['session_id'],$u['upload_id']);if(empty($f['ok'])||kicomReadStage('ci/autonomy.txt')!==$payload)exit(24);
+          $snap=json_encode(['schema'=>1,'kind'=>'ci','goal_hypotheses'=>[['title'=>'CI autonomy','description'=>'Verify direct memory archival','priority'=>'low','success_criteria'=>'snapshot stored']]],JSON_UNESCAPED_SLASHES);
+          $u2=kicomAutonomyUploadBegin($session['session_id'],'memory_snapshot',['label'=>'CI snapshot']);if(empty($u2['ok']))exit(25);
+          $c2=kicomAutonomyUploadChunk($session['session_id'],$u2['upload_id'],0,kicomEncodeBase64Url($snap));if(empty($c2['ok']))exit(26);
+          $f2=kicomAutonomyUploadFinish($session['session_id'],$u2['upload_id']);if(empty($f2['ok']))exit(27);
+          $src=kicomAutonomySourceList();if(!array_filter($src,fn($x)=>($x['path']??'')==='lib.php'))exit(28);
+          $rd=kicomAutonomySourceRead('lib.php',0,128);if(empty($rd['ok'])||empty($rd['data']))exit(29);
+          $st=kicomAutonomyStatus();if(empty($st['totp']['configured'])||empty($st['policy']['enabled']))exit(30);
+          echo "AUTONOMY_FUNCTIONAL_OK\n";
+          PHP
+            php /tmp/test096.php >>"$LOG" 2>&1
+            rc=$?; if [ $rc -ne 0 ]; then fail=$rc; failed_stage='fresh-functional'; fi
+          fi
+
+          if [ $fail -eq 0 ]; then
+            echo '== exact 0.9.5 verifier ==' >>"$LOG"
+            rm -rf /tmp/kicom095-verifier && mkdir -p /tmp/kicom095-verifier && unzip -q "$BASE" -d /tmp/kicom095-verifier
+            PACKAGE="$PKG" php -r '$p=getenv("PACKAGE");require "/tmp/kicom095-verifier/lib.php";$x=kicomSelfUpdateZipInspect($p);if(empty($x["ok"])){echo "INSPECT_CODE=".($x["code"]??"UNKNOWN")." PATH=".($x["path"]??"")."\n";exit(31);} $r=kicomSelfUpdateRiskClass($x);$c=(string)($r["class"]??"red");echo "RISK=$c\nREASONS=".json_encode($r["reasons"]??[])."\n";if(($x["version"]??"")!=="0.9.6"||($x["genome"]["id"]??"")!=="kicom-0.9.6-g7")exit(32);if($c!=="red")exit(33);' >>"$LOG" 2>&1
+            rc=$?; if [ $rc -ne 0 ]; then fail=$rc; failed_stage='verifier'; else risk="$(grep '^RISK=' "$LOG"|tail -1|cut -d= -f2)"; fi
+          fi
+
+          if [ $fail -eq 0 ]; then
+            echo '== publish bootstrap mirror ==' >>"$LOG"
+            pkg_sha="$(sha256sum "$PKG"|awk '{print $1}')"; export pkg_sha
+            mkdir -p releases/0.9.6 /tmp/kicom096-source
+            cp "$PKG" releases/0.9.6/KiCom-0.9.6-Autonomy-Bridge.zip
+            rm -rf source/0.9.6 /tmp/kicom096-source; mkdir -p source/0.9.6 /tmp/kicom096-source
+            unzip -q "$PKG" -d /tmp/kicom096-source
+            find /tmp/kicom096-source/var -mindepth 1 ! -name .htaccess -exec rm -rf {} + 2>/dev/null || true
+            find /tmp/kicom096-source/stage -mindepth 1 ! -name .htaccess -exec rm -rf {} + 2>/dev/null || true
+            cp -a /tmp/kicom096-source/. source/0.9.6/
+            python - <<'PY'
+          import json,os
+          from datetime import datetime,timezone
+          from pathlib import Path
+          sha=os.environ['pkg_sha']
+          Path('source/0.9.6/SOURCE-SNAPSHOT.json').write_text(json.dumps({'schema':1,'product':'kicom','version':'0.9.6','release_sha256':sha,'source_of_truth':'releases/0.9.6/KiCom-0.9.6-Autonomy-Bridge.zip','runtime_state_removed':True,'policy':'immutable release-derived source snapshot','github_role':'bootstrap-mirror-only'},indent=2)+'\n')
+          p=Path('channel.json');d=json.loads(p.read_text());d['releases']=[r for r in d.get('releases',[]) if r.get('version')!='0.9.6'];d['releases'].insert(0,{'version':'0.9.6','url':'https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.6/KiCom-0.9.6-Autonomy-Bridge.zip','sha256':sha,'published_at':datetime.now(timezone.utc).isoformat()});p.write_text(json.dumps(d,indent=2,ensure_ascii=False)+'\n')
+          PY
+          fi
+
+          if [ $fail -eq 0 ]; then result='success'; failed_stage='complete'; else result='failed'; fi
+          export result failed_stage fail risk pkg_sha
+          tail -c 60000 "$LOG" > build/status/0.9.6.log
+          python - <<'PY'
+          import json,os
+          from datetime import datetime,timezone
+          from pathlib import Path
+          Path('build/status/0.9.6.json').write_text(json.dumps({'schema':1,'product':'kicom','version':'0.9.6','result':os.environ['result'],'stage':os.environ['failed_stage'],'exit_code':int(os.environ['fail']),'risk':os.environ['risk'],'package_sha256':os.environ['pkg_sha'],'updated_at':datetime.now(timezone.utc).isoformat(),'trigger':'push:.github/triggers/build-096.txt','builder_sha256':'b6a5c3dcab6a2bb69cf7e7bd1cf753270cd5485e926136d8d3ff58a2654f93d8','bootstrap_transport':'github-mirror-only'},indent=2)+'\n')
+          PY
+
+          git config user.name 'kicom-bootstrap-bot'; git config user.email 'kicom-bootstrap-bot@users.noreply.github.com'
+          git add build/status/0.9.6.json build/status/0.9.6.log
+          if [ $fail -eq 0 ]; then git add releases/0.9.6 source/0.9.6 channel.json; fi
+          git commit -m "KiCom 0.9.6 build result: $result" || true
+          git push || exit 90
+          exit $fail
