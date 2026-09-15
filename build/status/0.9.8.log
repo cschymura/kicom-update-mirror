@@ -1,5 +1,5 @@
-PACKAGE_SHA256=5c6acf9a21f617772b177429d2f72e96df2098055100f5246156f88dbfe98fc9
-+ php -r require '/tmp/k097verify-4bprkv2i/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.8-Fast-Transport.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";echo "VERSION=".($x["version"]??"?")."\n";if(($x["version"]??"")!=="0.9.8"||($x["genome"]["id"]??"")!=="kicom-0.9.8-g9")exit(32);
+PACKAGE_SHA256=36ae43695877e26a0a978d8da8e2f34a8446049fa6a5aa827df187846c1218fd
++ php -r require '/tmp/k097verify-4kcllrnl/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.8-candidate.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";echo "VERSION=".($x["version"]??"?")."\n";if(($x["version"]??"")!=="0.9.8"||($x["genome"]["id"]??"")!=="kicom-0.9.8-g9")exit(32);
 RISK=red
 VERSION=0.9.8
 + php /tmp/test098.php
@@ -16,3 +16,5 @@ Traceback (most recent call last):
   File "/usr/lib/python3.12/subprocess.py", line 571, in run
     raise CalledProcessError(retcode, process.args,
 subprocess.CalledProcessError: Command '['php', '/tmp/test098.php']' returned non-zero exit status 42.
+STAGE1_RC=1
+PROJECT_STATE_SEED_MISSING
