@@ -1,0 +1,67 @@
+name: Diagnose KiCom 0.9.5 Goal Memory Build
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  diagnose:
+    if: github.event.issue.title == 'DIAGNOSE_KICOM_0.9.5'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Run diagnostic build and report result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        shell: bash
+        run: |
+          set +e
+          LOG=/tmp/kicom095-diagnostic.log
+          {
+            echo '== immutable base =='
+            sha256sum releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip
+            echo '== builder =='
+            python tools/build_095_goal_memory.py releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip /tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip
+            RC=$?
+            if [ $RC -ne 0 ]; then echo "BUILDER_FAILED rc=$RC"; exit $RC; fi
+            ROOT=/tmp/kicom095-goal-memory
+            echo '== php syntax =='
+            for f in lib.php goals_memory.php living.php index.php api.php admin.php guardian.php recovery.php; do php -l "$ROOT/$f" || exit $?; done
+            echo '== fresh install =='
+            rm -rf /tmp/kicom095-fresh && mkdir -p /tmp/kicom095-fresh
+            unzip -q /tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip -d /tmp/kicom095-fresh || exit $?
+            php -r 'require "/tmp/kicom095-fresh/lib.php"; if (KICOM_VERSION !== "0.9.5") exit(11); if(!kicomEnsureStorage()) exit(12); $s=kicomLivingStatus(); var_export($s); if(empty($s["trusted"])||empty($s["lkg_ok"])) exit(13); $g=kicomGoals(true); $m=kicomMemoryArchiveStatus(); var_export([$g["policy"]??null,$m["policy"]??null]); if(($g["policy"]??"")!=="archive-never-hard-delete"||($m["policy"]??"")!=="archive-never-hard-delete") exit(14);'
+            RC=$?
+            if [ $RC -ne 0 ]; then echo "FRESH_FAILED rc=$RC"; exit $RC; fi
+            echo '== functional =='
+            php -r 'require "/tmp/kicom095-fresh/lib.php"; $g=kicomGoalUpsert("human","Test goal","Verify persistent goal semantics","low","CI","Goal remains permissionless","ci:test",true); var_export($g); if(empty($g["ok"])) exit(21); $raw=json_encode(["schema"=>1,"kind"=>"full_snapshot","memory"=>["test"=>"ci"],"goal_hypotheses"=>[["title"=>"Memory-derived CI goal","description"=>"Verify approved memory can create a goal hypothesis","priority"=>"low","success_criteria"=>"Goal exists"]]],JSON_UNESCAPED_SLASHES); $m=kicomMemoryArchiveSnapshotStore($raw,"chatgpt_memory","CI snapshot"); var_export($m); if(empty($m["ok"])||count($m["goals_ingested"]??[])!==1) exit(22);'
+            RC=$?
+            if [ $RC -ne 0 ]; then echo "FUNCTIONAL_FAILED rc=$RC"; exit $RC; fi
+            echo '== 0.9.4 verifier =='
+            rm -rf /tmp/kicom094-verifier && mkdir -p /tmp/kicom094-verifier
+            unzip -q releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip -d /tmp/kicom094-verifier
+            PACKAGE=/tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip php -r '$p=getenv("PACKAGE"); require "/tmp/kicom094-verifier/lib.php"; $x=kicomSelfUpdateZipInspect($p); var_export($x); if(empty($x["ok"])) exit(31); $r=kicomSelfUpdateRiskClass($x); var_export($r); if(($x["version"]??"")!=="0.9.5") exit(32); if(($x["genome"]["id"]??"")!=="kicom-0.9.5-g6") exit(33); if(($r["class"]??"red")==="green") exit(34);'
+            RC=$?
+            if [ $RC -ne 0 ]; then echo "VERIFIER_FAILED rc=$RC"; exit $RC; fi
+            echo 'DIAGNOSTIC_OK'
+          } >"$LOG" 2>&1
+          RC=$?
+          tail -c 55000 "$LOG" > /tmp/tail.log
+          if [ $RC -eq 0 ]; then STATUS='✅ DIAGNOSTIC_OK'; else STATUS="❌ DIAGNOSTIC_FAILED rc=$RC"; fi
+          {
+            echo "$STATUS"
+            echo
+            echo '```text'
+            cat /tmp/tail.log
+            echo
+            echo '```'
+          } > /tmp/comment.md
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body-file /tmp/comment.md
+          exit $RC
