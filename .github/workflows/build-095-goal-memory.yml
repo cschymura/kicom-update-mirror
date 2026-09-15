@@ -1,114 +1,107 @@
 name: Build KiCom 0.9.5 Goal Layer and Memory Archive
 
 on:
-  issues:
-    types: [opened]
+  push:
+    paths:
+      - '.github/triggers/build-095-goal-memory.txt'
 
 permissions:
   contents: write
 
 jobs:
   build:
-    if: github.event.issue.title == 'BUILD_KICOM_0.9.5_GOAL_MEMORY'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
 
-      - name: Verify immutable installed 0.9.4 base
+      - name: Build, verify, publish and persist status
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
+          LOG=/tmp/kicom095-build.log
+          STATUS_DIR=build/status
+          mkdir -p "$STATUS_DIR"
+          : > "$LOG"
+
+          fail=0
+          stage='base'
+          echo '== immutable 0.9.4 base ==' >>"$LOG"
           BASE='releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip'
-          test -f "$BASE"
-          ACTUAL="$(sha256sum "$BASE" | awk '{print $1}')"
-          echo "0.9.4 base SHA-256: $ACTUAL"
-          test "$ACTUAL" = '88fa2502ff473f1477c16a215e99b1f36e2d7f57fb1f71adf5e4af2ebc158a58'
+          if [ ! -f "$BASE" ]; then echo 'BASE_MISSING' >>"$LOG"; fail=1; fi
+          if [ $fail -eq 0 ]; then
+            ACTUAL="$(sha256sum "$BASE" | awk '{print $1}')"
+            echo "base_sha256=$ACTUAL" >>"$LOG"
+            if [ "$ACTUAL" != '88fa2502ff473f1477c16a215e99b1f36e2d7f57fb1f71adf5e4af2ebc158a58' ]; then echo 'BASE_SHA_MISMATCH' >>"$LOG"; fail=1; fi
+          fi
 
-      - name: Build 0.9.5 from immutable 0.9.4
-        shell: bash
-        run: |
-          set -euo pipefail
-          python tools/build_095_goal_memory.py \
-            releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip \
-            /tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip
-          test -f /tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip
+          stage='builder'
+          if [ $fail -eq 0 ]; then
+            echo '== builder ==' >>"$LOG"
+            python tools/build_095_goal_memory.py "$BASE" /tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip >>"$LOG" 2>&1
+            rc=$?; if [ $rc -ne 0 ]; then echo "BUILDER_FAILED rc=$rc" >>"$LOG"; fail=$rc; fi
+          fi
 
-      - name: PHP syntax and fresh-install seed verification
-        shell: bash
-        run: |
-          set -euo pipefail
-          ROOT='/tmp/kicom095-goal-memory'
-          php -l "$ROOT/lib.php"
-          php -l "$ROOT/goals_memory.php"
-          php -l "$ROOT/living.php"
-          php -l "$ROOT/index.php"
-          php -l "$ROOT/api.php"
-          php -l "$ROOT/admin.php"
-          php -l "$ROOT/guardian.php"
-          php -l "$ROOT/recovery.php"
-          grep -q 'VERSION "0.9.5"' "$ROOT/memory/project_state.kcl"
-          rm -rf /tmp/kicom095-fresh
-          mkdir -p /tmp/kicom095-fresh
-          unzip -q /tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip -d /tmp/kicom095-fresh
-          php -r 'require "/tmp/kicom095-fresh/lib.php"; if (KICOM_VERSION !== "0.9.5") exit(1); if(!kicomEnsureStorage()) exit(2); $s=kicomLivingStatus(); if(empty($s["trusted"])||empty($s["lkg_ok"])) exit(3); $g=kicomGoals(true); $m=kicomMemoryArchiveStatus(); if(($g["policy"]??"")!=="archive-never-hard-delete"||($m["policy"]??"")!=="archive-never-hard-delete") exit(4); echo "FRESH_INSTALL_OK\n";'
+          stage='syntax'
+          if [ $fail -eq 0 ]; then
+            echo '== php syntax ==' >>"$LOG"
+            ROOT=/tmp/kicom095-goal-memory
+            for f in lib.php goals_memory.php living.php index.php api.php admin.php guardian.php recovery.php; do
+              php -l "$ROOT/$f" >>"$LOG" 2>&1
+              rc=$?; if [ $rc -ne 0 ]; then echo "PHP_LINT_FAILED file=$f rc=$rc" >>"$LOG"; fail=$rc; break; fi
+            done
+          fi
 
-      - name: Functional Goal Layer and private archive test
-        shell: bash
-        run: |
-          set -euo pipefail
-          php -r '
-            require "/tmp/kicom095-fresh/lib.php";
-            $g=kicomGoalUpsert("human","Test goal","Verify persistent goal semantics","low","CI","Goal remains permissionless","ci:test",true);
-            if(empty($g["ok"])) {fwrite(STDERR,json_encode($g));exit(1);}
-            $raw=json_encode(["schema"=>1,"kind"=>"full_snapshot","memory"=>["test"=>"ci"],"goal_hypotheses"=>[["title"=>"Memory-derived CI goal","description"=>"Verify approved memory can create a goal hypothesis","priority"=>"low","success_criteria"=>"Goal exists"]]],JSON_UNESCAPED_SLASHES);
-            $m=kicomMemoryArchiveSnapshotStore($raw,"chatgpt_memory","CI snapshot");
-            if(empty($m["ok"])||count($m["goals_ingested"]??[])!==1){fwrite(STDERR,json_encode($m));exit(2);}
-            $st=kicomMemoryArchiveStatus();if(($st["count"]??0)!==1)exit(3);
-            echo "GOAL_MEMORY_FUNCTIONAL_OK\n";
-          '
+          stage='fresh-install'
+          if [ $fail -eq 0 ]; then
+            echo '== fresh install ==' >>"$LOG"
+            rm -rf /tmp/kicom095-fresh && mkdir -p /tmp/kicom095-fresh
+            unzip -q /tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip -d /tmp/kicom095-fresh >>"$LOG" 2>&1
+            rc=$?
+            if [ $rc -ne 0 ]; then fail=$rc; else
+              php -r 'require "/tmp/kicom095-fresh/lib.php"; if (KICOM_VERSION !== "0.9.5") exit(11); if(!kicomEnsureStorage()) exit(12); $s=kicomLivingStatus(); if(empty($s["trusted"])||empty($s["lkg_ok"])) exit(13); $g=kicomGoals(true); $m=kicomMemoryArchiveStatus(); if(($g["policy"]??"")!=="archive-never-hard-delete"||($m["policy"]??"")!=="archive-never-hard-delete") exit(14); echo "FRESH_INSTALL_OK\n";' >>"$LOG" 2>&1
+              rc=$?; if [ $rc -ne 0 ]; then echo "FRESH_INSTALL_FAILED rc=$rc" >>"$LOG"; fail=$rc; fi
+            fi
+          fi
 
-      - name: Verify package with exact 0.9.4 verifier and require human attention
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf /tmp/kicom094-verifier
-          mkdir -p /tmp/kicom094-verifier
-          unzip -q releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip -d /tmp/kicom094-verifier
-          PACKAGE='/tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip' php -r '
-            $p=getenv("PACKAGE");
-            require "/tmp/kicom094-verifier/lib.php";
-            $x=kicomSelfUpdateZipInspect($p);
-            if(empty($x["ok"])){fwrite(STDERR,"inspect ".($x["code"]??"UNKNOWN")."\n");exit(1);}
-            $r=kicomSelfUpdateRiskClass($x);
-            $class=(string)($r["class"]??"red");
-            if(($x["version"]??"")!=="0.9.5" || ($x["genome"]["id"]??"")!=="kicom-0.9.5-g6"){fwrite(STDERR,"identity mismatch\n");exit(2);}
-            if($class==="green"){fwrite(STDERR,"Capability expansion must not be classified green\n");exit(3);}
-            echo "INSPECT_OK version=0.9.5 risk=$class\n";
-            echo "REASONS=".json_encode($r["reasons"]??[])."\n";
-          '
+          stage='functional'
+          if [ $fail -eq 0 ]; then
+            echo '== goal/memory functional test ==' >>"$LOG"
+            php -r 'require "/tmp/kicom095-fresh/lib.php"; $g=kicomGoalUpsert("human","Test goal","Verify persistent goal semantics","low","CI","Goal remains permissionless","ci:test",true); if(empty($g["ok"])) {fwrite(STDERR,json_encode($g));exit(21);} $raw=json_encode(["schema"=>1,"kind"=>"full_snapshot","memory"=>["test"=>"ci"],"goal_hypotheses"=>[["title"=>"Memory-derived CI goal","description"=>"Verify approved memory can create a goal hypothesis","priority"=>"low","success_criteria"=>"Goal exists"]]],JSON_UNESCAPED_SLASHES); $m=kicomMemoryArchiveSnapshotStore($raw,"chatgpt_memory","CI snapshot"); if(empty($m["ok"])||count($m["goals_ingested"]??[])!==1){fwrite(STDERR,json_encode($m));exit(22);} $st=kicomMemoryArchiveStatus();if(($st["count"]??0)!==1)exit(23); echo "GOAL_MEMORY_FUNCTIONAL_OK\n";' >>"$LOG" 2>&1
+            rc=$?; if [ $rc -ne 0 ]; then echo "FUNCTIONAL_FAILED rc=$rc" >>"$LOG"; fail=$rc; fi
+          fi
 
-      - name: Publish immutable release, source snapshot and mirror feed
-        shell: bash
-        run: |
-          set -euo pipefail
-          PKG='/tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip'
-          SHA="$(sha256sum "$PKG" | awk '{print $1}')"
-          export SHA
-          mkdir -p releases/0.9.5
-          cp "$PKG" releases/0.9.5/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip
-          rm -rf source/0.9.5 /tmp/kicom095-source
-          mkdir -p source/0.9.5 /tmp/kicom095-source
-          unzip -q "$PKG" -d /tmp/kicom095-source
-          find /tmp/kicom095-source/var -mindepth 1 ! -name .htaccess -exec rm -rf {} + 2>/dev/null || true
-          find /tmp/kicom095-source/stage -mindepth 1 ! -name .htaccess -exec rm -rf {} + 2>/dev/null || true
-          cp -a /tmp/kicom095-source/. source/0.9.5/
-          python - <<'PY'
+          stage='verifier'
+          risk='unknown'
+          if [ $fail -eq 0 ]; then
+            echo '== exact 0.9.4 verifier ==' >>"$LOG"
+            rm -rf /tmp/kicom094-verifier && mkdir -p /tmp/kicom094-verifier
+            unzip -q "$BASE" -d /tmp/kicom094-verifier
+            PACKAGE=/tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip php -r '$p=getenv("PACKAGE"); require "/tmp/kicom094-verifier/lib.php"; $x=kicomSelfUpdateZipInspect($p); if(empty($x["ok"])){fwrite(STDERR,"inspect ".($x["code"]??"UNKNOWN")."\n");exit(31);} $r=kicomSelfUpdateRiskClass($x); $class=(string)($r["class"]??"red"); echo "RISK=$class\n"; echo "REASONS=".json_encode($r["reasons"]??[])."\n"; if(($x["version"]??"")!=="0.9.5" || ($x["genome"]["id"]??"")!=="kicom-0.9.5-g6") exit(32); if($class==="green") exit(33);' >>"$LOG" 2>&1
+            rc=$?; if [ $rc -ne 0 ]; then echo "VERIFIER_FAILED rc=$rc" >>"$LOG"; fail=$rc; else risk="$(grep '^RISK=' "$LOG" | tail -1 | cut -d= -f2)"; fi
+          fi
+
+          stage='publish'
+          pkg_sha=''
+          if [ $fail -eq 0 ]; then
+            echo '== publish ==' >>"$LOG"
+            PKG='/tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip'
+            pkg_sha="$(sha256sum "$PKG" | awk '{print $1}')"
+            export pkg_sha
+            mkdir -p releases/0.9.5
+            cp "$PKG" releases/0.9.5/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip
+            rm -rf source/0.9.5 /tmp/kicom095-source
+            mkdir -p source/0.9.5 /tmp/kicom095-source
+            unzip -q "$PKG" -d /tmp/kicom095-source
+            find /tmp/kicom095-source/var -mindepth 1 ! -name .htaccess -exec rm -rf {} + 2>/dev/null || true
+            find /tmp/kicom095-source/stage -mindepth 1 ! -name .htaccess -exec rm -rf {} + 2>/dev/null || true
+            cp -a /tmp/kicom095-source/. source/0.9.5/
+            python - <<'PY'
           import json, os
           from datetime import datetime, timezone
           from pathlib import Path
-          sha=os.environ['SHA']
+          sha=os.environ['pkg_sha']
           Path('source/0.9.5/SOURCE-SNAPSHOT.json').write_text(json.dumps({
             'schema':1,'product':'kicom','version':'0.9.5','release_sha256':sha,
             'source_of_truth':'releases/0.9.5/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip',
@@ -118,9 +111,30 @@ jobs:
           rels.insert(0,{'version':'0.9.5','url':'https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.5/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip','sha256':sha,'published_at':datetime.now(timezone.utc).isoformat()})
           d['schema']=1;d['product']='kicom';d['releases']=rels;p.write_text(json.dumps(d,indent=2,ensure_ascii=False)+'\n')
           PY
-          echo "0.9.5 package SHA-256: $SHA"
+            echo "PACKAGE_SHA=$pkg_sha" >>"$LOG"
+          fi
+
+          if [ $fail -eq 0 ]; then result='success'; else result='failed'; fi
+          export result stage fail risk pkg_sha
+          tail -c 60000 "$LOG" > "$STATUS_DIR/0.9.5.log"
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          status={
+            'schema':1,'product':'kicom','version':'0.9.5','result':os.environ['result'],
+            'stage':os.environ['stage'],'exit_code':int(os.environ['fail']),
+            'risk':os.environ.get('risk','unknown'),'package_sha256':os.environ.get('pkg_sha',''),
+            'updated_at':datetime.now(timezone.utc).isoformat(),
+            'trigger':'push:.github/triggers/build-095-goal-memory.txt'
+          }
+          Path('build/status/0.9.5.json').write_text(json.dumps(status,indent=2)+'\n')
+          PY
+
           git config user.name 'kicom-mirror-bot'
           git config user.email 'kicom-mirror-bot@users.noreply.github.com'
-          git add releases/0.9.5 source/0.9.5 channel.json
-          git commit -m 'Publish KiCom 0.9.5 Goal Layer and memory archive'
-          git push
+          git add "$STATUS_DIR/0.9.5.json" "$STATUS_DIR/0.9.5.log"
+          if [ $fail -eq 0 ]; then git add releases/0.9.5 source/0.9.5 channel.json; fi
+          git commit -m "KiCom 0.9.5 build result: $result" || true
+          git push || exit 90
+          exit $fail
