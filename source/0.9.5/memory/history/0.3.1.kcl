@@ -1,0 +1,6 @@
+SNAPSHOT kicom version="0.3.1" date="2026-09-14"
+FACT milestone="Durable canonical project memory added"
+FACT bootstrap="?q=BOOTSTRAP"
+FACT resources="PROJECT_STATE,ARCHITECTURE,PROTOCOL,DECISIONS,CHANGELOG,NEXT"
+FACT production_write=false
+NEXT "Confirm bootstrap from external ChatGPT web access, then build workspace layer"

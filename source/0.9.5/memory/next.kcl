@@ -1,0 +1,11 @@
+NEXT kicom
+PRIORITY 1 goal="Install and verify KiCom 0.9.5 Goal Layer and persistent memory archive"
+PRIORITY 2 goal="Archive first approved ChatGPT project-memory snapshot and ingest its explicit project goal hypotheses"
+PRIORITY 3 goal="Use Goal Layer as durable input to the external Reasoning Cortex for capability-gap detection and candidate creation"
+PRIORITY 4 goal="Measure whether integrated capabilities reduce repeated work or unlock previously unreachable tasks"
+PRIORITY 5 goal="Evolve toward KiCom 1.0 defined by a complete experience -> goal -> capability-gap -> candidate -> fitness -> integration -> measured-result loop"
+CONSTRAINT "Goals cannot grant runtime permissions"
+CONSTRAINT "Do not hard-delete canonical goals or memory snapshots; archive or supersede instead"
+CONSTRAINT "Do not expose memory snapshot payload through public KCL"
+CONSTRAINT "Preserve Genome, LKG, recovery-kernel and risk-class boundaries"
+END_NEXT kicom

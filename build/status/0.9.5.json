@@ -2,11 +2,12 @@
   "schema": 1,
   "product": "kicom",
   "version": "0.9.5",
-  "result": "failed",
-  "stage": "publish",
-  "exit_code": 31,
-  "risk": "unknown",
-  "package_sha256": "",
-  "updated_at": "2026-09-15T07:17:50.361639+00:00",
-  "trigger": "push:.github/triggers/build-095-goal-memory.txt"
+  "result": "success",
+  "stage": "complete",
+  "exit_code": 0,
+  "risk": "red",
+  "package_sha256": "a65f35786eb010c8ebf5bfca12db64125ff0829d0b56db4ee83a271a0fc34790",
+  "updated_at": "2026-09-15T07:20:15.430306+00:00",
+  "trigger": "push:.github/triggers/build-095-r2.txt",
+  "builder": "allowlist-compatible"
 }

@@ -1,0 +1,9 @@
+CHANGELOG kicom
+RELEASE "0.9.0" date="2026-09-14" change="Trusted Genome, recovery kernel, LKG and Living Architecture"
+RELEASE "0.9.1" date="2026-09-14" change="Autonomous Immune Guardian"
+RELEASE "0.9.2" date="2026-09-15" change="Human Control Plane plus redundant HTTPS pull and authenticated push update channels"
+RELEASE "0.9.3" date="2026-09-15" change="Per-feed update diagnostics"
+RELEASE "0.9.4" date="2026-09-15" change="Autonomous evolution loop, safety stop, separate evolution generations and Epoch reports"
+RELEASE "0.9.5" date="2026-09-15" change="Persistent Goal Layer, append-only ChatGPT memory archive, bounded LLM ingest channel, no-hard-delete policy and reproducible release source snapshots"
+EVENT "2026-09-15" change="0.9.4 immutable release exported to source/0.9.4 and repository policy established: every future release keeps a sanitized source snapshot"
+END_CHANGELOG kicom

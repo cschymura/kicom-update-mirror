@@ -1,0 +1,18 @@
+PROTOCOL KCL/1
+SEMANTIC FACT="verified observation returned by KiCom"
+SEMANTIC READY="accepted request requiring approval or further action"
+GOALS read="?q=GOALS"
+MEMORY_ARCHIVE status="?q=MEMORY_ARCHIVE_STATUS"
+MEMORY_ARCHIVE list="?q=MEMORY_ARCHIVE_LIST"
+MEMORY_ARCHIVE begin="?q=BRIDGE_INTENT&operation=MEMORY_ARCHIVE_BEGIN&target=chatgpt_memory then ?q=MEMORY_ARCHIVE_BEGIN&intent=<token>&label=<label>"
+MEMORY_ARCHIVE chunk="?q=MEMORY_ARCHIVE_CHUNK&upload_id=<id>&token=<upload_token>&seq=<n>&data=<base64url>"
+MEMORY_ARCHIVE finish="?q=MEMORY_ARCHIVE_FINISH&upload_id=<id>&token=<upload_token>"
+POST goal_propose="api.php operation=GOAL_PROPOSE content=<base64url-json>"
+POST memory_snapshot_propose="api.php operation=CHATGPT_MEMORY_SNAPSHOT_PROPOSE content=<base64url-json>"
+RULE "Goal and memory archive final writes require human approval when supplied externally"
+RULE "System-experience goals may be derived internally from trusted Living Insights"
+RULE "Goals cannot change runtime permissions"
+RULE "Archive payload is not exposed by public KCL"
+RULE "No hard-delete operation exists for canonical goals or memory snapshots"
+RULE "Transient ingest sessions expire and are bounded to 262144 payload bytes"
+END_PROTOCOL KCL/1

@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.5",
+  "release_sha256": "a65f35786eb010c8ebf5bfca12db64125ff0829d0b56db4ee83a271a0fc34790",
+  "source_of_truth": "releases/0.9.5/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip",
+  "runtime_state_removed": true,
+  "policy": "immutable release-derived source snapshot"
+}

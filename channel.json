@@ -3,6 +3,12 @@
   "product": "kicom",
   "releases": [
     {
+      "version": "0.9.5",
+      "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.5/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip",
+      "sha256": "a65f35786eb010c8ebf5bfca12db64125ff0829d0b56db4ee83a271a0fc34790",
+      "published_at": "2026-09-15T07:20:15.400735+00:00"
+    },
+    {
       "version": "0.9.4",
       "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip",
       "sha256": "88fa2502ff473f1477c16a215e99b1f36e2d7f57fb1f71adf5e4af2ebc158a58",

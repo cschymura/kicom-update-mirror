@@ -1,0 +1,18 @@
+DECISIONS kicom
+DECISION D015 status=accepted title="Adopt Living Architecture"
+RATIONALE D015 "KiCom uses genome, phenotype, recovery kernel, immune system, LKG, experience and controlled evolution"
+DECISION D016 status=accepted title="Separate genome, memory and phenotype"
+RATIONALE D016 "Blueprint, learned history and running state cannot silently redefine one another"
+DECISION D017 status=accepted title="Healing restores trusted state; evolution is risk-proportional"
+RATIONALE D017 "Known-good repair may be automatic; novel executable capability follows fitness and risk policy"
+DECISION D018 status=accepted title="Persist a general Goal Layer"
+RATIONALE D018 "Human intent, ChatGPT-memory hypotheses and system experience need a common durable goal representation between memory and evolution"
+DECISION D019 status=accepted title="Goals never grant permissions"
+RATIONALE D019 "A desired outcome may reveal a capability gap but cannot expand shell, network, deployment or filesystem authority"
+DECISION D020 status=accepted title="Archive ChatGPT memory append-only"
+RATIONALE D020 "Historical context should remain reconstructable; superseding and archiving are preferred over destructive deletion"
+DECISION D021 status=accepted title="Do not expose memory archive payload through public KCL"
+RATIONALE D021 "Backup may contain private context; public interfaces return metadata and hashes only"
+DECISION D022 status=accepted title="Keep release-derived source snapshots"
+RATIONALE D022 "Future capability work must never depend on recovering source through an LLM-hostile binary transport"
+END_DECISIONS kicom
