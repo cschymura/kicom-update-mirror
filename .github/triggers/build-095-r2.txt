@@ -1,0 +1,3 @@
+trigger=BUILD_KICOM_0.9.5_R2
+requested_at=2026-09-15T07:25:00Z
+constraint=stay within KiCom 0.9.4 executable path allowlist
