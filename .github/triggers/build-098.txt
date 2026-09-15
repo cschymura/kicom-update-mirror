@@ -1,2 +1,3 @@
 KiCom 0.9.8 Fast Transport build trigger
 Goal: transport_performance / 1da1bd2cbad9f55072eb3b6e
+Retry: 2 — include canonical memory seeds in package
