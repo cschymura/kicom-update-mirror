@@ -3,6 +3,12 @@
   "product": "kicom",
   "releases": [
     {
+      "version": "0.9.3",
+      "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.3/KiCom-0.9.3-Feed-Diagnostics.zip",
+      "sha256": "7bc33a5b5188548ea3d3b15065b5de6de38282b18cf24d141f9ec4ec6a958031",
+      "published_at": "2026-09-15T04:15:00+02:00"
+    },
+    {
       "version": "0.9.2",
       "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.2/KiCom-0.9.2-R2.zip",
       "sha256": "b46cd8205449d98b5dd048f995cdb88da05a1443f81b7027e6d24da40024b1fd",
