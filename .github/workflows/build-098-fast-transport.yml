@@ -1,0 +1,99 @@
+name: Build KiCom 0.9.8 Fast Transport
+
+on:
+  push:
+    paths:
+      - '.github/triggers/build-098.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Build verify publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='releases/0.9.7/KiCom-0.9.7-Resilient-Autonomy.zip'
+          OUT='/tmp/KiCom-0.9.8-Fast-Transport.zip'
+          LOG='build/status/0.9.8.log'
+          BUILDER='/tmp/build_098_fast_transport.py'
+          mkdir -p build/status releases/0.9.8 source/0.9.8
+          base64 -d tools/build_098_fast_transport.py.gz.b64 | gzip -dc > "$BUILDER"
+          python -m py_compile "$BUILDER"
+          : > "$LOG"
+          result=failed
+          stage=builder
+          risk=unknown
+          pkg_sha=''
+          set +e
+          python "$BUILDER" "$BASE" "$OUT" >"$LOG" 2>&1
+          rc=$?
+          set -e
+          if [ -f "$LOG" ]; then
+            risk="$(grep -E '^RISK=' "$LOG" | tail -1 | cut -d= -f2 || true)"
+            [ -n "$risk" ] || risk=unknown
+          fi
+          if [ $rc -eq 0 ] && [ -f "$OUT" ]; then
+            stage=publish
+            pkg_sha="$(sha256sum "$OUT" | awk '{print $1}')"
+            cp "$OUT" releases/0.9.8/KiCom-0.9.8-Fast-Transport.zip
+            rm -rf /tmp/k098src source/0.9.8
+            mkdir -p /tmp/k098src source/0.9.8
+            unzip -q "$OUT" -d /tmp/k098src
+            cp -a /tmp/k098src/. source/0.9.8/
+            export pkg_sha
+            python - <<'PY'
+          import json, os
+          from pathlib import Path
+          from datetime import datetime, timezone
+          p=Path('channel.json'); d=json.loads(p.read_text())
+          v='0.9.8'; sha=os.environ['pkg_sha']
+          d['releases']=[r for r in d.get('releases',[]) if r.get('version')!=v]
+          d['releases'].insert(0,{
+            'version':v,
+            'url':'https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.8/KiCom-0.9.8-Fast-Transport.zip',
+            'sha256':sha,
+            'published_at':datetime.now(timezone.utc).isoformat()
+          })
+          p.write_text(json.dumps(d,indent=2,ensure_ascii=False)+'\n')
+          Path('source/0.9.8/SOURCE-SNAPSHOT.json').write_text(json.dumps({
+            'schema':1,'product':'kicom','version':v,'release_sha256':sha,
+            'source_of_truth':'releases/0.9.8/KiCom-0.9.8-Fast-Transport.zip',
+            'runtime_state_removed':True,
+            'policy':'immutable release-derived install/update source snapshot',
+            'github_role':'temporary-fallback-transport-only; KiCom remains authority'
+          },indent=2)+'\n')
+          PY
+            result=success
+            stage=complete
+          fi
+          export result stage rc risk pkg_sha
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          from datetime import datetime,timezone
+          Path('build/status/0.9.8.json').write_text(json.dumps({
+            'schema':1,'product':'kicom','version':'0.9.8',
+            'result':os.environ['result'],'stage':os.environ['stage'],
+            'exit_code':int(os.environ['rc']),'risk':os.environ['risk'],
+            'package_sha256':os.environ['pkg_sha'],
+            'updated_at':datetime.now(timezone.utc).isoformat(),
+            'transport_role':'temporary fallback only; 0.9.8 adds first-party server-side candidate builds'
+          },indent=2)+'\n')
+          PY
+          git config user.name 'kicom-bootstrap-bot'
+          git config user.email 'kicom-bootstrap-bot@users.noreply.github.com'
+          git add build/status/0.9.8.json build/status/0.9.8.log
+          if [ "$result" = success ]; then
+            git add releases/0.9.8 source/0.9.8 channel.json
+          fi
+          git commit -m "KiCom 0.9.8 build result: $result" || true
+          git push
+          exit "$rc"
