@@ -1,5 +1,5 @@
-PACKAGE_SHA256=7df38338cffc41abfcf9f21aaa8e35d7de949233288940fbfed311e30b9f4ac6
-+ php -r require '/tmp/k097verify-ffdxxi5l/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.8-Fast-Transport.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";echo "VERSION=".($x["version"]??"?")."\n";if(($x["version"]??"")!=="0.9.8"||($x["genome"]["id"]??"")!=="kicom-0.9.8-g9")exit(32);
+PACKAGE_SHA256=5c6acf9a21f617772b177429d2f72e96df2098055100f5246156f88dbfe98fc9
++ php -r require '/tmp/k097verify-4bprkv2i/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.8-Fast-Transport.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";echo "VERSION=".($x["version"]??"?")."\n";if(($x["version"]??"")!=="0.9.8"||($x["genome"]["id"]??"")!=="kicom-0.9.8-g9")exit(32);
 RISK=red
 VERSION=0.9.8
 + php /tmp/test098.php
