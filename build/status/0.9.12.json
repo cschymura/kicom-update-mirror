@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.12",
+  "result": "success",
+  "stage": "complete",
+  "exit_code": 0,
+  "risk": "red",
+  "package_sha256": "a027bff93992e0ad0ab4a815f0b0319620110d659b554d502a1b3fdb3fadbfe6",
+  "updated_at": "2026-09-15T18:20:40.609960+00:00",
+  "transport_role": "optional mirror build transport; package verified by 0.9.11 verifier and regression suite"
+}

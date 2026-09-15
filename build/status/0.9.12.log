@@ -1,0 +1,20 @@
+PACKAGE_SHA256=a027bff93992e0ad0ab4a815f0b0319620110d659b554d502a1b3fdb3fadbfe6
++ php -r require '/home/runner/work/kicom-update-mirror/kicom-update-mirror/source/0.9.11/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.12-Session-TOTP-Grace.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$q=kicomSelfUpdateRiskClass($x);echo "RISK=".($q["class"]??"?")."\nVERSION=".($x["version"]??"?")."\n";if(($x["version"]??"")!=="0.9.12"||($x["genome"]["id"]??"")!=="kicom-0.9.12-g13")exit(32);
+RISK=red
+VERSION=0.9.12
++ php -l /tmp/k0912-q4_2cf93/admin.php
+No syntax errors detected in /tmp/k0912-q4_2cf93/admin.php
++ php -l /tmp/k0912-q4_2cf93/api.php
+No syntax errors detected in /tmp/k0912-q4_2cf93/api.php
++ php -l /tmp/k0912-q4_2cf93/guardian.php
+No syntax errors detected in /tmp/k0912-q4_2cf93/guardian.php
++ php -l /tmp/k0912-q4_2cf93/index.php
+No syntax errors detected in /tmp/k0912-q4_2cf93/index.php
++ php -l /tmp/k0912-q4_2cf93/lib.php
+No syntax errors detected in /tmp/k0912-q4_2cf93/lib.php
++ php -l /tmp/k0912-q4_2cf93/living.php
+No syntax errors detected in /tmp/k0912-q4_2cf93/living.php
++ php -l /tmp/k0912-q4_2cf93/recovery.php
+No syntax errors detected in /tmp/k0912-q4_2cf93/recovery.php
++ php /tmp/test0912.php
+SESSION_TOTP_GRACE_OK

@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.12",
+  "release_sha256": "a027bff93992e0ad0ab4a815f0b0319620110d659b554d502a1b3fdb3fadbfe6",
+  "source_of_truth": "releases/0.9.12/KiCom-0.9.12-Session-TOTP-Grace.zip",
+  "runtime_state_removed": true,
+  "policy": "immutable release-derived install/update source snapshot",
+  "github_role": "optional external mirror/fallback transport only; KiCom remains authority"
+}
