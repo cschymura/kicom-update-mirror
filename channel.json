@@ -3,6 +3,12 @@
   "product": "kicom",
   "releases": [
     {
+      "version": "0.9.7",
+      "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.7/KiCom-0.9.7-Resilient-Autonomy.zip",
+      "sha256": "608b886d6adab24e4226e1fc6d2c2f07a5937f12e7817ffa2fd0817b5902690f",
+      "published_at": "2026-09-15T10:40:31.671588+00:00"
+    },
+    {
       "version": "0.9.6",
       "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.6/KiCom-0.9.6-Autonomy-Bridge.zip",
       "sha256": "02120f28a953f01987fa1f650a77ee6bfe4dc3c0bf685ca2ef48d512987baef9",

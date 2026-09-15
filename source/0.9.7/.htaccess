@@ -1,0 +1,23 @@
+Options -Indexes
+ServerSignature Off
+
+<IfModule mod_headers.c>
+  Header always set X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, noimageindex"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Cache-Control "no-store, private, max-age=0"
+  Header always unset X-Powered-By
+  Header always unset ETag
+</IfModule>
+FileETag None
+
+# Internal implementation/package metadata is never meant to be fetched directly.
+<FilesMatch "^(lib\.php|living\.php|README\.md|MANIFEST\.sha256)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Deny from all
+  </IfModule>
+</FilesMatch>

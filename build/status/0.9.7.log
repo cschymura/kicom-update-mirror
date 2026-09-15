@@ -1,7 +1,8 @@
-PACKAGE_SHA256=b032a014dedc1f4fda2a14a34cebae189f0becd8b2d6230c350c63af3af5ed16
++ /usr/bin/python tools/build_097_resilient_autonomy.py releases/0.9.6/KiCom-0.9.6-Autonomy-Bridge.zip /tmp/KiCom-0.9.7-Resilient-Autonomy.zip
+PACKAGE_SHA256=4019096687b913812189362176a33d10896929e315cd98e395628a228de2f527
 LIVING_SHA256=937ff6e09de086170cd2abc1e8b69d7703e5565e9972de27d018145bac48f131
 LIB_SHA256=010506f513dc7683adb4f7c27c3132277cf8ed20a2a8ced3a1acb7ff1268440f
-+ php -r require '/tmp/kicom096-verify-fp6heeom/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.7-Resilient-Autonomy.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";if(($x["version"]??"")!=="0.9.7"||($x["genome"]["id"]??"")!=="kicom-0.9.7-g8")exit(32);if(($r["class"]??"")!=="yellow")exit(33);
++ php -r require '/tmp/kicom096-verify-drclfil5/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.7-Resilient-Autonomy.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";if(($x["version"]??"")!=="0.9.7"||($x["genome"]["id"]??"")!=="kicom-0.9.7-g8")exit(32);if(($r["class"]??"")!=="yellow")exit(33);
 RISK=yellow
 + php /tmp/test097.php
 Traceback (most recent call last):
@@ -17,3 +18,8 @@ Traceback (most recent call last):
   File "/usr/lib/python3.12/subprocess.py", line 571, in run
     raise CalledProcessError(retcode, process.args,
 subprocess.CalledProcessError: Command '['php', '/tmp/test097.php']' returned non-zero exit status 42.
+FINAL_PACKAGE_SHA256=608b886d6adab24e4226e1fc6d2c2f07a5937f12e7817ffa2fd0817b5902690f
++ php -r require '/tmp/k096verify-kuffj56y/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.7-Resilient-Autonomy.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";if(($r["class"]??"")!=="yellow")exit(32);
+RISK=yellow
++ php /tmp/test097v2.php
+FRESH_RESILIENT_AUTONOMY_OK

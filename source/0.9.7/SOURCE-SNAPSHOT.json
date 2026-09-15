@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.7",
+  "release_sha256": "608b886d6adab24e4226e1fc6d2c2f07a5937f12e7817ffa2fd0817b5902690f",
+  "source_of_truth": "releases/0.9.7/KiCom-0.9.7-Resilient-Autonomy.zip",
+  "runtime_state_removed": true,
+  "policy": "immutable release-derived install/update source snapshot",
+  "github_role": "temporary-fallback-transport-only"
+}
