@@ -7,6 +7,6 @@
   "exit_code": 1,
   "risk": "unknown",
   "package_sha256": "",
-  "updated_at": "2026-09-15T17:37:59.097869+00:00",
-  "transport_role": "temporary mirror transport; package verified by 0.9.10 verifier and regression suite"
+  "updated_at": "2026-09-15T17:39:42.979890+00:00",
+  "attempt": "v2"
 }
