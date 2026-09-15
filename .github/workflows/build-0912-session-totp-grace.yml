@@ -3,7 +3,7 @@ name: Build KiCom 0.9.12 Session TOTP Grace
 on:
   push:
     paths:
-      - '.github/triggers/build-0912.txt'
+      - 'tools/build_0912_session_totp_grace.py'
 
 permissions:
   contents: write
