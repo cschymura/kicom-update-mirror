@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.6",
+  "result": "failed",
+  "stage": "verifier",
+  "exit_code": 31,
+  "risk": "unknown",
+  "package_sha256": "",
+  "updated_at": "2026-09-15T08:19:20.434312+00:00",
+  "trigger": "push:.github/triggers/build-096.txt",
+  "builder_sha256": "b6a5c3dcab6a2bb69cf7e7bd1cf753270cd5485e926136d8d3ff58a2654f93d8",
+  "bootstrap_transport": "github-mirror-only"
+}
