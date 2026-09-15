@@ -1,0 +1,91 @@
+name: Export KiCom 0.9.4 Source Snapshot
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    if: github.event.issue.title == 'EXPORT_KICOM_0.9.4_SOURCE'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Verify immutable 0.9.4 release
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip'
+          test -f "$BASE"
+          ACTUAL="$(sha256sum "$BASE" | awk '{print $1}')"
+          echo "0.9.4 package SHA-256: $ACTUAL"
+          test "$ACTUAL" = '88fa2502ff473f1477c16a215e99b1f36e2d7f57fb1f71adf5e4af2ebc158a58'
+
+      - name: Export sanitized source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf source/0.9.4 /tmp/kicom094-source
+          mkdir -p source/0.9.4 /tmp/kicom094-source
+          unzip -q releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip -d /tmp/kicom094-source
+          find /tmp/kicom094-source/var -mindepth 1 ! -name .htaccess -exec rm -rf {} + 2>/dev/null || true
+          find /tmp/kicom094-source/stage -mindepth 1 ! -name .htaccess -exec rm -rf {} + 2>/dev/null || true
+          cp -a /tmp/kicom094-source/. source/0.9.4/
+          cat > source/0.9.4/SOURCE-SNAPSHOT.json <<'JSON'
+          {
+            "schema": 1,
+            "product": "kicom",
+            "version": "0.9.4",
+            "release_sha256": "88fa2502ff473f1477c16a215e99b1f36e2d7f57fb1f71adf5e4af2ebc158a58",
+            "source_of_truth": "releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip",
+            "runtime_state_removed": true,
+            "policy": "immutable release-derived source snapshot"
+          }
+          JSON
+
+      - name: Verify snapshot identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -r 'require "source/0.9.4/lib.php"; if (KICOM_VERSION !== "0.9.4") exit(1); echo "SOURCE_VERSION_OK\n";'
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          g=json.loads(Path('source/0.9.4/genome/genome.json').read_text())
+          assert g['id']=='kicom-0.9.4-g5'
+          assert g['version']=='0.9.4'
+          PY
+
+      - name: Publish source snapshot and reproducibility policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p source
+          cat > source/README.md <<'EOF'
+          # KiCom release source snapshots
+
+          Every published KiCom release must keep both:
+
+          1. the immutable install ZIP under `releases/<version>/`, and
+          2. a sanitized, release-derived source snapshot under `source/<version>/`.
+
+          Runtime state under `var/` and `stage/` is never copied into a source snapshot (protective `.htaccess` files may remain).
+
+          A new release build must be reproducible from the immediately preceding immutable release or its source snapshot, must publish its own source snapshot in the same commit as the release, and must preserve the release SHA-256 in `SOURCE-SNAPSHOT.json`.
+
+          This policy exists so future development never depends on extracting binary ZIP data through an LLM transport.
+          EOF
+          git config user.name 'kicom-mirror-bot'
+          git config user.email 'kicom-mirror-bot@users.noreply.github.com'
+          git add source/0.9.4 source/README.md
+          if git diff --cached --quiet; then
+            echo 'Source snapshot already current.'
+            exit 0
+          fi
+          git commit -m 'Archive reproducible KiCom 0.9.4 source snapshot'
+          git push
