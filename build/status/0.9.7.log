@@ -1,0 +1,19 @@
+PACKAGE_SHA256=b032a014dedc1f4fda2a14a34cebae189f0becd8b2d6230c350c63af3af5ed16
+LIVING_SHA256=937ff6e09de086170cd2abc1e8b69d7703e5565e9972de27d018145bac48f131
+LIB_SHA256=010506f513dc7683adb4f7c27c3132277cf8ed20a2a8ced3a1acb7ff1268440f
++ php -r require '/tmp/kicom096-verify-fp6heeom/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.7-Resilient-Autonomy.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";if(($x["version"]??"")!=="0.9.7"||($x["genome"]["id"]??"")!=="kicom-0.9.7-g8")exit(32);if(($r["class"]??"")!=="yellow")exit(33);
+RISK=yellow
++ php /tmp/test097.php
+Traceback (most recent call last):
+  File "/home/runner/work/kicom-update-mirror/kicom-update-mirror/tools/build_097_resilient_autonomy.py", line 174, in <module>
+    if __name__=='__main__': main()
+                             ^^^^^^
+  File "/home/runner/work/kicom-update-mirror/kicom-update-mirror/tools/build_097_resilient_autonomy.py", line 168, in main
+    rr=run(['php',str(script)]); print(rr.stdout,end='')
+       ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/kicom-update-mirror/kicom-update-mirror/tools/build_097_resilient_autonomy.py", line 53, in run
+    return subprocess.run(cmd, check=True, text=True, capture_output=True, **kw)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['php', '/tmp/test097.php']' returned non-zero exit status 42.

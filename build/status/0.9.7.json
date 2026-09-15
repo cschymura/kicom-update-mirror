@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.7",
+  "result": "failed",
+  "stage": "builder",
+  "exit_code": 1,
+  "risk": "unknown",
+  "package_sha256": "",
+  "updated_at": "2026-09-15T10:38:34.394652+00:00",
+  "transport_role": "temporary-fallback-mirror; KiCom remains authority"
+}
