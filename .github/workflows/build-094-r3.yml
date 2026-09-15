@@ -1,0 +1,164 @@
+name: Build KiCom 0.9.4 Autonomous Evolution R3
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.event.issue.title == 'BUILD_KICOM_0.9.4_AUTONOMOUS_EVOLUTION_R3'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Verify exact installed 0.9.3 base
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='releases/0.9.3/KiCom-0.9.3-Feed-Diagnostics.zip'
+          test -f "$BASE"
+          ACTUAL="$(sha256sum "$BASE" | awk '{print $1}')"
+          echo "0.9.3 base SHA-256: $ACTUAL"
+          test "$ACTUAL" = '7bc33a5b5188548ea3d3b15065b5de6de38282b18cf24d141f9ec4ec6a958031'
+          rm -rf /tmp/kicom094 /tmp/kicom093-inspect
+          mkdir -p /tmp/kicom094 /tmp/kicom093-inspect
+          unzip -q "$BASE" -d /tmp/kicom094
+          unzip -q "$BASE" -d /tmp/kicom093-inspect
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          g=json.loads(Path('/tmp/kicom094/genome/genome.json').read_text())
+          assert g['id']=='kicom-0.9.3-g4'
+          assert g['version']=='0.9.3'
+          assert g['parent']=='kicom-0.9.2-g3'
+          PY
+          php -r 'require "/tmp/kicom093-inspect/lib.php"; if (KICOM_VERSION !== "0.9.3") exit(1); echo "BASE_IDENTITY_OK\n";'
+
+      - name: Verify and apply reviewed code patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode build/0.9.4/core.patch.gz.b64 | gzip --decompress > /tmp/kicom094-full.patch
+          PATCH_SHA="$(sha256sum /tmp/kicom094-full.patch | awk '{print $1}')"
+          echo "Reviewed full patch SHA-256: $PATCH_SHA"
+          test "$PATCH_SHA" = 'f99b58d76776c9d4106eb2c655efd6f2242ca7e7aac6c44d152bf4605df38a4a'
+          python - <<'PY'
+          from pathlib import Path
+          src=Path('/tmp/kicom094-full.patch').read_text()
+          blocks=[]
+          for part in src.split('--- a/'):
+              if not part:
+                  continue
+              path=part.split('\n',1)[0]
+              if path=='README.md':
+                  continue
+              blocks.append('--- a/'+part)
+          Path('/tmp/kicom094-code.patch').write_text(''.join(blocks))
+          PY
+          patch --batch --forward -p1 -d /tmp/kicom094 < /tmp/kicom094-code.patch
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/kicom094/README.md')
+          lines=p.read_text().splitlines()
+          if lines:
+              lines[0]='# KiCom 0.9.4 – Autonomous Evolution Epochs'
+          text='\n'.join(lines).rstrip()+'\n'
+          section='''\n## 0.9.4 – Autonomous Evolution Epochs\n- Evolution loop runs from the existing Update-Agent cadence; no new cron secret is required.\n- Derives non-executable improvement goals from Living Insights.\n- FIT green candidates can be promoted and installed autonomously after the same manifest, SHA-256, Genome, backup and healthcheck path.\n- Yellow/red candidates remain human-gated.\n- Product version and evolution generation are separate.\n- Every 10 successful evolutionary generations creates a protected Epoch report plus LKG metadata snapshot.\n- Evolution stops immediately on untrusted Genome, missing LKG, drift, unknown code or kernel drift.\n- A human can pause/resume autonomy at any time.\n'''
+          if '## 0.9.4 – Autonomous Evolution Epochs' not in text:
+              text += section
+          p.write_text(text)
+          PY
+          find /tmp/kicom094/var -mindepth 1 ! -name .htaccess -exec rm -rf {} +
+          find /tmp/kicom094/stage -mindepth 1 ! -name .htaccess -exec rm -rf {} +
+
+      - name: Verify Genome, components and PHP
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json
+          root=Path('/tmp/kicom094')
+          g=json.loads((root/'genome/genome.json').read_text())
+          assert g['id']=='kicom-0.9.4-g5'
+          assert g['version']=='0.9.4'
+          assert g['parent']=='kicom-0.9.3-g4'
+          assert g['generation']==5
+          assert g.get('evolution',{}).get('autonomous_loop') is True
+          assert g.get('evolution',{}).get('epoch_size')==10
+          assert g.get('evolution',{}).get('counts_as_generation') is False
+          for c in g['components']:
+              p=root/c['path']
+              actual=hashlib.sha256(p.read_bytes()).hexdigest()
+              assert actual==c['sha256'], (c['path'],actual,c['sha256'])
+          rows=[]
+          for p in sorted(root.rglob('*')):
+              if not p.is_file(): continue
+              rel=p.relative_to(root).as_posix()
+              if rel=='MANIFEST.sha256': continue
+              rows.append(f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {rel}\n")
+          (root/'MANIFEST.sha256').write_text(''.join(rows))
+          PY
+          php -l /tmp/kicom094/lib.php
+          php -l /tmp/kicom094/living.php
+          php -l /tmp/kicom094/admin.php
+          php -l /tmp/kicom094/index.php
+          php -l /tmp/kicom094/api.php
+
+      - name: Package and inspect with KiCom 0.9.3 verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE='/tmp/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip'
+          rm -f "$PACKAGE"
+          (cd /tmp/kicom094 && zip -q -r "$PACKAGE" .)
+          PACKAGE="$PACKAGE" php -r '
+            $p=getenv("PACKAGE");
+            require "/tmp/kicom093-inspect/lib.php";
+            $x=kicomSelfUpdateZipInspect($p);
+            if(empty($x["ok"])){fwrite(STDERR,"inspect ".($x["code"]??"UNKNOWN")."\n");exit(1);}
+            $r=kicomSelfUpdateRiskClass($x);
+            if(($x["version"]??"")!=="0.9.4" || ($x["genome"]["id"]??"")!=="kicom-0.9.4-g5" || ($r["class"]??"")!=="yellow"){
+              fwrite(STDERR,json_encode([$x["version"]??null,$x["genome"]["id"]??null,$r])."\n");exit(1);
+            }
+            echo "INSPECT_OK version=0.9.4 risk=yellow\n";
+          '
+          mkdir -p releases/0.9.4
+          rm -f releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip
+          mv "$PACKAGE" releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip
+
+      - name: Publish 0.9.4 mirror feed entry
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHA="$(sha256sum releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip | awk '{print $1}')"
+          export SHA
+          echo "0.9.4 package SHA-256: $SHA"
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone
+          from pathlib import Path
+          p=Path('channel.json')
+          d=json.loads(p.read_text())
+          releases=[r for r in d.get('releases',[]) if r.get('version')!='0.9.4']
+          releases.insert(0,{
+            'version':'0.9.4',
+            'url':'https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip',
+            'sha256':os.environ['SHA'],
+            'published_at':datetime.now(timezone.utc).isoformat()
+          })
+          d['schema']=1
+          d['product']='kicom'
+          d['releases']=releases
+          p.write_text(json.dumps(d,indent=2,ensure_ascii=False)+'\n')
+          PY
+          git config user.name 'kicom-mirror-bot'
+          git config user.email 'kicom-mirror-bot@users.noreply.github.com'
+          git add releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip channel.json
+          git commit -m 'Publish KiCom 0.9.4 autonomous evolution epochs'
+          git push
