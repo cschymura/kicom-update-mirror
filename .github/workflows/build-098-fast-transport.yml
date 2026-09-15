@@ -21,21 +21,37 @@ jobs:
         run: |
           set -euo pipefail
           BASE='releases/0.9.7/KiCom-0.9.7-Resilient-Autonomy.zip'
+          CAND='/tmp/KiCom-0.9.8-candidate.zip'
           OUT='/tmp/KiCom-0.9.8-Fast-Transport.zip'
           LOG='build/status/0.9.8.log'
           BUILDER='/tmp/build_098_fast_transport.py'
           mkdir -p build/status releases/0.9.8 source/0.9.8
           base64 -d tools/build_098_fast_transport.py.gz.b64 | gzip -dc > "$BUILDER"
           python -m py_compile "$BUILDER"
+          python -m py_compile tools/finalize_098_fast_transport.py
           : > "$LOG"
           result=failed
           stage=builder
           risk=unknown
           pkg_sha=''
+
+          # Stage 1 may deliberately stop at its old fresh-install assertion, but it must
+          # have produced a verifier-accepted candidate before the finalizer may run.
           set +e
-          python "$BUILDER" "$BASE" "$OUT" >"$LOG" 2>&1
-          rc=$?
+          python "$BUILDER" "$BASE" "$CAND" >"$LOG" 2>&1
+          builder_rc=$?
           set -e
+          echo "STAGE1_RC=$builder_rc" >>"$LOG"
+
+          rc=1
+          if [ -f "$CAND" ]; then
+            stage=finalize
+            set +e
+            python tools/finalize_098_fast_transport.py "$BASE" "$CAND" "$OUT" >>"$LOG" 2>&1
+            rc=$?
+            set -e
+          fi
+
           if [ -f "$LOG" ]; then
             risk="$(grep -E '^RISK=' "$LOG" | tail -1 | cut -d= -f2 || true)"
             [ -n "$risk" ] || risk=unknown
