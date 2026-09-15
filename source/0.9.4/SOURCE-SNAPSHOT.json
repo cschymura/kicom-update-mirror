@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.4",
+  "release_sha256": "88fa2502ff473f1477c16a215e99b1f36e2d7f57fb1f71adf5e4af2ebc158a58",
+  "source_of_truth": "releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip",
+  "runtime_state_removed": true,
+  "policy": "immutable release-derived source snapshot"
+}

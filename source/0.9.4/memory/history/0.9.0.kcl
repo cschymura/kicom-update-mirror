@@ -1,0 +1,5 @@
+HISTORY kicom version="0.9.0"
+CHANGE "Added Living Architecture: genome/DNA, standalone recovery kernel, immune scan, LKG, genome backup recovery, quarantine, Guardian cron, autonomous reversible healing, experience log, candidate Evolution Lab, deterministic fitness, lineage and human-gated genome promotion"
+RULE "Genome, memory and phenotype are separate trust domains"
+RULE "Recovery kernel is not auto-healed"
+END_HISTORY kicom

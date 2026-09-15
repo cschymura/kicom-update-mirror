@@ -1,0 +1,30 @@
+PROJECT kicom
+VERSION "0.6.0"
+STATE active
+FACT canonical_name="KiCom"
+FACT purpose="Controlled HTTPS communication, development and allowlisted deployment gateway between ChatGPT and Christoph's RTB web systems"
+FACT protocol="KCL/1"
+FACT transport="HTTPS"
+FACT mode="controlled-deployment-with-human-approval"
+FACT production_write="allowlisted-human-approved"
+FACT direct_shell=false
+FACT arbitrary_remote_fetch=false
+MILESTONE "HTTP communication" status=passed version="0.1.0"
+MILESTONE "Bidirectional parameter exchange" status=passed version="0.2.0"
+MILESTONE "Human-approved staging roundtrip" status=passed version="0.3.0"
+MILESTONE "Persistent project memory and bootstrap" status=passed version="0.3.1"
+MILESTONE "Versioned workspace" status=passed version="0.4.0"
+MILESTONE "Versioned canonical memory" status=passed version="0.5.0"
+MILESTONE "Mutation transport hardening" status=passed version="0.5.1"
+MILESTONE "Allowlisted single-file deployment layer" status=implemented version="0.6.0"
+FACT deployment_targets_human_configured=true
+FACT deployment_single_file_only=true
+FACT deployment_dry_run=true
+FACT deployment_backup_before_write=true
+FACT deployment_healthcheck_optional=true
+FACT deployment_health_failure_auto_rollback=true
+FACT deployment_rollback_requires_human_approval=true
+FACT target_roots_never_returned=true
+FACT current_capabilities="workspace,memory,deploy.targets,deploy.dry_run,deploy.propose,deploy.history,deploy.rollback"
+FACT canonical_memory_via="?q=BOOTSTRAP"
+END_PROJECT kicom

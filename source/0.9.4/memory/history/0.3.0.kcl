@@ -1,0 +1,6 @@
+SNAPSHOT kicom version="0.3.0" date="2026-09-14"
+FACT milestone="Human-approved staging roundtrip completed"
+FACT file="test/chatgpt-roundtrip.txt"
+FACT sha256="fea1d4029f571533fdb1c023d8658b49a1b462f9575da95b881e1ba57e5e0e01"
+FACT production_write=false
+NEXT "Add durable project memory before expanding workspace capabilities"

@@ -1,0 +1,13 @@
+SNAPSHOT kicom version="0.4.0" date="2026-09-14"
+STATE "Versioned workspace introduced"
+CAPABILITY "WORKSPACE_LIST"
+CAPABILITY "WORKSPACE_READ"
+CAPABILITY "WORKSPACE_PROPOSE with base_sha256"
+CAPABILITY "WORKSPACE_DIFF"
+CAPABILITY "WORKSPACE_VALIDATE"
+CAPABILITY "WORKSPACE_HISTORY"
+CAPABILITY "WORKSPACE_ROLLBACK"
+SECURITY "Human approval remains mandatory for writes and rollback"
+SECURITY "No production deployment capability"
+SECURITY "Optimistic concurrency prevents stale overwrites"
+END_SNAPSHOT

@@ -1,0 +1,8 @@
+RELEASE kicom version="0.8.0"
+FEATURE "Authenticated human-gated self-update controller"
+FEATURE "ZIP path/symlink/unmanifested-file rejection and MANIFEST.sha256 verification"
+FEATURE "Complete pre-update snapshot of every touched code file and post-update integrity/HELLO healthcheck"
+FEATURE "Automatic snapshot restoration on update failure"
+RULE "var and stage are always preserved"
+RULE "no unconditional KCL self-update mutation"
+END_RELEASE kicom

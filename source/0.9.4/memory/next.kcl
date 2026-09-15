@@ -1,0 +1,11 @@
+NEXT kicom
+PRIORITY 1 goal="Install and live-verify KiCom 0.9.2 Human Control Plane and redundant update channels"
+PRIORITY 2 goal="Configure update.rurtalbahn.info as primary Pull feed and one independent mirror; schedule UPDATE_AGENT URL cron"
+PRIORITY 3 goal="Connect an authorized Push client so ChatGPT/automation can deliver packages directly when available"
+PRIORITY 4 goal="Prove green auto-install, yellow one-click staging and red explicit-confirmation behavior with controlled test releases"
+PRIORITY 5 goal="Continue controlled evolution toward KiCom 1.0 Living Architecture"
+CONSTRAINT "All update transports converge on one verifier and one risk policy"
+CONSTRAINT "Autonomous installation is limited to green changes with unchanged trust boundaries"
+CONSTRAINT "Recovery kernel, API/perimeter and Genome-security invariant changes remain red"
+CONSTRAINT "No unrestricted shell, SQL, arbitrary filesystem root or arbitrary remote-fetch access"
+END_NEXT kicom

@@ -1,0 +1,57 @@
+PROJECT kicom
+VERSION "0.9.2"
+STATE active
+FACT canonical_name="KiCom"
+FACT purpose="Controlled HTTPS development gateway evolving into a self-healing Living Architecture for RTB web systems"
+FACT protocol="KCL/1"
+FACT transport="HTTPS"
+FACT mode="living-architecture-with-human-gated-evolution"
+FACT production_write="allowlisted-human-approved"
+FACT direct_shell=false
+FACT arbitrary_remote_fetch=false
+FACT canonical_memory_via="?q=BOOTSTRAP"
+MILESTONE "Communication, staging and canonical memory" status=passed versions="0.1-0.5.1"
+MILESTONE "Allowlisted deployment, production hardening and transactional package deployment" status=passed versions="0.6.0-0.7.0"
+MILESTONE "Privacy/search-engine hardening" status=passed version="0.7.1"
+MILESTONE "Human-gated self-update controller" status=passed version="0.8.0"
+MILESTONE "Genome and Self-Healing Core" status=passed version="0.9.0"
+MILESTONE "Autonomous Immune Guardian" status=passed version="0.9.1"
+MILESTONE "Human Control Plane and redundant update channels" status=implemented version="0.9.2"
+FACT genome_schema=1
+FACT genome_memory_phenotype_separated=true
+FACT recovery_kernel_standalone=true
+FACT recovery_kernel_auto_heal=false
+FACT last_known_good=true
+FACT autonomous_healing="trusted-reversible-restoration-only"
+FACT quarantine_unknown_code=true
+FACT immune_scan_scope="recursive-nonstate-executable-and-control-artifacts"
+FACT guardian_unknown_quarantine="automatic-reversible"
+FACT guardian_cron_supported=true
+FACT guardian_request_preflight=true
+FACT guardian_scan_throttle_seconds=10
+FACT guardian_parallel_healing_lock=true
+FACT guardian_postheal_php_parse=true
+FACT immune_maintenance_lock_during_self_update=true
+FACT experience_log=true
+FACT living_insights=true
+FACT evolution_lab=true
+FACT evolution_candidate_execution="none-before-promotion"
+FACT evolution_fitness="manifest,genome,parent,generation,mutation-reason,version,php-syntax,privacy,static-interface,kernel-declaration,human-gate"
+FACT evolution_promotion="human-gated-via-self-update"
+FACT reasoning_cortex="ChatGPT-via-KCL-initially"
+FACT update_channels="admin-upload,https-pull-primary+mirror,authenticated-push"
+FACT update_channels_same_verifier=true
+FACT update_risk_policy="green-auto,yellow-one-click,red-explicit"
+FACT human_control_plane="progressive-disclosure-attention-first"
+FACT genome_lineage=true
+FACT kernel_update_requires_extra_confirmation=true
+FACT self_update_manifest_sha256_required=true
+FACT self_update_complete_touched_file_snapshot=true
+FACT self_update_postwrite_healthcheck=true
+FACT self_update_health_failure_auto_rollback=true
+FACT self_update_preserves_var_and_stage_runtime_data=true
+FACT state_perimeter_sentinels="var/.htaccess,stage/.htaccess"
+FACT deployment_target_classes="test,staging,production"
+FACT production_healthcheck_mandatory=true
+FACT current_capabilities="workspace,memory,deploy.single,deploy.package,self_update,genome,immune_scan,self_heal,quarantine,experience,insights,evolution"
+END_PROJECT kicom

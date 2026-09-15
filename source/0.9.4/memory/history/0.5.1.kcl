@@ -1,0 +1,5 @@
+SNAPSHOT kicom
+VERSION "0.5.1"
+DATE "2026-09-14"
+SUMMARY "POST mutation transport, one-time guarded GET bridge, exact memory patch proposals"
+END_SNAPSHOT kicom

@@ -1,0 +1,11 @@
+CHANGELOG kicom
+RELEASE "0.1.0-0.5.1" change="Communication, staging, canonical memory, version history and mutation transport hardening"
+RELEASE "0.6.0-0.7.0" change="Allowlisted deployment, production health policy and transactional multi-file package deployment"
+RELEASE "0.7.1" change="Privacy/search-engine hardening with bare-root 404, noindex headers, robots.txt and disabled listings"
+RELEASE "0.8.0" change="Human-gated self-update controller with manifest verification, backup, healthcheck and automatic rollback"
+RELEASE "0.9.0" date="2026-09-15" change="Living Architecture: declarative genome/DNA, standalone recovery kernel, trusted genome pin, Last-Known-Good, immune scan, genome recovery, quarantine, secret guardian cron, autonomous reversible healing, structured experience log plus insight engine, recursive unknown-artifact detection, Guardian auto-quarantine, candidate evolution lab, static fitness, lineage and human-gated genome promotion"
+EVENT "0.9.0 design" change="Genome, project memory and running phenotype are intentionally separate trust domains; ChatGPT remains the initial external development cortex"
+EVENT "0.9.0 hardening" change="Immune scan covers nested executable/control artifacts outside var/stage; Guardian can reversibly quarantine unknown artifacts; evolution fitness enforces parent/generation lineage, mutation reason and static KCL interface regression"
+RELEASE "0.9.1" date="2026-09-15" change="Autonomous Immune Guardian: request-driven preflight healing before normal phenotype boot, cron idle-time healing, parallel-healing lock, maintenance lock during self-update, post-heal full rescan and PHP TOKEN_PARSE verification"
+RELEASE "0.9.2" date="2026-09-15" change="Human Control Plane with attention-first progressive disclosure, redundant HTTPS Pull plus authenticated Push update channels, primary/mirror feeds, shared verifier, green/yellow/red risk classes and automatic installation of fully verified green releases"
+END_CHANGELOG kicom

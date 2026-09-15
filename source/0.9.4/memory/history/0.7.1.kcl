@@ -1,0 +1,5 @@
+HISTORY kicom
+VERSION "0.7.1"
+DATE "2026-09-14"
+CHANGE "Privacy/search-engine hardening: bare-root 404, explicit X-Robots-Tag, robots.txt disallow-all, directory listing disabled and metadata files denied."
+END_HISTORY kicom
