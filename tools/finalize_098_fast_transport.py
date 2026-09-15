@@ -53,12 +53,15 @@ def main():
         with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
             for p in sorted(paths+['MANIFEST.sha256']):z.write(root/p,p)
         print('FINAL_PACKAGE_SHA256='+sha(out.read_bytes()))
+        # Exact parent verifier validates the upgrade package and determines real risk.
         verify=Path(tempfile.mkdtemp(prefix='k097verify-final-'))
         try:
             with zipfile.ZipFile(base) as z:z.extractall(verify)
             code=f'''require {str(verify/'lib.php')!r};$x=kicomSelfUpdateZipInspect({str(out)!r});if(empty($x["ok"])){{echo "INSPECT=".($x["code"]??"?")."\\n";exit(31);}}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\\n";echo "VERSION=".($x["version"]??"?")."\\n";if(($x["version"]??"")!=="0.9.8"||($x["genome"]["id"]??"")!=="kicom-0.9.8-g9")exit(32);'''
             rr=run(['php','-r',code]); print(rr.stdout,end='')
         finally: shutil.rmtree(verify,ignore_errors=True)
+        # True fresh-install test only tests fresh initialization. A same-version package
+        # must not be re-fed to 0.9.8 as an update; the parent verifier above already covers it.
         fresh=Path(tempfile.mkdtemp(prefix='k098fresh-final-'))
         try:
             with zipfile.ZipFile(out) as z:z.extractall(fresh)
@@ -68,7 +71,7 @@ chdir({str(fresh)!r});require {str(fresh/'lib.php')!r};
 if(KICOM_VERSION!=="0.9.8")exit(41);
 if(!kicomEnsureStorage())exit(42);
 $r=kicomReadMemoryResource('PROJECT_STATE');if(!is_array($r)||!str_contains($r['raw'],'VERSION "0.9.8"'))exit(43);
-$x=kicomSelfUpdateZipInspect({str(out)!r});if(empty($x['ok']))exit(44);
+$g=kicomGenomeCurrent();if(!is_array($g)||($g['id']??'')!=="kicom-0.9.8-g9")exit(44);
 echo "FRESH_INSTALL_OK\\n";
 ''')
             rr=run(['php',str(test)]); print(rr.stdout,end='')
