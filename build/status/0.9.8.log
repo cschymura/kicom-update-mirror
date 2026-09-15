@@ -1,5 +1,5 @@
-PACKAGE_SHA256=c2b636ee633e5864dd04dcd6f8c625e54f59019eade2a5be3eaff57a307388e8
-+ php -r require '/tmp/k097verify-zv4slnkv/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.8-candidate.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";echo "VERSION=".($x["version"]??"?")."\n";if(($x["version"]??"")!=="0.9.8"||($x["genome"]["id"]??"")!=="kicom-0.9.8-g9")exit(32);
+PACKAGE_SHA256=9a7307a018ceb724065d4189fffe7ff6298b3ac18bc767dbbd5cd9316e3bb56d
++ php -r require '/tmp/k097verify-_x98v7wi/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.8-candidate.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";echo "VERSION=".($x["version"]??"?")."\n";if(($x["version"]??"")!=="0.9.8"||($x["genome"]["id"]??"")!=="kicom-0.9.8-g9")exit(32);
 RISK=red
 VERSION=0.9.8
 + php /tmp/test098.php
@@ -17,21 +17,9 @@ Traceback (most recent call last):
     raise CalledProcessError(retcode, process.args,
 subprocess.CalledProcessError: Command '['php', '/tmp/test098.php']' returned non-zero exit status 42.
 STAGE1_RC=1
-FINAL_PACKAGE_SHA256=452c9c4bc8f38132c75abd9e2222992adc18a94fde8eabe7a90dc4708b08a9d3
-+ php -r require '/tmp/k097verify-final-vilem38_/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.8-Fast-Transport.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";echo "VERSION=".($x["version"]??"?")."\n";if(($x["version"]??"")!=="0.9.8"||($x["genome"]["id"]??"")!=="kicom-0.9.8-g9")exit(32);
+FINAL_PACKAGE_SHA256=06a8dfeec40f8cd9cb6a1bc972242fe750405f3dd694c73d8a967375476f800d
++ php -r require '/tmp/k097verify-final-ia8t62sc/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.8-Fast-Transport.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";echo "VERSION=".($x["version"]??"?")."\n";if(($x["version"]??"")!=="0.9.8"||($x["genome"]["id"]??"")!=="kicom-0.9.8-g9")exit(32);
 RISK=red
 VERSION=0.9.8
 + php /tmp/test098final.php
-Traceback (most recent call last):
-  File "/home/runner/work/kicom-update-mirror/kicom-update-mirror/tools/finalize_098_fast_transport.py", line 78, in <module>
-    if __name__=='__main__':main()
-                            ^^^^^^
-  File "/home/runner/work/kicom-update-mirror/kicom-update-mirror/tools/finalize_098_fast_transport.py", line 74, in main
-    rr=run(['php',str(test)]); print(rr.stdout,end='')
-       ^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/runner/work/kicom-update-mirror/kicom-update-mirror/tools/finalize_098_fast_transport.py", line 13, in run
-    return subprocess.run(cmd,text=True,capture_output=True,check=True)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/lib/python3.12/subprocess.py", line 571, in run
-    raise CalledProcessError(retcode, process.args,
-subprocess.CalledProcessError: Command '['php', '/tmp/test098final.php']' returned non-zero exit status 44.
+FRESH_INSTALL_OK

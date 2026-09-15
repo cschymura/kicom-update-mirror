@@ -1,0 +1,11 @@
+NEXT kicom
+PRIORITY 1 goal="Enroll FreeOTP and verify chat-opened rolling autonomy session"
+PRIORITY 2 goal="Backfill available installed releases into kicomarchive and publish current verified package to first-party updatefeed"
+PRIORITY 3 goal="Use sandbox for automatic non-production capability tests"
+PRIORITY 4 goal="Use KiCom direct source reads and direct update uploads so future development does not depend on GitHub"
+CONSTRAINT "RED, production and recovery-kernel trust-boundary crossings require transaction-bound FreeOTP"
+CONSTRAINT "No unrestricted filesystem, shell, SQL or arbitrary remote-fetch access"
+CONSTRAINT "Archive release artifacts are append-only; conflicts never overwrite"
+PRIORITY 1 goal="Verify first-party kicomArchive backfill and primary feed after 0.9.7 installation"
+PRIORITY 1 goal="Verify transport performance target: routine memory/source operations in 1-3 requests and server-side candidate build without GitHub dependency"
+END_NEXT kicom

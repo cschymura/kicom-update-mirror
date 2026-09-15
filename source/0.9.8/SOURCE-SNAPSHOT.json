@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.8",
+  "release_sha256": "06a8dfeec40f8cd9cb6a1bc972242fe750405f3dd694c73d8a967375476f800d",
+  "source_of_truth": "releases/0.9.8/KiCom-0.9.8-Fast-Transport.zip",
+  "runtime_state_removed": true,
+  "policy": "immutable release-derived install/update source snapshot",
+  "github_role": "temporary-fallback-transport-only; KiCom remains authority"
+}
