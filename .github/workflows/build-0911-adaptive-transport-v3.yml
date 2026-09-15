@@ -1,0 +1,47 @@
+name: Build KiCom 0.9.11 Adaptive Transport v3
+
+on:
+  push:
+    paths:
+      - '.github/triggers/build-0911-v3.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Build verify publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT='/tmp/KiCom-0.9.11-Adaptive-Transport.zip'; LOG='build/status/0.9.11-v3.log'
+          mkdir -p build/status releases/0.9.11 source/0.9.11; : > "$LOG"
+          result=failed;stage=builder;risk=unknown;pkg_sha='';set +e
+          python tools/build_0911_adaptive_transport_v3.py source/0.9.10 "$OUT" >"$LOG" 2>&1;rc=$?;set -e
+          if [ -f "$LOG" ]; then risk="$(grep -E '^RISK=' "$LOG" | tail -1 | cut -d= -f2 || true)";[ -n "$risk" ]||risk=unknown;fi
+          if [ $rc -eq 0 ] && [ -f "$OUT" ]; then
+            stage=publish;pkg_sha="$(sha256sum "$OUT"|awk '{print $1}')";cp "$OUT" releases/0.9.11/KiCom-0.9.11-Adaptive-Transport.zip
+            rm -rf /tmp/k0911src source/0.9.11;mkdir -p /tmp/k0911src source/0.9.11;unzip -q "$OUT" -d /tmp/k0911src;cp -a /tmp/k0911src/. source/0.9.11/
+            export pkg_sha
+            python - <<'PY'
+          import json,os
+          from pathlib import Path
+          from datetime import datetime,timezone
+          p=Path('channel.json');d=json.loads(p.read_text());v='0.9.11';s=os.environ['pkg_sha'];d['releases']=[r for r in d.get('releases',[]) if r.get('version')!=v];d['releases'].insert(0,{'version':v,'url':'https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.11/KiCom-0.9.11-Adaptive-Transport.zip','sha256':s,'published_at':datetime.now(timezone.utc).isoformat()});p.write_text(json.dumps(d,indent=2)+'\n');Path('source/0.9.11/SOURCE-SNAPSHOT.json').write_text(json.dumps({'schema':1,'product':'kicom','version':v,'release_sha256':s,'source_of_truth':'releases/0.9.11/KiCom-0.9.11-Adaptive-Transport.zip','runtime_state_removed':True,'policy':'immutable release-derived source snapshot','github_role':'temporary transport mirror only; KiCom remains authority'},indent=2)+'\n')
+          PY
+            result=success;stage=complete
+          fi
+          export result stage rc risk pkg_sha
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          from datetime import datetime,timezone
+          Path('build/status/0.9.11.json').write_text(json.dumps({'schema':1,'product':'kicom','version':'0.9.11','result':os.environ['result'],'stage':os.environ['stage'],'exit_code':int(os.environ['rc']),'risk':os.environ['risk'],'package_sha256':os.environ['pkg_sha'],'updated_at':datetime.now(timezone.utc).isoformat(),'attempt':'v3'},indent=2)+'\n')
+          PY
+          cp "$LOG" build/status/0.9.11.log
+          git config user.name 'kicom-bootstrap-bot';git config user.email 'kicom-bootstrap-bot@users.noreply.github.com';git add build/status/0.9.11.json build/status/0.9.11.log; if [ "$result" = success ];then git add releases/0.9.11 source/0.9.11 channel.json;fi;git commit -m "KiCom 0.9.11 v3 build result: $result"||true;git push;exit "$rc"
