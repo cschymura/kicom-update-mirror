@@ -1,0 +1,18 @@
+PACKAGE_SHA256=7df38338cffc41abfcf9f21aaa8e35d7de949233288940fbfed311e30b9f4ac6
++ php -r require '/tmp/k097verify-ffdxxi5l/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.8-Fast-Transport.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";echo "VERSION=".($x["version"]??"?")."\n";if(($x["version"]??"")!=="0.9.8"||($x["genome"]["id"]??"")!=="kicom-0.9.8-g9")exit(32);
+RISK=red
+VERSION=0.9.8
++ php /tmp/test098.php
+Traceback (most recent call last):
+  File "/tmp/build_098_fast_transport.py", line 206, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/tmp/build_098_fast_transport.py", line 199, in main
+    rr=run(['php',str(test)]);print(rr.stdout,end='')
+       ^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/build_098_fast_transport.py", line 17, in run
+    return subprocess.run(cmd,text=True,capture_output=True,check=check)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['php', '/tmp/test098.php']' returned non-zero exit status 42.

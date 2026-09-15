@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.8",
+  "result": "failed",
+  "stage": "builder",
+  "exit_code": 1,
+  "risk": "red",
+  "package_sha256": "",
+  "updated_at": "2026-09-15T11:26:33.615369+00:00",
+  "transport_role": "temporary fallback only; 0.9.8 adds first-party server-side candidate builds"
+}
