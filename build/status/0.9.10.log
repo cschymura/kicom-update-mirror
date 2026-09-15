@@ -1,0 +1,20 @@
+PACKAGE_SHA256=a55f08c10dd460878451cb7190bc82efcd4284cb1864d9c0dc51e63797be3a33
++ php -r require '/tmp/k099verify-mnrhonw4/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.10-Transaction-Buffer.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$r=kicomSelfUpdateRiskClass($x);echo "RISK=".($r["class"]??"?")."\n";echo "VERSION=".($x["version"]??"?")."\n";if(($x["version"]??"")!=="0.9.10"||($x["genome"]["id"]??"")!=="kicom-0.9.10-g11")exit(32);
+RISK=red
+VERSION=0.9.10
++ php -l /tmp/kicom0910-h2l1espn/admin.php
+No syntax errors detected in /tmp/kicom0910-h2l1espn/admin.php
++ php -l /tmp/kicom0910-h2l1espn/api.php
+No syntax errors detected in /tmp/kicom0910-h2l1espn/api.php
++ php -l /tmp/kicom0910-h2l1espn/guardian.php
+No syntax errors detected in /tmp/kicom0910-h2l1espn/guardian.php
++ php -l /tmp/kicom0910-h2l1espn/index.php
+No syntax errors detected in /tmp/kicom0910-h2l1espn/index.php
++ php -l /tmp/kicom0910-h2l1espn/lib.php
+No syntax errors detected in /tmp/kicom0910-h2l1espn/lib.php
++ php -l /tmp/kicom0910-h2l1espn/living.php
+No syntax errors detected in /tmp/kicom0910-h2l1espn/living.php
++ php -l /tmp/kicom0910-h2l1espn/recovery.php
+No syntax errors detected in /tmp/kicom0910-h2l1espn/recovery.php
++ php /tmp/test0910.php
+TRANSACTION_BUFFER_OK

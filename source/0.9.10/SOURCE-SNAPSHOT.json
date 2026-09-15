@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.10",
+  "release_sha256": "a55f08c10dd460878451cb7190bc82efcd4284cb1864d9c0dc51e63797be3a33",
+  "source_of_truth": "releases/0.9.10/KiCom-0.9.10-Transaction-Buffer.zip",
+  "runtime_state_removed": true,
+  "policy": "immutable release-derived install/update source snapshot",
+  "github_role": "temporary transport for 0.9.10 bootstrap only; KiCom remains authority"
+}

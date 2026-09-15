@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.10",
+  "result": "success",
+  "stage": "complete",
+  "exit_code": 0,
+  "risk": "red",
+  "package_sha256": "a55f08c10dd460878451cb7190bc82efcd4284cb1864d9c0dc51e63797be3a33",
+  "updated_at": "2026-09-15T16:29:48.859004+00:00",
+  "transport_role": "temporary mirror bootstrap; package verified by 0.9.9 verifier and regression suite"
+}

@@ -1,0 +1,10 @@
+CHANGELOG kicom
+RELEASE "0.9.5" date="2026-09-15" change="Persistent Goal Layer and append-only ChatGPT memory archive"
+RELEASE "0.9.6" date="2026-09-15" change="Bounded Autonomy Envelope, FreeOTP Human Authorization Bridge, rolling one-time sessions, direct trusted-source reads, direct self-update upload, append-only release archive and first-party feed publication"
+FIX "0.9.6" change="MEMORY_ARCHIVE_BEGIN bridge ordering no longer collides with generic MEMORY_* handling"
+POLICY "0.9.6" change="GitHub becomes optional mirror/transport rather than a trust anchor"
+RELEASE "0.9.7" date="2026-09-15" change="Resilient autonomy session recovery, stale FreeOTP setup cleanup and semantically idempotent append-only release archival"
+RELEASE "0.9.8" date="2026-09-15" change="Fast transport: larger trusted-source reads, large POST transport, batch/direct patch operations and protected server-side candidate builder using the unchanged verifier"
+RELEASE "0.9.9" date="2026-09-15" change="Low-roundtrip control plane: source read leases, compact GET batch, semantic release preparation and robust PHP lint fallback"
+RELEASE "0.9.10" date="2026-09-15" change="Transaction buffer for low-bandwidth chat clients and one-code execution of still-valid exact RED bindings after session idle"
+END_CHANGELOG kicom
