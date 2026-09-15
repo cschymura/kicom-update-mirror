@@ -23,7 +23,6 @@ jobs:
           BASE='releases/0.9.6/KiCom-0.9.6-Autonomy-Bridge.zip'
           OUT='/tmp/KiCom-0.9.7-Resilient-Autonomy.zip'
           LOG='build/status/0.9.7.log'
-          STATUS='build/status/0.9.7.json'
           mkdir -p build/status releases/0.9.7 source/0.9.7
           : > "$LOG"
           result=failed
@@ -31,7 +30,7 @@ jobs:
           risk=unknown
           pkg_sha=''
           set +e
-          python tools/build_097_resilient_autonomy.py "$BASE" "$OUT" >"$LOG" 2>&1
+          python tools/build_097_resilient_autonomy_v2.py "$BASE" "$OUT" >"$LOG" 2>&1
           rc=$?
           set -e
           if [ $rc -eq 0 ]; then
@@ -62,14 +61,12 @@ jobs:
             'schema':1,'product':'kicom','version':v,'release_sha256':sha,
             'source_of_truth':'releases/0.9.7/KiCom-0.9.7-Resilient-Autonomy.zip',
             'runtime_state_removed':True,
-            'policy':'immutable release-derived minimal update source snapshot',
+            'policy':'immutable release-derived install/update source snapshot',
             'github_role':'temporary-fallback-transport-only'
           },indent=2)+'\n')
           PY
             result=success
             stage=complete
-          else
-            risk=unknown
           fi
           export result stage rc risk pkg_sha
           python - <<'PY'
