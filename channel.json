@@ -3,6 +3,12 @@
   "product": "kicom",
   "releases": [
     {
+      "version": "0.9.4",
+      "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.4/KiCom-0.9.4-Autonomous-Evolution-Epochs.zip",
+      "sha256": "6f2203188b0cbba0b69bd07ff7315046770b6ace06e7433f1fafdb30a359fa6a",
+      "published_at": "2026-09-15T06:13:56.429605+00:00"
+    },
+    {
       "version": "0.9.3",
       "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.3/KiCom-0.9.3-Feed-Diagnostics.zip",
       "sha256": "7bc33a5b5188548ea3d3b15065b5de6de38282b18cf24d141f9ec4ec6a958031",
