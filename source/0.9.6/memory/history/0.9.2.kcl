@@ -1,0 +1,7 @@
+RELEASE kicom version="0.9.2" date="2026-09-15"
+CHANGE "Human Control Plane: attention-first admin overview with technical detail behind expert disclosure"
+CHANGE "Redundant update transports: manual admin upload, allowlisted HTTPS Pull with primary/mirror feeds, and authenticated Push/Inbox"
+CHANGE "All transports converge on one verifier, Genome/lineage checks, complete backup, post-write healthcheck and automatic rollback"
+CHANGE "Risk classes: green may auto-install, yellow needs one deliberate click, red trust-boundary changes require explicit confirmation"
+SAFETY "No unrestricted shell, SQL, filesystem-root or arbitrary remote-fetch access added"
+END_RELEASE kicom

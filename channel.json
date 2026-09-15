@@ -3,6 +3,12 @@
   "product": "kicom",
   "releases": [
     {
+      "version": "0.9.6",
+      "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.6/KiCom-0.9.6-Autonomy-Bridge.zip",
+      "sha256": "02120f28a953f01987fa1f650a77ee6bfe4dc3c0bf685ca2ef48d512987baef9",
+      "published_at": "2026-09-15T08:24:15.467331+00:00"
+    },
+    {
       "version": "0.9.5",
       "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.5/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip",
       "sha256": "a65f35786eb010c8ebf5bfca12db64125ff0829d0b56db4ee83a271a0fc34790",

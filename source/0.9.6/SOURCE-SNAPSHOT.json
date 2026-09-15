@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.6",
+  "release_sha256": "02120f28a953f01987fa1f650a77ee6bfe4dc3c0bf685ca2ef48d512987baef9",
+  "source_of_truth": "releases/0.9.6/KiCom-0.9.6-Autonomy-Bridge.zip",
+  "runtime_state_removed": true,
+  "policy": "immutable release-derived source snapshot",
+  "github_role": "bootstrap-mirror-only"
+}

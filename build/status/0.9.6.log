@@ -2,7 +2,7 @@ base_sha256=a65f35786eb010c8ebf5bfca12db64125ff0829d0b56db4ee83a271a0fc34790
 == decode builder ==
 builder_sha256=b6a5c3dcab6a2bb69cf7e7bd1cf753270cd5485e926136d8d3ff58a2654f93d8
 == builder ==
-BUILT /tmp/KiCom-0.9.6-Autonomy-Bridge.zip sha256 c562be0d210ef7d7d3447fca55ce240777af8082dcfd2542fa646ab2aaf92e89
+BUILT /tmp/KiCom-0.9.6-Autonomy-Bridge.zip sha256 02120f28a953f01987fa1f650a77ee6bfe4dc3c0bf685ca2ef48d512987baef9
 == php syntax ==
 No syntax errors detected in /tmp/kicom096-autonomy/lib.php
 No syntax errors detected in /tmp/kicom096-autonomy/living.php
@@ -14,5 +14,32 @@ No syntax errors detected in /tmp/kicom096-autonomy/recovery.php
 == package policy ==
 == fresh install + FreeOTP/autonomy functional ==
 AUTONOMY_FUNCTIONAL_OK
-== exact 0.9.5 verifier ==
-INSPECT_CODE=GENOME_REQUIRED_COMPONENT_MISSING PATH=goals_memory.php
+== 0.9.5 compatibility hotfix ==
+compat_living_sha256=70269b933c7ff579469411199a51e185bc03db31dd60aab726af29c2d99e4bfb
+compat_genome_sha256=89fb82146ea2e9dfef30ba21fffcd14d4e16dd0bd035cfb26a2ab7bdf8f6e706
+No syntax errors detected in /tmp/kicom095-compat/living.php
+{
+    "ok": true,
+    "genome_id": "kicom-0.9.5-g6",
+    "version": "0.9.5",
+    "genome_sha256": "89fb82146ea2e9dfef30ba21fffcd14d4e16dd0bd035cfb26a2ab7bdf8f6e706"
+}
+{
+    "ok": true,
+    "healthy": true,
+    "genome_id": "kicom-0.9.5-g6",
+    "version": "0.9.5",
+    "genome_sha256": "89fb82146ea2e9dfef30ba21fffcd14d4e16dd0bd035cfb26a2ab7bdf8f6e706",
+    "genome_source": "current",
+    "trusted": true,
+    "lkg_ok": true,
+    "drift": [],
+    "unknown": [],
+    "kernel_drift": false,
+    "components": 14
+}
+compat_hotfix_zip_sha256=d95419f6dac88e94157286b4571812d209dd5e8b888c60fba485900882ac2542
+== exact hotfixed 0.9.5 verifier ==
+RISK=red
+REASONS=["genome-invariants-change","security-boundary-change:index.php","core-library-change","reviewed-code-or-memory-change:admin.php","reviewed-code-or-memory-change:living.php","reviewed-code-or-memory-change:memory\/architecture.kcl","reviewed-code-or-memory-change:memory\/changelog.kcl","reviewed-code-or-memory-change:memory\/decisions.kcl","reviewed-code-or-memory-change:memory\/next.kcl","reviewed-code-or-memory-change:memory\/project_state.kcl","reviewed-code-or-memory-change:memory\/protocol.kcl"]
+== publish bootstrap mirror ==

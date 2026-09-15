@@ -1,0 +1,4 @@
+RELEASE kicom version="0.9.1" date="2026-09-15"
+CHANGE "Autonomous Immune Guardian runs before normal core request handling, restores trusted auto-healable drift from LKG without operator action, quarantines unknown executable/control artifacts, serializes healing and pauses during approved self-update mutation."
+VERIFY "Controlled injury test: modify living.php, then call GENOME_STATUS without manual recovery; expected result is healthy=true, drift=0 and guardian_auto_repair/self_heal events."
+END_RELEASE kicom
