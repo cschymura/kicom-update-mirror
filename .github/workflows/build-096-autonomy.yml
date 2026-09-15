@@ -27,7 +27,7 @@ jobs:
           STATUS='build/status/0.9.6.json'
           mkdir -p build/status
           : > "$LOG"
-          fail=0; failed_stage=''; risk='unknown'; pkg_sha=''
+          fail=0; failed_stage=''; risk='unknown'; pkg_sha=''; hotfix_sha=''
 
           run_stage(){
             local name="$1"; shift
@@ -103,16 +103,51 @@ jobs:
           fi
 
           if [ $fail -eq 0 ]; then
-            echo '== exact 0.9.5 verifier ==' >>"$LOG"
-            rm -rf /tmp/kicom095-verifier && mkdir -p /tmp/kicom095-verifier && unzip -q "$BASE" -d /tmp/kicom095-verifier
-            PACKAGE="$PKG" php -r '$p=getenv("PACKAGE");require "/tmp/kicom095-verifier/lib.php";$x=kicomSelfUpdateZipInspect($p);if(empty($x["ok"])){echo "INSPECT_CODE=".($x["code"]??"UNKNOWN")." PATH=".($x["path"]??"")."\n";exit(31);} $r=kicomSelfUpdateRiskClass($x);$c=(string)($r["class"]??"red");echo "RISK=$c\nREASONS=".json_encode($r["reasons"]??[])."\n";if(($x["version"]??"")!=="0.9.6"||($x["genome"]["id"]??"")!=="kicom-0.9.6-g7")exit(32);if($c!=="red")exit(33);' >>"$LOG" 2>&1
+            echo '== 0.9.5 compatibility hotfix ==' >>"$LOG"
+            HOTFIX_ROOT='/tmp/kicom095-compat'
+            HOTFIX_ZIP='/tmp/KiCom-0.9.5-Compat-Hotfix.zip'
+            rm -rf "$HOTFIX_ROOT" "$HOTFIX_ZIP" && mkdir -p "$HOTFIX_ROOT" && unzip -q "$BASE" -d "$HOTFIX_ROOT"
+            python - <<'PY' >>"$LOG" 2>&1
+          from pathlib import Path
+          import hashlib,json
+          root=Path('/tmp/kicom095-compat')
+          lp=root/'living.php'
+          s=lp.read_text()
+          old="'living.php','goals_memory.php','recovery.php'"
+          new="'living.php','recovery.php'"
+          if old not in s: raise SystemExit('compat validator anchor missing')
+          lp.write_text(s.replace(old,new,1))
+          gp=root/'genome/genome.json'; g=json.loads(gp.read_text())
+          found=False
+          for c in g.get('components',[]):
+              if c.get('path')=='living.php':
+                  c['sha256']=hashlib.sha256(lp.read_bytes()).hexdigest(); found=True
+          if not found: raise SystemExit('living genome component missing')
+          g['mutation_reason']=(str(g.get('mutation_reason','')).rstrip()+' Compatibility hotfix: remove stale goals_memory.php validator requirement after Goal Layer was compiled into living.php.').strip()
+          g['compat_hotfix']='0.9.5-validator-goals-memory-inline'
+          gp.write_text(json.dumps(g,indent=2,ensure_ascii=False)+'\n')
+          print('compat_living_sha256='+hashlib.sha256(lp.read_bytes()).hexdigest())
+          print('compat_genome_sha256='+hashlib.sha256(gp.read_bytes()).hexdigest())
+          PY
+            rc=$?; if [ $rc -ne 0 ]; then fail=$rc; failed_stage='compat-hotfix-build'; fi
+            if [ $fail -eq 0 ]; then php -l "$HOTFIX_ROOT/living.php" >>"$LOG" 2>&1 || { fail=$?; failed_stage='compat-hotfix-lint'; }; fi
+            if [ $fail -eq 0 ]; then (cd "$HOTFIX_ROOT" && php recovery.php bootstrap && php recovery.php scan) >>"$LOG" 2>&1 || { fail=$?; failed_stage='compat-hotfix-recovery'; }; fi
+            if [ $fail -eq 0 ]; then (cd "$HOTFIX_ROOT" && zip -q "$HOTFIX_ZIP" living.php genome/genome.json); hotfix_sha="$(sha256sum "$HOTFIX_ZIP"|awk '{print $1}')"; echo "compat_hotfix_zip_sha256=$hotfix_sha" >>"$LOG"; fi
+          fi
+
+          if [ $fail -eq 0 ]; then
+            echo '== exact hotfixed 0.9.5 verifier ==' >>"$LOG"
+            PACKAGE="$PKG" php -r '$p=getenv("PACKAGE");require "/tmp/kicom095-compat/lib.php";$x=kicomSelfUpdateZipInspect($p);if(empty($x["ok"])){echo "INSPECT_CODE=".($x["code"]??"UNKNOWN")." PATH=".($x["path"]??"")."\n";exit(31);} $r=kicomSelfUpdateRiskClass($x);$c=(string)($r["class"]??"red");echo "RISK=$c\nREASONS=".json_encode($r["reasons"]??[])."\n";if(($x["version"]??"")!=="0.9.6"||($x["genome"]["id"]??"")!=="kicom-0.9.6-g7")exit(32);if($c!=="red")exit(33);' >>"$LOG" 2>&1
             rc=$?; if [ $rc -ne 0 ]; then fail=$rc; failed_stage='verifier'; else risk="$(grep '^RISK=' "$LOG"|tail -1|cut -d= -f2)"; fi
           fi
 
           if [ $fail -eq 0 ]; then
             echo '== publish bootstrap mirror ==' >>"$LOG"
             pkg_sha="$(sha256sum "$PKG"|awk '{print $1}')"; export pkg_sha
-            mkdir -p releases/0.9.6 /tmp/kicom096-source
+            mkdir -p releases/0.9.6 recovery/0.9.5-compat-hotfix /tmp/kicom096-source
+            cp /tmp/KiCom-0.9.5-Compat-Hotfix.zip recovery/0.9.5-compat-hotfix/KiCom-0.9.5-Compat-Hotfix.zip
+            printf '%s  %s\n' "$hotfix_sha" 'KiCom-0.9.5-Compat-Hotfix.zip' > recovery/0.9.5-compat-hotfix/SHA256SUMS
+            printf '%s\n' 'KiCom 0.9.5 compatibility hotfix.' 'Contains exactly living.php and genome/genome.json.' 'Purpose: remove the stale goals_memory.php candidate-validator requirement that conflicts with the 0.9.5 self-update path allowlist.' 'Apply both files together, then immediately open recovery.php and use "Genom neu verankern" before returning to the normal KiCom core.' > recovery/0.9.5-compat-hotfix/README.txt
             cp "$PKG" releases/0.9.6/KiCom-0.9.6-Autonomy-Bridge.zip
             rm -rf source/0.9.6 /tmp/kicom096-source; mkdir -p source/0.9.6 /tmp/kicom096-source
             unzip -q "$PKG" -d /tmp/kicom096-source
@@ -130,18 +165,18 @@ jobs:
           fi
 
           if [ $fail -eq 0 ]; then result='success'; failed_stage='complete'; else result='failed'; fi
-          export result failed_stage fail risk pkg_sha
+          export result failed_stage fail risk pkg_sha hotfix_sha
           tail -c 60000 "$LOG" > build/status/0.9.6.log
           python - <<'PY'
           import json,os
           from datetime import datetime,timezone
           from pathlib import Path
-          Path('build/status/0.9.6.json').write_text(json.dumps({'schema':1,'product':'kicom','version':'0.9.6','result':os.environ['result'],'stage':os.environ['failed_stage'],'exit_code':int(os.environ['fail']),'risk':os.environ['risk'],'package_sha256':os.environ['pkg_sha'],'updated_at':datetime.now(timezone.utc).isoformat(),'trigger':'push:.github/triggers/build-096.txt','builder_sha256':'b6a5c3dcab6a2bb69cf7e7bd1cf753270cd5485e926136d8d3ff58a2654f93d8','bootstrap_transport':'github-mirror-only'},indent=2)+'\n')
+          Path('build/status/0.9.6.json').write_text(json.dumps({'schema':1,'product':'kicom','version':'0.9.6','result':os.environ['result'],'stage':os.environ['failed_stage'],'exit_code':int(os.environ['fail']),'risk':os.environ['risk'],'package_sha256':os.environ['pkg_sha'],'compat_hotfix_sha256':os.environ['hotfix_sha'],'updated_at':datetime.now(timezone.utc).isoformat(),'trigger':'push:.github/triggers/build-096.txt','builder_sha256':'b6a5c3dcab6a2bb69cf7e7bd1cf753270cd5485e926136d8d3ff58a2654f93d8','bootstrap_transport':'github-mirror-only'},indent=2)+'\n')
           PY
 
           git config user.name 'kicom-bootstrap-bot'; git config user.email 'kicom-bootstrap-bot@users.noreply.github.com'
           git add build/status/0.9.6.json build/status/0.9.6.log
-          if [ $fail -eq 0 ]; then git add releases/0.9.6 source/0.9.6 channel.json; fi
+          if [ $fail -eq 0 ]; then git add releases/0.9.6 source/0.9.6 recovery/0.9.5-compat-hotfix channel.json; fi
           git commit -m "KiCom 0.9.6 build result: $result" || true
           git push || exit 90
           exit $fail
