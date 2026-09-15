@@ -3,8 +3,7 @@ name: Build KiCom mirror release
 on:
   push:
     paths:
-      - 'payload/**'
-      - '.github/workflows/build-release.yml'
+      - 'payload/READY'
   workflow_dispatch:
 
 permissions:
