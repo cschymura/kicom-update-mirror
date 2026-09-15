@@ -7,6 +7,6 @@
   "exit_code": 1,
   "risk": "red",
   "package_sha256": "",
-  "updated_at": "2026-09-15T11:31:33.886116+00:00",
+  "updated_at": "2026-09-15T11:32:35.438565+00:00",
   "transport_role": "temporary fallback only; 0.9.8 adds first-party server-side candidate builds"
 }
