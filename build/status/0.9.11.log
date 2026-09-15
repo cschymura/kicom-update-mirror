@@ -1,11 +1,20 @@
-Traceback (most recent call last):
-  File "/tmp/build_0911_adaptive_transport_fixed.py", line 50, in <module>
-    if __name__=='__main__':main()
-                            ^^^^^^
-  File "/tmp/build_0911_adaptive_transport_fixed.py", line 34, in main
-    for f,old,new in [('architecture.kcl','COMPONENT transaction_buffer role="inert bounded fragment buffer; commit executes existing patch allowlists with one main-session rotation"','COMPONENT transaction_buffer role="adaptive inert fragment buffer with per-profile safe/probe sizing, idempotent retries and backoff feedback; commit validates and rotates once"'),('protocol.kcl','AUTONOMY transaction_buffer="BEGIN nonrotating -> APPEND <=1024-byte inert fragments -> COMMIT sha256 + one main-session rotation; max 64KiB/600s"','AUTONOMY transaction_buffer="AUTONOMY_TX_BEGIN(profile) returns safe/probe sizes -> inert AUTONOMY_TX_APPEND with idempotent retry -> optional AUTONOMY_TX_BACKOFF after transport failure -> AUTONOMY_TX_COMMIT; main session rotates once"')]:p=r/'memory'/f;x=p.read_text();x=h.replace_once(x,old,new,f);p.write_text(x)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/runner/work/kicom-update-mirror/kicom-update-mirror/tools/build_0910_transaction_buffer.py", line 45, in replace_once
-    if n!=1: raise RuntimeError(f'{label}: expected 1 match, got {n}')
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-RuntimeError: protocol.kcl: expected 1 match, got 0
+PACKAGE_SHA256=607b3f559269aae09f7aea3c39c2338ca773045121a4de1e5417590dda23e5f9
++ php -r require '/home/runner/work/kicom-update-mirror/kicom-update-mirror/source/0.9.10/lib.php';$x=kicomSelfUpdateZipInspect('/tmp/KiCom-0.9.11-Adaptive-Transport.zip');if(empty($x["ok"])){echo "INSPECT=".($x["code"]??"?")."\n";exit(31);}$q=kicomSelfUpdateRiskClass($x);echo "RISK=".($q["class"]??"?")."\nVERSION=".($x["version"]??"?")."\n";if(($x["version"]??"")!=="0.9.11"||($x["genome"]["id"]??"")!=="kicom-0.9.11-g12")exit(32);
+RISK=red
+VERSION=0.9.11
++ php -l /tmp/k0911-cgc17vwp/admin.php
+No syntax errors detected in /tmp/k0911-cgc17vwp/admin.php
++ php -l /tmp/k0911-cgc17vwp/api.php
+No syntax errors detected in /tmp/k0911-cgc17vwp/api.php
++ php -l /tmp/k0911-cgc17vwp/guardian.php
+No syntax errors detected in /tmp/k0911-cgc17vwp/guardian.php
++ php -l /tmp/k0911-cgc17vwp/index.php
+No syntax errors detected in /tmp/k0911-cgc17vwp/index.php
++ php -l /tmp/k0911-cgc17vwp/lib.php
+No syntax errors detected in /tmp/k0911-cgc17vwp/lib.php
++ php -l /tmp/k0911-cgc17vwp/living.php
+No syntax errors detected in /tmp/k0911-cgc17vwp/living.php
++ php -l /tmp/k0911-cgc17vwp/recovery.php
+No syntax errors detected in /tmp/k0911-cgc17vwp/recovery.php
++ php /tmp/test0911.php
+ADAPTIVE_TRANSPORT_OK

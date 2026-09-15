@@ -2,11 +2,11 @@
   "schema": 1,
   "product": "kicom",
   "version": "0.9.11",
-  "result": "failed",
-  "stage": "builder",
-  "exit_code": 1,
-  "risk": "unknown",
-  "package_sha256": "",
-  "updated_at": "2026-09-15T17:39:42.979890+00:00",
-  "attempt": "v2"
+  "result": "success",
+  "stage": "complete",
+  "exit_code": 0,
+  "risk": "red",
+  "package_sha256": "607b3f559269aae09f7aea3c39c2338ca773045121a4de1e5417590dda23e5f9",
+  "updated_at": "2026-09-15T17:40:40.513832+00:00",
+  "attempt": "v3"
 }

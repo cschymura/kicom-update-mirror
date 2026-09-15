@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.11",
+  "release_sha256": "607b3f559269aae09f7aea3c39c2338ca773045121a4de1e5417590dda23e5f9",
+  "source_of_truth": "releases/0.9.11/KiCom-0.9.11-Adaptive-Transport.zip",
+  "runtime_state_removed": true,
+  "policy": "immutable release-derived source snapshot",
+  "github_role": "temporary transport mirror only; KiCom remains authority"
+}

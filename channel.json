@@ -3,6 +3,12 @@
   "product": "kicom",
   "releases": [
     {
+      "version": "0.9.11",
+      "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.11/KiCom-0.9.11-Adaptive-Transport.zip",
+      "sha256": "607b3f559269aae09f7aea3c39c2338ca773045121a4de1e5417590dda23e5f9",
+      "published_at": "2026-09-15T17:40:40.481142+00:00"
+    },
+    {
       "version": "0.9.10",
       "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.10/KiCom-0.9.10-Transaction-Buffer.zip",
       "sha256": "a55f08c10dd460878451cb7190bc82efcd4284cb1864d9c0dc51e63797be3a33",

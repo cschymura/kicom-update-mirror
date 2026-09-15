@@ -1,0 +1,145 @@
+{
+  "schema": 1,
+  "id": "kicom-0.9.11-g12",
+  "version": "0.9.11",
+  "parent": "kicom-0.9.10-g11",
+  "generation": 12,
+  "created_at": "2026-09-15T17:40:39.872779+00:00",
+  "kernel_revision": 1,
+  "mutation_reason": "Adaptive transport sizing with per-profile learning, backoff and idempotent retry; authorization boundaries unchanged.",
+  "invariants": [
+    "no-arbitrary-shell",
+    "no-arbitrary-sql",
+    "no-arbitrary-remote-fetch",
+    "human-gated-new-capabilities",
+    "separate-genome-memory-phenotype",
+    "autonomous-heal-trusted-state-only",
+    "production-writes-human-approved",
+    "recovery-kernel-not-auto-healed",
+    "unknown-code-quarantine-before-use",
+    "immune-maintenance-lock-during-approved-mutation",
+    "parallel-healing-serialized",
+    "redundant-update-transports-single-verifier",
+    "risk-proportional-human-attention",
+    "goal-layer-no-permission-grants",
+    "memory-archive-no-hard-delete",
+    "autonomy-envelope-bounded",
+    "critical-actions-totp-bound",
+    "release-archive-append-only"
+  ],
+  "mutable_paths": [
+    "var/",
+    "stage/"
+  ],
+  "healthchecks": [
+    "HELLO",
+    "BOOTSTRAP",
+    "LIVING_STATUS"
+  ],
+  "evolution": {
+    "candidate_execution": "forbidden-before-promotion",
+    "promotion": "green-autonomous-yellow-red-human-gated",
+    "reasoning_cortex": "ChatGPT-via-KCL-initially",
+    "autonomous_loop": true,
+    "epoch_size": 10,
+    "report_policy": "every-10-successful-evolution-generations",
+    "counts_as_generation": false,
+    "goal_sources": [
+      "human",
+      "chatgpt_memory",
+      "system_experience"
+    ],
+    "goal_permission_authority": false,
+    "memory_archive": "append-only-protected",
+    "autonomy_envelope": "totp-opened-rolling-session",
+    "critical_approval": "transaction-bound-freeotp",
+    "github_role": "optional-mirror",
+    "release_archive": "kicomarchive-append-only"
+  },
+  "components": [
+    {
+      "path": ".htaccess",
+      "sha256": "750f9a9602a400545a38c88f959c7ae3d4276b8034234a19e67b7fda73cba273",
+      "role": "perimeter",
+      "auto_heal": true
+    },
+    {
+      "path": "admin.php",
+      "sha256": "ce9136c84942d293758dc01c31c2b870c1e8b4ab350f57d2a84f239e971a58ee",
+      "role": "admin",
+      "auto_heal": true
+    },
+    {
+      "path": "assets/control-plane.css",
+      "sha256": "776ce9850c0afc5e2c17d3654d77c7d6938e78ac725536bfe01e7b4a5526b05e",
+      "role": "human-control-plane-presentation",
+      "auto_heal": true
+    },
+    {
+      "path": "api.php",
+      "sha256": "54ccaead70ee1948ade3da317137f8000f0c5ba9355d8420a799a3450c0084a5",
+      "role": "api",
+      "auto_heal": true
+    },
+    {
+      "path": "index.php",
+      "sha256": "8916c60164d0af45a1b95884c728f7d95abaac760cf37be7b583389b72a62d86",
+      "role": "kcl-core",
+      "auto_heal": true
+    },
+    {
+      "path": "lib.php",
+      "sha256": "04f4c233f421fd6a04b3991c3fbdf604733440272a09f506fb7953364d89c107",
+      "role": "core-library",
+      "auto_heal": true
+    },
+    {
+      "path": "living.php",
+      "sha256": "4f9824f1b0d49ec10208c238c156f3fac24b5434eacecb8269b191b9915eeee9",
+      "role": "living-architecture",
+      "auto_heal": true
+    },
+    {
+      "path": "guardian.php",
+      "sha256": "7ca215e03486efbe982d8f4c9e24115d29d232ee518d4c74a663adfdd7dcab31",
+      "role": "autonomous-immune-guardian",
+      "auto_heal": true
+    },
+    {
+      "path": "recovery.php",
+      "sha256": "d2eb63e03dd92e6d36a4458822f3e42758cfd9aad56a13af8aaac157de3c8496",
+      "role": "recovery-kernel",
+      "auto_heal": false
+    },
+    {
+      "path": "robots.txt",
+      "sha256": "331ea9090db0c9f6f597bd9840fd5b171830f6e0b3ba1cb24dfa91f0c95aedc1",
+      "role": "privacy",
+      "auto_heal": true
+    },
+    {
+      "path": "genome/.htaccess",
+      "sha256": "65e0dad8c3e06aff754a1aa691d5c5f1e7c3e25ea5d8d88e9e463f0f59c191a1",
+      "role": "genome-perimeter",
+      "auto_heal": true
+    },
+    {
+      "path": "memory/.htaccess",
+      "sha256": "65e0dad8c3e06aff754a1aa691d5c5f1e7c3e25ea5d8d88e9e463f0f59c191a1",
+      "role": "memory-perimeter",
+      "auto_heal": true
+    },
+    {
+      "path": "stage/.htaccess",
+      "sha256": "65e0dad8c3e06aff754a1aa691d5c5f1e7c3e25ea5d8d88e9e463f0f59c191a1",
+      "role": "workspace-perimeter",
+      "auto_heal": true
+    },
+    {
+      "path": "var/.htaccess",
+      "sha256": "65e0dad8c3e06aff754a1aa691d5c5f1e7c3e25ea5d8d88e9e463f0f59c191a1",
+      "role": "runtime-state-perimeter",
+      "auto_heal": true
+    }
+  ]
+}
