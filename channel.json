@@ -3,6 +3,12 @@
   "product": "kicom",
   "releases": [
     {
+      "version": "0.9.9",
+      "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.9/KiCom-0.9.9-Low-Roundtrip.zip",
+      "sha256": "b9c18d0d729a6ed83ce934c5f96e1c3dbed4dbd8d52a6378501cbe728c5aa723",
+      "published_at": "2026-09-15T12:07:04.258451+00:00"
+    },
+    {
       "version": "0.9.8",
       "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.8/KiCom-0.9.8-Fast-Transport.zip",
       "sha256": "06a8dfeec40f8cd9cb6a1bc972242fe750405f3dd694c73d8a967375476f800d",

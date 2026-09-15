@@ -1,0 +1,26 @@
+PROJECT kicom
+VERSION "0.9.9"
+STATE active
+FACT canonical_name="KiCom"
+FACT purpose="Persistent self-extending AI work environment and controlled HTTPS/KCL gateway"
+FACT protocol="KCL/1"
+FACT mode="living-architecture-with-bounded-autonomy"
+FACT genome_id="kicom-0.9.9-g10"
+FACT genome_generation=10
+FACT direct_shell=false
+FACT arbitrary_remote_fetch=false
+FACT production_write="allowlisted-human-approved"
+FACT autonomy_envelope="freeotp-session:test,staging,workspace,memory,goals"
+FACT critical_approval="transaction-bound-freeotp:red,production,kernel"
+FACT github_role="optional-mirror-not-authority"
+FACT first_party_targets="sandbox,kicomarchive,updatefeed"
+FACT release_archive="append-only-install+update+source+hashes+metadata"
+FACT read_lease="trusted-source-only, ttl600, max_uses64, nonrotating"
+FACT compact_get_batch="up to 16 exact patch operations, one session rotation"
+FACT release_prepare="server-side semver and genome-lineage preparation"
+FACT canonical_memory_via="?q=BOOTSTRAP"
+MILESTONE "Goal Layer and append-only ChatGPT memory archive" status=passed version="0.9.5"
+MILESTONE "Autonomy Envelope and Human Authorization Bridge" status=implemented version="0.9.6"
+MILESTONE "Fast transport" status=implemented version="0.9.8"
+MILESTONE "Low-roundtrip control plane" status=implemented version="0.9.9"
+END_PROJECT kicom

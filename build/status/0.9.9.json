@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.9",
+  "result": "success",
+  "stage": "complete",
+  "exit_code": 0,
+  "risk": "red",
+  "package_sha256": "b9c18d0d729a6ed83ce934c5f96e1c3dbed4dbd8d52a6378501cbe728c5aa723",
+  "updated_at": "2026-09-15T12:07:04.287706+00:00",
+  "transport_role": "one-time mirror bootstrap; future builds intended to use KiCom server-side builder"
+}
