@@ -9,31 +9,58 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    if: github.event_name == 'workflow_dispatch' || github.event.issue.title == 'BUILD_KICOM_0.9.2_R2'
+  build-093:
+    if: github.event_name == 'workflow_dispatch' || github.event.issue.title == 'BUILD_KICOM_0.9.3_FEED_DIAGNOSTICS'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Reassemble verified package
+      - name: Reassemble trusted 0.9.2 R2 base
         shell: bash
         run: |
           set -euo pipefail
-          test -f payload/EXPECTED_SHA256
           EXPECTED="$(tr -d '\r\n ' < payload/EXPECTED_SHA256)"
-          cat payload/part-*.b64 | tr -d '\r\n' | base64 --decode > KiCom-0.9.2-R2.zip
-          ACTUAL="$(sha256sum KiCom-0.9.2-R2.zip | awk '{print $1}')"
+          cat payload/part-0??.b64 | tr -d '\r\n' | base64 --decode > /tmp/KiCom-0.9.2-R2.zip
+          ACTUAL="$(sha256sum /tmp/KiCom-0.9.2-R2.zip | awk '{print $1}')"
           test "$ACTUAL" = "$EXPECTED"
-          mkdir -p releases/0.9.2
-          mv KiCom-0.9.2-R2.zip releases/0.9.2/KiCom-0.9.2-R2.zip
-      - name: Commit binary mirror artifact
+          test "$ACTUAL" = "b46cd8205449d98b5dd048f995cdb88da05a1443f81b7027e6d24da40024b1fd"
+      - name: Build 0.9.3 feed diagnostics
         shell: bash
         run: |
           set -euo pipefail
+          python tools/build_093_feed_diagnostics.py /tmp/KiCom-0.9.2-R2.zip /tmp/KiCom-0.9.3-Feed-Diagnostics.zip
+          rm -rf /tmp/kicom-lint && mkdir /tmp/kicom-lint
+          unzip -q /tmp/KiCom-0.9.3-Feed-Diagnostics.zip -d /tmp/kicom-lint
+          php -l /tmp/kicom-lint/lib.php
+          php -l /tmp/kicom-lint/admin.php
+          php -l /tmp/kicom-lint/index.php
+          php -l /tmp/kicom-lint/api.php
+          mkdir -p releases/0.9.3
+          mv /tmp/KiCom-0.9.3-Feed-Diagnostics.zip releases/0.9.3/KiCom-0.9.3-Feed-Diagnostics.zip
+      - name: Publish feed entry
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHA="$(sha256sum releases/0.9.3/KiCom-0.9.3-Feed-Diagnostics.zip | awk '{print $1}')"
+          export SHA
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          p=Path('channel.json')
+          d=json.loads(p.read_text())
+          releases=[r for r in d.get('releases',[]) if r.get('version')!='0.9.3']
+          releases.insert(0,{
+            'version':'0.9.3',
+            'url':'https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.3/KiCom-0.9.3-Feed-Diagnostics.zip',
+            'sha256':os.environ['SHA'],
+            'published_at':'2026-09-15T04:15:00+02:00'
+          })
+          d['schema']=1; d['product']='kicom'; d['releases']=releases
+          p.write_text(json.dumps(d,indent=2,ensure_ascii=False)+'\n')
+          PY
           git config user.name 'kicom-mirror-bot'
           git config user.email 'kicom-mirror-bot@users.noreply.github.com'
-          git add releases/0.9.2/KiCom-0.9.2-R2.zip
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Build verified KiCom 0.9.2 R2 mirror artifact'
+          git add releases/0.9.3/KiCom-0.9.3-Feed-Diagnostics.zip channel.json
+          git commit -m 'Publish KiCom 0.9.3 feed diagnostics'
           git push
