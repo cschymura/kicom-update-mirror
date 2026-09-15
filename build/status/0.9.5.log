@@ -1,0 +1,24 @@
+== immutable 0.9.4 base ==
+base_sha256=88fa2502ff473f1477c16a215e99b1f36e2d7f57fb1f71adf5e4af2ebc158a58
+== builder ==
+{
+  "package": "/tmp/KiCom-0.9.5-Goal-Layer-Memory-Archive.zip",
+  "sha256": "7b019246f795726afee730614ee06c8bb6129f1241c2ce5cdc411963ab61b107",
+  "work": "/tmp/kicom095-goal-memory"
+}
+== php syntax ==
+No syntax errors detected in /tmp/kicom095-goal-memory/lib.php
+No syntax errors detected in /tmp/kicom095-goal-memory/goals_memory.php
+No syntax errors detected in /tmp/kicom095-goal-memory/living.php
+No syntax errors detected in /tmp/kicom095-goal-memory/index.php
+No syntax errors detected in /tmp/kicom095-goal-memory/api.php
+No syntax errors detected in /tmp/kicom095-goal-memory/admin.php
+No syntax errors detected in /tmp/kicom095-goal-memory/guardian.php
+No syntax errors detected in /tmp/kicom095-goal-memory/recovery.php
+== fresh install ==
+FRESH_INSTALL_OK
+== goal/memory functional test ==
+GOAL_MEMORY_FUNCTIONAL_OK
+== exact 0.9.4 verifier ==
+inspect UPDATE_PATH_NOT_ALLOWLISTED
+VERIFIER_FAILED rc=31

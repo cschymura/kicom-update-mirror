@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.5",
+  "result": "failed",
+  "stage": "publish",
+  "exit_code": 31,
+  "risk": "unknown",
+  "package_sha256": "",
+  "updated_at": "2026-09-15T07:17:50.361639+00:00",
+  "trigger": "push:.github/triggers/build-095-goal-memory.txt"
+}
