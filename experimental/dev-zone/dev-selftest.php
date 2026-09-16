@@ -25,6 +25,9 @@ dok(($r['token_rotation']??true)===false,'DEV tokens do not rotate');
 dok(($r['ttl']??0)===604800,'default absolute TTL is 7 days');
 dok(($r['idle_ttl']??0)===86400,'default idle TTL is 24 hours');
 dok(KiComDevSessionManager::capabilityDefined('workspace.write'),'workspace write allowed');
+dok(KiComDevSessionManager::capabilityDefined('expansion.resource.status'),'expansion resource status allowed');
+dok(KiComDevSessionManager::capabilityDefined('expansion.test.execute'),'test expansion allowed');
+dok(!KiComDevSessionManager::capabilityDefined('expansion.production.execute'),'production expansion forbidden');
 dok(!KiComDevSessionManager::capabilityDefined('deploy.production'),'production deploy forbidden');
 dok(!KiComDevSessionManager::capabilityDefined('self_update.install'),'self-update forbidden');
 dok(!KiComDevSessionManager::capabilityDefined('kernel.write'),'kernel forbidden');
@@ -37,6 +40,8 @@ dok(($a1['ok']??false)===true,'DEV session authenticates for allowed capability'
 dok(($a1['token_rotates']??true)===false,'successful request does not rotate token');
 $a2=$sessions->authenticate($sid,$tok,'build.test');
 dok(($a2['ok']??false)===true,'same token reusable for another DEV request');
+$a3=$sessions->authenticate($sid,$tok,'expansion.test.execute');
+dok(($a3['ok']??false)===true,'same token usable for test-only expansion capability');
 $deny=$sessions->authenticate($sid,$tok,'deploy.production');
 dok(($deny['ok']??true)===false&&($deny['code']??'')==='DEV_CAPABILITY_FORBIDDEN','production capability denied before token use');
 $bad=$sessions->authenticate($sid,str_repeat('0',64),'workspace.read');
