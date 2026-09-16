@@ -3,8 +3,8 @@
     "candidate": "interrupt-auth-resilience-v5",
     "promotion_manifest_sha256": "664d1581b9c8d8fb550356eeeaf0e137e6f5a539c44930d6658d101e99274bf0",
     "bundle": "living_bundle_v5.php",
-    "bytes": 43473,
-    "sha256": "14f6fa40b5596118ce6d1d90e3bf929b490130483900286205a0330deb0c3572",
+    "bytes": 45315,
+    "sha256": "e0f90a5b56f5f518e2c72b11aa6ecd08ce5460f53171b9307d50d972cf82e0e5",
     "sources": {
         "interrupt_resilience_v1.php": "6c688291410de65fd0720a1dc5162bdbdadb700338383f400072f4bf7f4901fe",
         "interrupt_resilience_v2.php": "2b6d7e2781b41fea755367652ece86f18612e688984fd5cf2c6ba262161b87d4",
@@ -19,6 +19,6 @@
         "approval_status_v1.php": "198a1c494b2e7fcc4a74553f4b5bde8236e32f0ce83b0293c885bea73891e139",
         "update_pending_inspect_v1.php": "de952b0b8a45a9378c2a1a670558f54a5c01a052775253c83c6f92ecffcabc0a",
         "source_manifest_status_v1.php": "f35dedaf1dfa7134cfc695de6131546f7efe5fd577c9b9d60251fc3d15997750",
-        "route_helpers_v1.php": "6d88940416ba434a9040bd8ea5bd22c918a8071da3353a660320f18515f7f9d9"
+        "route_helpers_v1.php": "e134c45c186573b03341e07409cd11c5e9d3b05d821a48d2cc7c3e1228f2f042"
     }
 }

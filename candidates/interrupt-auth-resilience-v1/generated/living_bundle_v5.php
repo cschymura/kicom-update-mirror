@@ -390,7 +390,7 @@ function kicomSourceManifestStatusV1(): array {
 }
 /* END source_manifest_status_v1.php */
 
-/* BEGIN route_helpers_v1.php sha256=6d88940416ba434a9040bd8ea5bd22c918a8071da3353a660320f18515f7f9d9 */
+/* BEGIN route_helpers_v1.php sha256=e134c45c186573b03341e07409cd11c5e9d3b05d821a48d2cc7c3e1228f2f042 */
 function kicomClientRequestIdV1(array $get,array $post=[]): string {
     $v=(string)($post['client_request_id']??$get['client_request_id']??'');
     return preg_match('/^[A-Za-z0-9_.:-]{16,80}$/',$v)?$v:'';
@@ -421,5 +421,13 @@ function kicomPendingInspectKclLinesV1(array $r,string $serverRequestId): array 
 function kicomSourceManifestKclLinesV1(array $r,string $serverRequestId): array {
     $lines=[KCL_PROTOCOL,'OK source_manifest_status','FACT request_id='.kclString($serverRequestId),'FACT version='.kclString((string)($r['version']??'')),'FACT manifest_sha256='.kclString((string)($r['manifest_sha256']??'')),'FACT files='.count($r['files']??[])];
     foreach(($r['files']??[]) as $i=>$f)$lines[]='FILE #'.($i+1).'. path='.kclString((string)($f['path']??'')).' bytes='.(int)($f['bytes']??0).' sha256='.kclString((string)($f['sha256']??''));$lines[]='RULE hashes-only-no-source-content';$lines[]='END';return $lines;
+}
+function kicomRouteReleaseConsistencyV1(): array {return kicomReleaseConsistencyStatusV1();}
+function kicomReleaseConsistencyKclLinesV1(array $r,string $serverRequestId): array {
+    if(empty($r['ok']))return [KCL_PROTOCOL,'ERROR release_consistency_status','FACT request_id='.kclString($serverRequestId),'FACT code='.kclString((string)($r['code']??'FAILED')),'END'];
+    $lines=[KCL_PROTOCOL,(!empty($r['consistent'])?'OK':'WARN').' release_consistency_status','FACT request_id='.kclString($serverRequestId),'FACT code='.kclString((string)($r['code']??'OK')),'FACT consistent='.(!empty($r['consistent'])?'true':'false'),'FACT runtime_version='.kclString((string)($r['runtime_version']??'')),'FACT genome_id='.kclString((string)($r['genome_id']??'')),'FACT genome_generation='.(int)($r['genome_generation']??0),'FACT project_state_version='.kclString((string)($r['project_state_version']??'')),'FACT project_state_genome_id='.kclString((string)($r['project_state_genome_id']??'')),'FACT project_state_generation='.(int)($r['project_state_generation']??0),'FACT project_state_consistent='.(!empty($r['project_state_consistent'])?'true':'false'),'FACT changelog_has_runtime_release='.(!empty($r['changelog_has_runtime_release'])?'true':'false'),'FACT next_priority1_has_runtime='.(!empty($r['next_priority1_has_runtime'])?'true':'false'),'FACT protocol_workspace_batch_consistent='.(!empty($r['protocol_workspace_batch_consistent'])?'true':'false')];
+    foreach(($r['stale_resources']??[]) as $i=>$name)$lines[]='STALE #'.($i+1).' resource='.kclString((string)$name);
+    foreach(($r['memory_sha256']??[]) as $name=>$sha)$lines[]='MEMORY resource='.kclString((string)$name).' sha256='.kclString((string)$sha);
+    $lines[]='RULE read-only-no-memory-mutation';$lines[]='RULE diagnostic-does-not-grant-authority';$lines[]='END';return $lines;
 }
 /* END route_helpers_v1.php */
