@@ -26,6 +26,7 @@
     "DevRouter.php",
     "DevHttpAdapter.php",
     "DevKiComBindings.php",
+    "DevDiagnostics.php",
     "dev-client.js",
     "dev-auth.php",
     "dev-api.php",
@@ -39,7 +40,8 @@
     "agent_bridge": "dev/dev-bridge.php",
     "one_time_enrollment": "existing FreeOTP verifier",
     "normal_entry": "WebAuthn passkey",
-    "bridge_link": "one-click copy from first-party DEV UI"
+    "bridge_link": "one-click copy from first-party DEV UI",
+    "diagnostics": ["dev_audit", "living_experience"]
   },
   "candidate_export": {
     "uses_existing_verifier": true,
@@ -52,7 +54,8 @@
     "kernel mutation",
     "recovery mutation",
     "auth administration",
-    "secret-store access"
+    "secret-store access",
+    "arbitrary log paths"
   ],
   "promotion": "separate production approval"
 }
