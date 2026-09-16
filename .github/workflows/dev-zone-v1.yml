@@ -35,11 +35,15 @@ jobs:
 
       - name: PHP syntax
         run: |
+          php -l experimental/passkey-auth/PasskeyBridge.php
           php -l experimental/dev-zone/DevSession.php
           php -l experimental/dev-zone/DevAuthAdapter.php
+          php -l experimental/dev-zone/DevAuthFlow.php
           php -l experimental/dev-zone/DevRouter.php
           php -l experimental/dev-zone/DevHttpAdapter.php
           php -l experimental/dev-zone/DevKiComBindings.php
+          php -l experimental/dev-zone/runtime/dev-auth.php
+          php -l experimental/dev-zone/runtime/dev-api.php
           php -l experimental/dev-zone/dev-selftest.php
           php -l experimental/dev-zone/dev-router-selftest.php
           php -l experimental/dev-zone/dev-http-selftest.php
@@ -47,7 +51,7 @@ jobs:
 
       - name: Validate candidate manifest
         run: |
-          php -r '$j=json_decode(file_get_contents("experimental/dev-zone/manifest.json"),true); if(!is_array($j)||($j["schema"]??0)!==1||($j["status"]??"")!=="candidate"||empty($j["candidate_export"]["creates_production_pending"])===false) exit(1); echo "manifest ok\n";'
+          php -r '$j=json_decode(file_get_contents("experimental/dev-zone/manifest.json"),true); if(!is_array($j)||($j["schema"]??0)!==1||($j["status"]??"")!=="candidate"||(($j["candidate_export"]["creates_production_pending"]??true)!==false)||($j["install_root"]??"")!=="dev/") exit(1); echo "manifest ok\n";'
 
       - name: DEV boundary static checks
         shell: bash
@@ -68,10 +72,16 @@ jobs:
             echo 'DEV browser client must not put credentials in query strings' >&2
             exit 1
           fi
+          if grep -Rni '\$_GET' experimental/dev-zone/runtime; then
+            echo 'DEV runtime endpoints must not accept query-string credentials or operations' >&2
+            exit 1
+          fi
           if grep -n 'kicomReceiveSelfUpdatePackage' experimental/dev-zone/DevKiComBindings.php; then
             echo 'DEV candidate export must not enter the self-update pending/install pipeline' >&2
             exit 1
           fi
+          grep -q 'withSessionLock' experimental/dev-zone/DevSession.php
+          grep -A18 'public function revoke' experimental/dev-zone/DevSession.php | grep -q 'withSessionLock'
 
       - name: DEV session and passkey selftest
         run: php experimental/dev-zone/dev-selftest.php
@@ -85,22 +95,30 @@ jobs:
       - name: KiCom runtime binding selftest
         run: php experimental/dev-zone/dev-bindings-selftest.php
 
-      - name: Build candidate bundle
+      - name: Build install-oriented candidate bundle
         shell: bash
         run: |
           set -euo pipefail
           rm -rf dist
-          mkdir -p dist/kicom-dev-zone-v1/passkey dist/kicom-dev-zone-v1/dev-zone
-          cp experimental/passkey-auth/PasskeyBridge.php dist/kicom-dev-zone-v1/passkey/
-          cp experimental/passkey-auth/browser.js dist/kicom-dev-zone-v1/passkey/
-          cp experimental/dev-zone/DevSession.php dist/kicom-dev-zone-v1/dev-zone/
-          cp experimental/dev-zone/DevAuthAdapter.php dist/kicom-dev-zone-v1/dev-zone/
-          cp experimental/dev-zone/DevRouter.php dist/kicom-dev-zone-v1/dev-zone/
-          cp experimental/dev-zone/DevHttpAdapter.php dist/kicom-dev-zone-v1/dev-zone/
-          cp experimental/dev-zone/DevKiComBindings.php dist/kicom-dev-zone-v1/dev-zone/
-          cp experimental/dev-zone/dev-client.js dist/kicom-dev-zone-v1/dev-zone/
+          mkdir -p dist/kicom-dev-zone-v1/dev
+          cp experimental/passkey-auth/PasskeyBridge.php dist/kicom-dev-zone-v1/dev/
+          cp experimental/passkey-auth/browser.js dist/kicom-dev-zone-v1/dev/
+          cp experimental/dev-zone/DevSession.php dist/kicom-dev-zone-v1/dev/
+          cp experimental/dev-zone/DevAuthAdapter.php dist/kicom-dev-zone-v1/dev/
+          cp experimental/dev-zone/DevAuthFlow.php dist/kicom-dev-zone-v1/dev/
+          cp experimental/dev-zone/DevRouter.php dist/kicom-dev-zone-v1/dev/
+          cp experimental/dev-zone/DevHttpAdapter.php dist/kicom-dev-zone-v1/dev/
+          cp experimental/dev-zone/DevKiComBindings.php dist/kicom-dev-zone-v1/dev/
+          cp experimental/dev-zone/dev-client.js dist/kicom-dev-zone-v1/dev/
+          cp experimental/dev-zone/runtime/dev-auth.php dist/kicom-dev-zone-v1/dev/
+          cp experimental/dev-zone/runtime/dev-api.php dist/kicom-dev-zone-v1/dev/
+          cp experimental/dev-zone/runtime/index.html dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/manifest.json dist/kicom-dev-zone-v1/
           cp experimental/dev-zone/README.md dist/kicom-dev-zone-v1/
+          php -l dist/kicom-dev-zone-v1/dev/DevAuthAdapter.php
+          php -l dist/kicom-dev-zone-v1/dev/DevAuthFlow.php
+          php -l dist/kicom-dev-zone-v1/dev/dev-auth.php
+          php -l dist/kicom-dev-zone-v1/dev/dev-api.php
           (cd dist && zip -qr kicom-dev-zone-v1.zip kicom-dev-zone-v1)
           sha256sum dist/kicom-dev-zone-v1.zip | tee dist/kicom-dev-zone-v1.zip.sha256
 
