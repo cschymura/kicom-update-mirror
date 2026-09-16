@@ -20,8 +20,14 @@
     <div class="row">
       <button id="connect">Mit Passkey verbinden</button>
       <button id="refresh" class="secondary">Status prüfen</button>
+      <button id="bridge" class="secondary">Agentenlink kopieren</button>
       <button id="logout" class="danger">DEV-Sitzung beenden</button>
     </div>
+  </section>
+
+  <section class="card">
+    <h2>Agenten-Zugang</h2>
+    <div class="muted">Der Agentenlink enthält ausschließlich die DEV-Berechtigung. Er darf Quellstand, Workspace und isolierte Builds bearbeiten, aber keine Produktion, Updates, Recovery, Auth-Verwaltung oder Secrets. Der Link ist für GET-basierte Entwicklungstools gedacht und bleibt bis zum Sitzungsende widerrufbar.</div>
   </section>
 
   <section class="card">
@@ -50,8 +56,18 @@ const post=async(operation,payload={})=>{
   if(!r.ok||!j.ok) throw Object.assign(new Error(j.code||('HTTP '+r.status)),{data:j});
   return j;
 };
+const bridgeUrl=()=>{
+  const s=KiComDev.load();if(!s)throw new Error('DEV session required');
+  const u=new URL('dev-bridge.php',location.href);
+  u.searchParams.set('sid',s.session_id);
+  u.searchParams.set('key',s.token);
+  u.searchParams.set('op','DEV_SESSION_STATUS');
+  u.searchParams.set('p','e30');
+  return u.toString();
+};
 async function refresh(){
   const saved=KiComDev.load();
+  $('bridge').disabled=!saved;
   if(!saved){$('status').textContent='Nicht verbunden';$('status').className='status';$('details').textContent='Passkey öffnen, dann kann die DEV-Sitzung bis zu 7 Tage genutzt werden.';return;}
   try{
     const s=await KiComDev.status();
@@ -72,6 +88,13 @@ $('connect').addEventListener('click',async()=>{
     KiComDev.save(s);log({ok:true,code:s.code,scope:s.scope,expires_in:s.expires_in,idle_expires_in:s.idle_expires_in});await refresh();
   }catch(e){log(e.data||e.message);$('status').textContent='Verbindung fehlgeschlagen';$('status').className='status err';}
   finally{b.disabled=false;}
+});
+$('bridge').addEventListener('click',async()=>{
+  try{
+    const url=bridgeUrl();
+    await navigator.clipboard.writeText(url);
+    log('DEV-Agentenlink kopiert. Er enthält nur die widerrufbare DEV-Berechtigung.');
+  }catch(e){log(e.message||String(e));}
 });
 $('enroll').addEventListener('click',async()=>{
   const b=$('enroll');const code=$('otp').value.replace(/\D/g,'');if(code.length!==6){log('Bitte einen 6-stelligen Code eingeben.');return;}b.disabled=true;
