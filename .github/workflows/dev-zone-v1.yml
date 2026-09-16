@@ -42,6 +42,7 @@ jobs:
           php -l experimental/dev-zone/DevRouter.php
           php -l experimental/dev-zone/DevHttpAdapter.php
           php -l experimental/dev-zone/DevKiComBindings.php
+          php -l experimental/dev-zone/DevDiagnostics.php
           php -l experimental/dev-zone/runtime/dev-auth.php
           php -l experimental/dev-zone/runtime/dev-api.php
           php -l experimental/dev-zone/runtime/dev-bridge.php
@@ -49,6 +50,7 @@ jobs:
           php -l experimental/dev-zone/dev-router-selftest.php
           php -l experimental/dev-zone/dev-http-selftest.php
           php -l experimental/dev-zone/dev-bindings-selftest.php
+          php -l experimental/dev-zone/dev-diagnostics-selftest.php
 
       - name: Validate candidate manifest
         run: |
@@ -85,6 +87,7 @@ jobs:
           fi
           grep -q 'withSessionLock' experimental/dev-zone/DevSession.php
           grep -A18 'public function revoke' experimental/dev-zone/DevSession.php | grep -q 'withSessionLock'
+          grep -q "DEV_LOG_STREAM_FORBIDDEN" experimental/dev-zone/DevDiagnostics.php
 
       - name: DEV session and passkey selftest
         run: php experimental/dev-zone/dev-selftest.php
@@ -97,6 +100,9 @@ jobs:
 
       - name: KiCom runtime binding selftest
         run: php experimental/dev-zone/dev-bindings-selftest.php
+
+      - name: DEV diagnostics selftest
+        run: php experimental/dev-zone/dev-diagnostics-selftest.php
 
       - name: Build install-oriented candidate bundle
         shell: bash
@@ -112,6 +118,7 @@ jobs:
           cp experimental/dev-zone/DevRouter.php dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/DevHttpAdapter.php dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/DevKiComBindings.php dist/kicom-dev-zone-v1/dev/
+          cp experimental/dev-zone/DevDiagnostics.php dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/dev-client.js dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/runtime/dev-auth.php dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/runtime/dev-api.php dist/kicom-dev-zone-v1/dev/
@@ -121,6 +128,7 @@ jobs:
           cp experimental/dev-zone/README.md dist/kicom-dev-zone-v1/
           php -l dist/kicom-dev-zone-v1/dev/DevAuthAdapter.php
           php -l dist/kicom-dev-zone-v1/dev/DevAuthFlow.php
+          php -l dist/kicom-dev-zone-v1/dev/DevDiagnostics.php
           php -l dist/kicom-dev-zone-v1/dev/dev-auth.php
           php -l dist/kicom-dev-zone-v1/dev/dev-api.php
           php -l dist/kicom-dev-zone-v1/dev/dev-bridge.php
