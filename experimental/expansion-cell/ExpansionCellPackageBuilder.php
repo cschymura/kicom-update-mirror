@@ -32,6 +32,9 @@ final class KiComExpansionCellPackageBuilder
         $p=parse_url((string)$prepared['child_base_url']);
         if (!is_array($p)||strtolower((string)($p['scheme']??''))!=='https'||empty($p['host'])) return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_HTTPS_REQUIRED'];
 
+        // Hidden dotfiles are deliberately not required as source inputs here.
+        // Some shared-hosting ZIP extractors omit dotfiles. The child .htaccess
+        // is generated below, making package creation robust after such installs.
         $required=[
             'ExpansionProtocol.php',
             'CellNode.php',
@@ -39,7 +42,6 @@ final class KiComExpansionCellPackageBuilder
             'cell-runtime/bootstrap.php',
             'cell-runtime/federation.php',
             'cell-runtime/status.php',
-            'cell-runtime/.htaccess',
         ];
         foreach ($required as $rel) if (!is_file($this->sourceDir.'/'.$rel)) return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_SOURCE_MISSING','path'=>$rel];
 
@@ -55,13 +57,16 @@ final class KiComExpansionCellPackageBuilder
             'cell-runtime/bootstrap.php'=>'bootstrap.php',
             'cell-runtime/federation.php'=>'federation.php',
             'cell-runtime/status.php'=>'status.php',
-            'cell-runtime/.htaccess'=>'.htaccess',
         ];
         foreach ($copy as $src=>$dst) {
             if (!@copy($this->sourceDir.'/'.$src,$outputDir.'/'.$dst)) return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_COPY_FAILED','path'=>$src];
             @chmod($outputDir.'/'.$dst,0600);
         }
-        @file_put_contents($outputDir.'/var/.htaccess',"Require all denied\n",LOCK_EX);
+
+        $publicDeny="Options -Indexes\n<FilesMatch \"^(bootstrap\\.config\\.php|common\\.php)$\">\n  Require all denied\n</FilesMatch>\n";
+        if (@file_put_contents($outputDir.'/.htaccess',$publicDeny,LOCK_EX)===false) return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_HTACCESS_FAILED'];
+        @chmod($outputDir.'/.htaccess',0600);
+        if (@file_put_contents($outputDir.'/var/.htaccess',"Require all denied\n",LOCK_EX)===false) return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_VAR_HTACCESS_FAILED'];
         @chmod($outputDir.'/var/.htaccess',0600);
 
         $caps=[];
