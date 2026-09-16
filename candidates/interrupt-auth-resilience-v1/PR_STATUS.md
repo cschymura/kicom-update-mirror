@@ -3,34 +3,44 @@
 Current candidate implements:
 
 - persistent non-secret jobs/checkpoints with CAS revision protection
-- pre-execution `IN_PROGRESS` request claims preventing blind double execution after transport loss
-- exact request replay v2: same normal-autonomy session + same request_id + same request fingerprint + same presented old token may retrieve only the already executed response
-- replay response encrypted at rest with AES-256-GCM using a key derived from the presented old token + request_id; neither old nor next token is stored in plaintext
-- explicit `IN_FLIGHT` result for the crash window between claim and durable completion; caller must inspect operation state rather than re-execute
-- strict secret filtering for resumable job/checkpoint state
-- existing 60-second previous-token recovery retained
-- idempotent FreeOTP session-open candidate for the same short-lived request ID, pending exact live-core review
-- locked rolling-token consumer preserving current session semantics
+- atomic pre-execution request claims
+- exact encrypted response replay for the same session + request_id + request fingerprint + presented old token
+- `IN_PROGRESS` handling that prevents duplicate execution
+- `UNCERTAIN` handling: expired in-flight work is never automatically re-executed
+- request-id/fingerprint/token conflict rejection
+- shared normal-session lock
+- locked rolling-token consumer preserving KiCom current-token + one-use 60-second previous-token recovery semantics
+- idempotent FreeOTP normal-session open v2 with 180-second exact replay and no secondary recovery bearer
+- common guarded normal-action wrapper v3
+- read-only `approval_id + binding_sha256` status recovery for lost critical-execute responses
+- strict secret filtering for resumable jobs/checkpoints
 
-Superseded candidate idea:
+Superseded development history retained but forbidden from promotion:
 
-- `session_recovery_v1.php` is retained only as development history and MUST NOT be integrated or promoted. A long-lived recovery handle would create a second bearer credential and is superseded by exact request replay v2.
+- `session_recovery_v1.php` — long-lived recovery handle rejected as unnecessary second bearer credential
+- v1 session-open/consume and older request-guard/wrapper iterations
 
 Local validation completed:
 
-- PHP syntax: request replay v2 + request guard v2 PASS
-- exact response replay PASS
-- no plaintext old/next token in replay receipt PASS
-- different action/fingerprint rejection PASS
-- different presented token rejection PASS
-- duplicate while first request is running => IN_FLIGHT PASS
-- completed duplicate => exact replay without re-execution PASS
+- PHP syntax PASS for session lock/consume/open v2, request guards, wrappers and approval status
+- FreeOTP session open consumes TOTP exactly once PASS
+- same open request replays same initial token PASS
+- open replay cannot roll a later token backward PASS
+- existing previous-token recovery remains one-use PASS
+- exact normal-response replay returns same next_token without re-execution PASS
+- different request fingerprint rejected PASS
+- `IN_PROGRESS` duplicate does not execute PASS
+- expired `IN_PROGRESS` becomes `UNCERTAIN` and remains non-executable PASS
+- approval-status wrong binding rejected PASS
+- approval payload not exposed PASS
 
-Not yet live. Promotion is intentionally blocked until:
+Live state remains unchanged: KiCom 0.9.14 is authoritative. Existing unknown RED pending 0.9.15 remains untouched.
 
-1. exact live 0.9.14+ auth source is re-read and every token-consume callsite is enumerated;
-2. existing unknown RED pending 0.9.15 is audited so a new finalize cannot overwrite `pending.json`;
+Promotion is intentionally blocked until:
+
+1. exact live 0.9.14+ auth/router source is re-read and every token-consume callsite is enumerated;
+2. unknown RED pending 0.9.15 is audited/resolved so no finalize overwrites `pending.json`;
 3. canonical KiCom memory receives the standing interruption/auth-resilience decision;
-4. isolated server build passes verifier/genome checks;
-5. normal-session replay smoke tests pass, including a deliberately lost-response simulation;
+4. an isolated server build integrates only the v2/v3/v4 approved components and passes verifier/genome checks;
+5. live lost-response smoke tests pass;
 6. RED/production/kernel critical approval semantics are confirmed unchanged.
