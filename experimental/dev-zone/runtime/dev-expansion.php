@@ -36,7 +36,7 @@ if(!is_array($body)) devExpansionOut(['ok'=>false,'code'=>'DEV_EXPANSION_JSON_IN
 $operation=strtoupper(trim((string)($body['operation']??'')));
 $capability=match($operation){
     'STATUS'=>'expansion.resource.status',
-    'EXECUTE_SANDBOX'=>'expansion.test.execute',
+    'EXECUTE_SANDBOX','REPAIR_SANDBOX_FEDERATION'=>'expansion.test.execute',
     default=>'',
 };
 if($capability==='') devExpansionOut(['ok'=>false,'code'=>'DEV_EXPANSION_OPERATION_FORBIDDEN'],403);
@@ -54,7 +54,12 @@ $observer->stage($opId,'AUTH','OK');
 try{
     $bindings=new KiComDevExpansionBindings(__DIR__.'/expansion','https://kicom.rurtalbahn.info');
     $observer->stage($opId,'BINDINGS','OK');
-    $result=$operation==='STATUS'?$bindings->resourceStatus():$bindings->executeSandbox();
+    $result=match($operation){
+        'STATUS'=>$bindings->resourceStatus(),
+        'EXECUTE_SANDBOX'=>$bindings->executeSandbox(),
+        'REPAIR_SANDBOX_FEDERATION'=>$bindings->repairSandboxFederation(),
+        default=>['ok'=>false,'code'=>'DEV_EXPANSION_OPERATION_FORBIDDEN'],
+    };
     $observer->finish($opId,!empty($result['ok']),(string)($result['code']??'UNKNOWN'),[
         'operation'=>$operation,
         'scope'=>'dev',
