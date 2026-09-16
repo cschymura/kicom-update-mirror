@@ -6,10 +6,20 @@ declare(strict_types=1);
 function kicomDelegatedBuildJobsDirV1(): string { return kicomVarDir().'/delegated_build_jobs_v1'; }
 function kicomDelegatedBuildJobFileV1(string $id): string { return kicomDelegatedBuildJobsDirV1().'/'.$id.'.json'; }
 function kicomDelegatedBuildJobLockV1(string $id): string { return kicomDelegatedBuildJobsDirV1().'/'.$id.'.lock'; }
+function kicomDelegatedBuildRevocationFileV1(): string { return kicomDelegatedBuildJobsDirV1().'/revocation.json'; }
+function kicomDelegatedBuildRevocationLockV1(): string { return kicomDelegatedBuildJobsDirV1().'/revocation.lock'; }
 function kicomDelegatedBuildRuntimeVersionV1(): string { return defined('KICOM_VERSION')?(string)constant('KICOM_VERSION'):''; }
 function kicomDelegatedBuildJobsEnsureV1(): bool {
     $d=kicomDelegatedBuildJobsDirV1();if(!is_dir($d)&&!@mkdir($d,0700,true)&&!is_dir($d))return false;
     $deny=$d.'/.htaccess';if(!is_file($deny))@file_put_contents($deny,"Require all denied\n",LOCK_EX);return true;
+}
+function kicomDelegatedBuildRevocationEpochV1(): int {
+    if(!kicomDelegatedBuildJobsEnsureV1())return -1;$f=kicomDelegatedBuildRevocationFileV1();$r=kicomAuthJsonRead($f);$epoch=(int)($r['epoch']??0);if($epoch>0)return $epoch;
+    $row=['schema'=>1,'epoch'=>1,'updated_at'=>gmdate('c')];return kicomAuthJsonWrite($f,$row)?1:-1;
+}
+function kicomDelegatedBuildRotateRevocationEpochV1(): array {
+    if(!kicomDelegatedBuildJobsEnsureV1())return ['ok'=>false,'code'=>'JOB_STORAGE_UNAVAILABLE'];$lf=kicomDelegatedBuildRevocationLockV1();$lock=@fopen($lf,'c+');if(is_resource($lock))@chmod($lf,0600);if($lock===false||!@flock($lock,LOCK_EX)){if(is_resource($lock))@fclose($lock);return ['ok'=>false,'code'=>'JOB_REVOCATION_LOCK_FAILED'];}
+    try{$f=kicomDelegatedBuildRevocationFileV1();$r=kicomAuthJsonRead($f);$epoch=max(0,(int)($r['epoch']??0))+1;$row=['schema'=>1,'epoch'=>$epoch,'updated_at'=>gmdate('c')];if(!kicomAuthJsonWrite($f,$row))return ['ok'=>false,'code'=>'JOB_REVOCATION_WRITE_FAILED'];if(function_exists('kicomLivingEvent'))kicomLivingEvent('delegated_build_jobs_revoked','warn',['epoch'=>$epoch]);return ['ok'=>true,'code'=>'JOB_REVOCATION_ROTATED','epoch'=>$epoch];}finally{@flock($lock,LOCK_UN);@fclose($lock);}
 }
 function kicomDelegatedBuildJobIdV1(string $id): ?string {$id=strtolower(trim($id));return preg_match('/^[a-f0-9]{24}$/',$id)?$id:null;}
 function kicomDelegatedBuildJobReadV1(string $id): ?array {$id=kicomDelegatedBuildJobIdV1($id)??'';return $id===''?null:kicomAuthJsonRead(kicomDelegatedBuildJobFileV1($id));}
@@ -40,8 +50,9 @@ function kicomDelegatedBuildJobCreateV1(array $session,array $plan): array {
     if(!kicomDelegatedBuildJobsEnsureV1())return ['ok'=>false,'code'=>'JOB_STORAGE_UNAVAILABLE'];
     if(kicomDelegatedBuildActiveCountV1()>=16)return ['ok'=>false,'code'=>'JOB_ACTIVE_LIMIT'];
     $sid=strtolower((string)($session['session_id']??''));$abs=(int)($session['expires_at']??0);$now=time();if(!preg_match('/^[a-f0-9]{24}$/',$sid)||$abs<=$now)return ['ok'=>false,'code'=>'JOB_SESSION_INVALID'];
+    $epoch=kicomDelegatedBuildRevocationEpochV1();if($epoch<1)return ['ok'=>false,'code'=>'JOB_REVOCATION_UNAVAILABLE'];
     $v=kicomDelegatedBuildPlanValidateV1($plan);if(empty($v['ok']))return $v;$id=substr(kicomAuthRandomHex(12),0,24);$expires=min($abs,$now+3600);$runtime=kicomDelegatedBuildRuntimeVersionV1();
-    $row=['schema'=>2,'id'=>$id,'state'=>'READY','session_id'=>$sid,'runtime_version'=>$runtime,'plan_sha256'=>(string)$v['plan_sha256'],'plan'=>$v['plan'],'next_step'=>0,'completed_steps'=>0,'created_at'=>gmdate('c'),'updated_at'=>gmdate('c'),'expires_at'=>$expires,'last_code'=>'READY','last_sha256'=>''];
+    $row=['schema'=>3,'id'=>$id,'state'=>'READY','session_id'=>$sid,'runtime_version'=>$runtime,'revocation_epoch'=>$epoch,'plan_sha256'=>(string)$v['plan_sha256'],'plan'=>$v['plan'],'next_step'=>0,'completed_steps'=>0,'created_at'=>gmdate('c'),'updated_at'=>gmdate('c'),'expires_at'=>$expires,'last_code'=>'READY','last_sha256'=>''];
     if(!kicomAuthJsonWrite(kicomDelegatedBuildJobFileV1($id),$row))return ['ok'=>false,'code'=>'JOB_WRITE_FAILED'];
     if(function_exists('kicomLivingEvent'))kicomLivingEvent('delegated_build_job_created','info',['job_id'=>$id,'build_id'=>$row['plan']['build_id'],'steps'=>count($row['plan']['steps']),'expires_in'=>$expires-$now]);
     return ['ok'=>true,'code'=>'JOB_CREATED','job_id'=>$id,'plan_sha256'=>$row['plan_sha256'],'steps'=>count($row['plan']['steps']),'expires_in'=>$expires-$now];
@@ -57,10 +68,11 @@ function kicomDelegatedBuildJobTickV1(string $id): array {
     $id=kicomDelegatedBuildJobIdV1($id)??'';if($id==='')return ['ok'=>false,'code'=>'JOB_ID_INVALID'];$lf=kicomDelegatedBuildJobLockV1($id);$lock=@fopen($lf,'c+');if(is_resource($lock))@chmod($lf,0600);if($lock===false||!@flock($lock,LOCK_EX)){if(is_resource($lock))@fclose($lock);return ['ok'=>false,'code'=>'JOB_LOCK_FAILED'];}
     try{
         $r=kicomDelegatedBuildJobReadV1($id);if(!is_array($r))return ['ok'=>false,'code'=>'JOB_NOT_FOUND'];$state=(string)($r['state']??'');
-        if(in_array($state,['COMPLETED','FAILED','EXPIRED'],true))return ['ok'=>true,'code'=>'JOB_TERMINAL','state'=>$state];
+        if(in_array($state,['COMPLETED','FAILED','EXPIRED','REVOKED'],true))return ['ok'=>true,'code'=>'JOB_TERMINAL','state'=>$state];
         if($state==='UNCERTAIN')return ['ok'=>false,'code'=>'JOB_UNCERTAIN','state'=>'UNCERTAIN','inspect_required'=>true];
         if($state==='RUNNING'){$r['state']='UNCERTAIN';$r['last_code']='JOB_INTERRUPTED_UNCERTAIN';$r['updated_at']=gmdate('c');kicomAuthJsonWrite(kicomDelegatedBuildJobFileV1($id),$r);return ['ok'=>false,'code'=>'JOB_UNCERTAIN','state'=>'UNCERTAIN','inspect_required'=>true];}
         if((int)($r['expires_at']??0)<time()){$r['state']='EXPIRED';$r['last_code']='JOB_EXPIRED';$r['updated_at']=gmdate('c');kicomAuthJsonWrite(kicomDelegatedBuildJobFileV1($id),$r);return ['ok'=>false,'code'=>'JOB_EXPIRED'];}
+        $storedEpoch=(int)($r['revocation_epoch']??0);$currentEpoch=kicomDelegatedBuildRevocationEpochV1();if($storedEpoch<1||$currentEpoch<1||$storedEpoch!==$currentEpoch){$r['state']='REVOKED';$r['last_code']='JOB_REVOKED';$r['updated_at']=gmdate('c');kicomAuthJsonWrite(kicomDelegatedBuildJobFileV1($id),$r);return ['ok'=>false,'code'=>'JOB_REVOKED','state'=>'REVOKED'];}
         $plan=is_array($r['plan']??null)?$r['plan']:[];$storedHash=strtolower((string)($r['plan_sha256']??''));$calcHash=kicomDelegatedBuildPlanHashV1($plan);if(!preg_match('/^[a-f0-9]{64}$/',$storedHash)||!hash_equals($storedHash,$calcHash))return kicomDelegatedBuildFailV1($r,'JOB_PLAN_INTEGRITY_FAILED');
         $boundRuntime=(string)($r['runtime_version']??'');$currentRuntime=kicomDelegatedBuildRuntimeVersionV1();if($boundRuntime!==''&&$currentRuntime!==''&&!hash_equals($boundRuntime,$currentRuntime))return kicomDelegatedBuildFailV1($r,'JOB_RUNTIME_CHANGED');
         $steps=$plan['steps']??[];$n=(int)($r['next_step']??0);if(!isset($steps[$n])||!is_array($steps[$n])){$r['state']='COMPLETED';$r['last_code']='COMPLETED';$r['updated_at']=gmdate('c');kicomAuthJsonWrite(kicomDelegatedBuildJobFileV1($id),$r);return ['ok'=>true,'code'=>'JOB_COMPLETED','completed_steps'=>(int)$r['completed_steps']];}
