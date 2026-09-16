@@ -1,0 +1,89 @@
+name: KiCom resilience candidate v5
+
+on:
+  push:
+    branches:
+      - 'candidate/interrupt-auth-resilience-v1'
+    paths:
+      - 'candidates/interrupt-auth-resilience-v1/*.php'
+      - 'candidates/interrupt-auth-resilience-v1/PROMOTION_MANIFEST.json'
+      - '.github/workflows/kicom-resilience-candidate.yml'
+  pull_request:
+    paths:
+      - 'candidates/interrupt-auth-resilience-v1/**'
+      - '.github/workflows/kicom-resilience-candidate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  php-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+      - name: PHP runtime
+        run: php -v
+      - name: Validate promotion manifest and syntax-check exact allowlist
+        run: |
+          set -euo pipefail
+          root=candidates/interrupt-auth-resilience-v1
+          php -r '
+            $root=$argv[1];
+            $m=json_decode(file_get_contents("$root/PROMOTION_MANIFEST.json"),true);
+            if(!is_array($m)||!is_array($m["runtime_include"]??null)) exit(2);
+            $ex=array_fill_keys(array_values(array_filter($m["runtime_exclude_superseded"]??[],"is_string")),true);
+            foreach($m["runtime_include"] as $f){
+              if(!is_string($f)||isset($ex[$f])||!preg_match("/^[A-Za-z0-9_.-]+\\.php$/",$f)||!is_file("$root/$f")) exit(3);
+              echo "$root/$f\n";
+            }
+          ' "$root" > /tmp/promote-php-files.txt
+          cat /tmp/promote-php-files.txt
+          while IFS= read -r f; do php -l "$f"; done < /tmp/promote-php-files.txt
+          php -l "$root/build_runtime_bundle.php"
+      - name: Current focused regressions
+        run: |
+          set -euo pipefail
+          root=candidates/interrupt-auth-resilience-v1
+          php "$root/test_candidate.php"
+          php "$root/test_session_v3.php"
+          php "$root/test_router_deferred_guard_v1.php"
+          php "$root/test_session_consume_bridge_v1.php"
+          php "$root/test_route_helpers_v1.php"
+          php "$root/test_release_consistency_status_v1.php"
+          php "$root/test_memory_sync_0.9.15.php"
+          php "$root/test_memory_sync_transport_fallback.php"
+      - name: Build deterministic v5 living bundle
+        run: |
+          set -euo pipefail
+          root=candidates/interrupt-auth-resilience-v1
+          rm -rf "$root/generated"
+          php "$root/build_runtime_bundle.php" | tee /tmp/resilience-build.log
+          cp /tmp/resilience-build.log "$root/generated/build.log"
+          php -l "$root/generated/living_bundle_v5.php"
+          cd "$root/generated"
+          sha256sum -c living_bundle_v5.sha256
+          cat living_bundle_v5.json
+      - name: Persist deterministic bundle on candidate branch
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          git config user.name 'kicom-build-bot'
+          git config user.email 'kicom-build-bot@users.noreply.github.com'
+          git add candidates/interrupt-auth-resilience-v1/generated
+          git commit -m 'Refresh KiCom resilience v5 deterministic bundle' || exit 0
+          git push origin HEAD:${{ github.ref_name }}
+      - name: Upload deterministic bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: kicom-resilience-v5-bundle
+          path: |
+            candidates/interrupt-auth-resilience-v1/generated/living_bundle_v5.php
+            candidates/interrupt-auth-resilience-v1/generated/living_bundle_v5.json
+            candidates/interrupt-auth-resilience-v1/generated/living_bundle_v5.sha256
+            candidates/interrupt-auth-resilience-v1/generated/build.log
+          if-no-files-found: error
+          retention-days: 7

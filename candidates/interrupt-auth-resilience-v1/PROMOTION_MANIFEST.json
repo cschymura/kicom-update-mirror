@@ -1,0 +1,86 @@
+{
+  "schema": 8,
+  "candidate": "interrupt-auth-resilience-v5",
+  "target_runtime": "0.9.16",
+  "target_genome_generation": 17,
+  "authority": "candidate-only; live KiCom remains authoritative",
+  "runtime_include": [
+    "interrupt_resilience_v1.php",
+    "interrupt_resilience_v2.php",
+    "request_replay_v3.php",
+    "request_guard_v5.php",
+    "session_lock_v2.php",
+    "session_consume_resilient_v3.php",
+    "session_consume_bridge_v1.php",
+    "session_open_resilient_v2.php",
+    "guarded_action_v5.php",
+    "router_deferred_guard_v1.php",
+    "approval_status_v1.php",
+    "update_pending_inspect_v1.php",
+    "source_manifest_status_v1.php",
+    "release_consistency_status_v1.php",
+    "route_helpers_v1.php"
+  ],
+  "runtime_exclude_superseded": [
+    "session_recovery_v1.php",
+    "session_open_resilient_v1.php",
+    "session_consume_resilient_v1.php",
+    "session_consume_resilient_v2.php",
+    "request_replay_v2.php",
+    "request_guard_v2.php",
+    "request_guard_v3.php",
+    "request_guard_v4.php",
+    "guarded_action_v2.php",
+    "guarded_action_v3.php",
+    "guarded_action_v4.php"
+  ],
+  "validated_properties": [
+    "same resilient request replays exact prior response and next token without re-execution",
+    "expired in-progress request becomes UNCERTAIN and is never automatically re-executed",
+    "previous rolling token is client_request_id-bound for resilient requests",
+    "legacy clients without client_request_id remain on the original session-consume path",
+    "server request_id is never reused as the client idempotency key",
+    "nested parameter order canonicalizes recursively and nested secret fields are excluded from fingerprints",
+    "replay receipts contain no plaintext session id, old token or next token",
+    "session-open replay cannot roll a later token backward",
+    "deferred router guard preserves exact response status and lines",
+    "critical approval status is read-only and exact-binding-sha protected",
+    "pending update inspector requires a valid normal-session peek, does not rotate the session token, and hides internal package path",
+    "public source manifest status exposes hashes only, never source content",
+    "release consistency status is read-only and reports runtime/genome versus canonical memory without mutating either"
+  ],
+  "live_0_9_15_review": {
+    "status": "completed",
+    "map": "LIVE_INTEGRATION_0.9.15.json",
+    "patch_plan": "LIVE_PATCH_PLAN_0.9.15.md",
+    "runtime_version": "0.9.15",
+    "genome_id": "kicom-0.9.15-g16",
+    "workspace_proposal_batch_live": true,
+    "workspace_proposal_batch_parameter": "proposal_ids",
+    "source_hashes": {
+      "index.php": "560e4252d8555210bb834a4a3dbc8cdfacbf67bca867f5f1e84317201fa8bd6f",
+      "api.php": "9c55813ea725e8f1e537094c1c9c22be7e870f72bb8217066c96d029b1e65421",
+      "living.php": "07d4e95280c0b9c2efecded71671502043f8b9d4d85feb9de09d99ebf4b7febd",
+      "lib.php": "9e4616c95839d0bdc133bd0c347244e82c9703f3bb29018b7fa6b61efa997b14",
+      "genome/genome.json": "c5191b1b025bde8fa0420319c412222758478b212c96f0290adcd36366dfd3a3"
+    }
+  },
+  "canonical_memory": {
+    "decision": "D024",
+    "decision_status": "confirmed_written",
+    "decisions_sha256": "48bbda6275a0441870e0ce5f1362adcb021e4b4336a55e930acbfccc6e3aa532",
+    "runtime_memory_sync_required": true,
+    "stale_resources": ["PROJECT_STATE", "PROTOCOL", "CHANGELOG", "NEXT"]
+  },
+  "rules": [
+    "Do not promote files merely because they exist on the candidate branch.",
+    "Apply only against a live 0.9.15 source state whose hashes match LIVE_INTEGRATION_0.9.15.json, or re-read/rebase first.",
+    "Preserve the installed 0.9.15 workspace_proposal_batch route and proposal_ids contract.",
+    "UPDATE_PENDING_INSPECT is an authorized nonrotating session-peek diagnostic, not a public package metadata endpoint.",
+    "RELEASE_CONSISTENCY_STATUS is read-only; it must never auto-mutate canonical memory.",
+    "RED/production/kernel FreeOTP execution semantics must remain unchanged.",
+    "Authenticated mutation transport denial is not evidence that KiCom executed a request; never blind-retry an ambiguous mutation.",
+    "Synchronize canonical PROJECT_STATE/PROTOCOL/CHANGELOG/NEXT to 0.9.15 before release promotion or as an explicitly verified prerequisite.",
+    "All release promotion must pass isolated build validation, workspace-batch regression, genome/verifier checks and deliberate lost-response tests."
+  ]
+}

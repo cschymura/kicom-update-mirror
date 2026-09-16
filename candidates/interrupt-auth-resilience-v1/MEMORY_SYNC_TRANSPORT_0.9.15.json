@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "source_plan": "MEMORY_SYNC_0.9.15.json",
+  "source_plan_schema": 2,
+  "target_runtime": "0.9.15",
+  "strategy": "ordered_three_phase_compact_batch_fallback",
+  "reason": "Keep authenticated GET payloads short while preserving the SHA dependency boundary between the two NEXT patches; do not guess the historical z/TLV encoder.",
+  "full_compact": {
+    "operations": 5,
+    "raw_bytes": 4038,
+    "sha256": "2f1c3c138e27bd4ab270766fc55e037bccb6899a9dedfa21fa6d0eabd73ee6c1"
+  },
+  "phases": [
+    {
+      "phase": 1,
+      "operation_indexes": [0],
+      "resources": ["PROJECT_STATE"],
+      "raw_bytes": 1487,
+      "base64url_chars": 1983,
+      "gzip_bytes": 592,
+      "gzip_base64url_chars": 790,
+      "payload_sha256": "8c7ca89d1058ef3c1684053c83298e8238adbc6facef8286cc9bfcb5a7a83379"
+    },
+    {
+      "phase": 2,
+      "operation_indexes": [1, 2, 3],
+      "resources": ["PROTOCOL", "CHANGELOG", "NEXT"],
+      "raw_bytes": 1919,
+      "base64url_chars": 2559,
+      "gzip_bytes": 892,
+      "gzip_base64url_chars": 1190,
+      "payload_sha256": "694def1a45e3782c416e1438d26142512b9e25e5c36b6c638e61cc00ced2f8be"
+    },
+    {
+      "phase": 3,
+      "operation_indexes": [4],
+      "resources": ["NEXT"],
+      "raw_bytes": 634,
+      "base64url_chars": 846,
+      "gzip_bytes": 438,
+      "gzip_base64url_chars": 584,
+      "payload_sha256": "b82d0493a0d355596c98ed07d9ff0121b5a91ba1441de00912add73cde86fd25"
+    }
+  ],
+  "max_base64url_chars": 2559,
+  "expected_next_chain": {
+    "live_base_sha256": "25c899e99b232171da6dd7bdd0d1f72f4fbf50563e57dc7d9f5e2fd50abc37db",
+    "intermediate_sha256": "b7596f525a855432294e64f6822adf8e89e77f71114c72a29188549c587a4063",
+    "final_sha256": "0aab01dd07b29f3fd5372b08bae69ae5cf9150033e91f4c29030e6b6a22d06e9"
+  },
+  "execution_rules": [
+    "Re-read BOOTSTRAP and all four target resource SHA-256 values immediately before execution; server state is authoritative.",
+    "Abort before phase 1 if any recorded live base SHA no longer matches.",
+    "Execute phases strictly in order and verify affected resource SHA/state after every phase.",
+    "Never place operation indexes 3 and 4 in the same batch; phase 3 is valid only after phase 2 produced the recorded NEXT intermediate SHA-256.",
+    "A transport denial is not an execution result. Do not blindly retry an ambiguous mutation; recover status first.",
+    "No phase changes runtime permissions, RED/production/kernel gates, or authentication policy.",
+    "No authentication secrets, session ids or rolling tokens are stored in this file."
+  ],
+  "verified_by_ci": {
+    "workflow_run": 35070368850,
+    "job": 104710225374,
+    "conclusion": "success"
+  }
+}
