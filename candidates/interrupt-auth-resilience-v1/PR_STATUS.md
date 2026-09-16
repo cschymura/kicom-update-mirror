@@ -3,20 +3,28 @@
 Current candidate implements:
 
 - persistent non-secret jobs/checkpoints with CAS revision protection
-- idempotent request receipts with request-ID tamper rejection
-- strict secret filtering for resumable state
+- pre-execution `IN_PROGRESS` request claims preventing blind double execution after transport loss
 - exact request replay v2: same normal-autonomy session + same request_id + same request fingerprint + same presented old token may retrieve only the already executed response
-- replay response is encrypted at rest with a key derived from the presented old token and request_id; neither old nor next token is stored in plaintext
-- existing 60-second previous-token recovery remains intact
-- idempotent FreeOTP session-open replay for the same short-lived request ID
+- replay response encrypted at rest with AES-256-GCM using a key derived from the presented old token + request_id; neither old nor next token is stored in plaintext
+- explicit `IN_FLIGHT` result for the crash window between claim and durable completion; caller must inspect operation state rather than re-execute
+- strict secret filtering for resumable job/checkpoint state
+- existing 60-second previous-token recovery retained
+- idempotent FreeOTP session-open candidate for the same short-lived request ID, pending exact live-core review
 - locked rolling-token consumer preserving current session semantics
-- integration contract covering GET, POST, transaction and batch token consumers
 
 Superseded candidate idea:
 
-- the standalone long-lived recovery-handle design in session_recovery_v1.php is retained only as development history and MUST NOT be integrated or promoted. It creates a second bearer credential and is superseded by exact request replay v2.
+- `session_recovery_v1.php` is retained only as development history and MUST NOT be integrated or promoted. A long-lived recovery handle would create a second bearer credential and is superseded by exact request replay v2.
 
-All local PHP syntax checks and standalone regression harnesses for request replay v2 pass.
+Local validation completed:
+
+- PHP syntax: request replay v2 + request guard v2 PASS
+- exact response replay PASS
+- no plaintext old/next token in replay receipt PASS
+- different action/fingerprint rejection PASS
+- different presented token rejection PASS
+- duplicate while first request is running => IN_FLIGHT PASS
+- completed duplicate => exact replay without re-execution PASS
 
 Not yet live. Promotion is intentionally blocked until:
 
