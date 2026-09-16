@@ -28,6 +28,7 @@ This avoids sending a TOTP seed, TOTP code, passkey private key, session token, 
 - `PasskeyBridge.php` — composer-free WebAuthn ES256 verification, challenge storage and encrypted session handoff.
 - `selftest.php` — deterministic synthetic registration + assertion test and libsodium handoff roundtrip.
 - `INTEGRATION.md` — proposed KiCom endpoint contract and staged activation plan.
+- `.github/workflows/passkey-auth-prototype.yml` — syntax, crypto-extension, static-boundary and synthetic end-to-end checks.
 
 ## Required PHP features
 
