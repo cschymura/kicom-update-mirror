@@ -75,6 +75,9 @@ final class KiComExpansionLocalFilesystemDeployer
      * This is used when deployment succeeded but the first HTTPS bootstrap was
      * blocked by shared-hosting permissions. No files are replaced or deleted.
      *
+     * bootstrap.config.php is treated strictly as text here. It is never
+     * included/executed from the sibling target.
+     *
      * @return array<string,mixed>
      */
     public function repairExisting(string $targetWebRoot): array
@@ -92,11 +95,11 @@ final class KiComExpansionLocalFilesystemDeployer
 
         $expansionId='';$childBase='';$state='unknown';
         $cfg=$target.'/bootstrap.config.php';
-        if(is_file($cfg)){
-            $row=@include $cfg;
-            if(is_array($row)){
-                $expansionId=(string)($row['expansion_id']??'');
-                $childBase=rtrim((string)($row['base_url']??''),'/');
+        if(is_file($cfg)&&!is_link($cfg)){
+            $raw=@file_get_contents($cfg);
+            if(is_string($raw)&&strlen($raw)<=65536){
+                if(preg_match("/['\"]expansion_id['\"]\\s*=>\\s*['\"](exp-[a-f0-9]{24})['\"]/",$raw,$m)) $expansionId=(string)$m[1];
+                if(preg_match("/['\"]base_url['\"]\\s*=>\\s*['\"](https:\\/\\/[^'\"\\r\\n]{1,300})['\"]/",$raw,$m)) $childBase=rtrim((string)$m[1],'/');
                 $state='bootstrap_pending';
             }
         }
@@ -118,7 +121,7 @@ final class KiComExpansionLocalFilesystemDeployer
         if($expansionId!==''&&!preg_match('/^exp-[a-f0-9]{24}$/',$expansionId)) return ['ok'=>false,'code'=>'EXPANSION_EXISTING_CELL_ID_INVALID'];
         if($childBase!==''){
             $p=parse_url($childBase);
-            if(!is_array($p)||strtolower((string)($p['scheme']??''))!=='https'||empty($p['host'])) return ['ok'=>false,'code'=>'EXPANSION_EXISTING_CELL_URL_INVALID'];
+            if(!is_array($p)||strtolower((string)($p['scheme']??''))!=='https'||empty($p['host'])||isset($p['user'])||isset($p['pass'])||isset($p['fragment'])) return ['ok'=>false,'code'=>'EXPANSION_EXISTING_CELL_URL_INVALID'];
         }
 
         return [
