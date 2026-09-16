@@ -23,15 +23,15 @@ jobs:
         run: |
           if ! command -v php >/dev/null 2>&1; then
             sudo apt-get update
-            sudo apt-get install -y php-cli php-common zip
+            sudo apt-get install -y php-cli php-common php-zip zip
           fi
           php -v
 
       - name: Require crypto extensions
         run: >-
-          php -r '$missing=[]; foreach (["openssl","sodium"] as $e) if (!extension_loaded($e)) $missing[]=$e;
+          php -r '$missing=[]; foreach (["openssl","sodium","zip"] as $e) if (!extension_loaded($e)) $missing[]=$e;
           if ($missing) { fwrite(STDERR,"Missing extensions: ".implode(",",$missing)."\n"); exit(1); }
-          echo "openssl+sodium available\n";'
+          echo "openssl+sodium+zip available\n";'
 
       - name: PHP syntax
         run: |
@@ -39,13 +39,15 @@ jobs:
           php -l experimental/dev-zone/DevAuthAdapter.php
           php -l experimental/dev-zone/DevRouter.php
           php -l experimental/dev-zone/DevHttpAdapter.php
+          php -l experimental/dev-zone/DevKiComBindings.php
           php -l experimental/dev-zone/dev-selftest.php
           php -l experimental/dev-zone/dev-router-selftest.php
           php -l experimental/dev-zone/dev-http-selftest.php
+          php -l experimental/dev-zone/dev-bindings-selftest.php
 
       - name: Validate candidate manifest
         run: |
-          php -r '$j=json_decode(file_get_contents("experimental/dev-zone/manifest.json"),true); if(!is_array($j)||($j["schema"]??0)!==1||($j["status"]??"")!=="candidate") exit(1); echo "manifest ok\n";'
+          php -r '$j=json_decode(file_get_contents("experimental/dev-zone/manifest.json"),true); if(!is_array($j)||($j["schema"]??0)!==1||($j["status"]??"")!=="candidate"||empty($j["candidate_export"]["creates_production_pending"])===false) exit(1); echo "manifest ok\n";'
 
       - name: DEV boundary static checks
         shell: bash
@@ -66,6 +68,10 @@ jobs:
             echo 'DEV browser client must not put credentials in query strings' >&2
             exit 1
           fi
+          if grep -n 'kicomReceiveSelfUpdatePackage' experimental/dev-zone/DevKiComBindings.php; then
+            echo 'DEV candidate export must not enter the self-update pending/install pipeline' >&2
+            exit 1
+          fi
 
       - name: DEV session and passkey selftest
         run: php experimental/dev-zone/dev-selftest.php
@@ -75,6 +81,9 @@ jobs:
 
       - name: DEV HTTP adapter selftest
         run: php experimental/dev-zone/dev-http-selftest.php
+
+      - name: KiCom runtime binding selftest
+        run: php experimental/dev-zone/dev-bindings-selftest.php
 
       - name: Build candidate bundle
         shell: bash
@@ -88,6 +97,7 @@ jobs:
           cp experimental/dev-zone/DevAuthAdapter.php dist/kicom-dev-zone-v1/dev-zone/
           cp experimental/dev-zone/DevRouter.php dist/kicom-dev-zone-v1/dev-zone/
           cp experimental/dev-zone/DevHttpAdapter.php dist/kicom-dev-zone-v1/dev-zone/
+          cp experimental/dev-zone/DevKiComBindings.php dist/kicom-dev-zone-v1/dev-zone/
           cp experimental/dev-zone/dev-client.js dist/kicom-dev-zone-v1/dev-zone/
           cp experimental/dev-zone/manifest.json dist/kicom-dev-zone-v1/
           cp experimental/dev-zone/README.md dist/kicom-dev-zone-v1/
