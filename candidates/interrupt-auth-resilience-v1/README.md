@@ -51,18 +51,7 @@ Make KiCom work safe under chat-stream interruption, platform-side review, lost 
    - current mirrored call-site inventory: `index.php::requireAutonomySession`, `living.php::kicomAutonomyTxCommit`, `api.php::AUTONOMY_UPDATE_UPLOAD`, `api.php::AUTONOMY_BATCH`
    - exact live source must be searched again before promotion because later codebook paths may add consumers
 
-## Integration contract
-
-Candidate endpoint shape:
-
-- `AUTH_SESSION_OPEN&code=<FreeOTP>&request_id=<stable-id>` -> existing fields plus `recovery_handle`, `recovery_limit`, `replayed=true|false`
-- repeating the exact same open request within 180 seconds -> same session/token/handle, no second TOTP consumption
-- `AUTH_SESSION_RECOVER&session_id=<id>&recovery_handle=<handle>&request_id=<stable-id>` -> `next_token`, normal session expiries, `replayed=true|false`
-- optional read-only `AUTH_SESSION_RECOVERY_STATUS&session_id=<id>` -> counters/expiry only, never the handle
-
-The recovery/open-replay endpoints are **not** critical approval endpoints. They cannot change scope, approve proposals, install updates, write production, mutate the recovery kernel or execute RED actions. Recovery only replaces the rolling action token of an already-valid normal autonomy session; open replay only reproduces an already-authorized normal-session creation.
-
-Before runtime promotion, the exact live `kicomAutonomySessionOpen` / `kicomAutonomySessionConsume` implementation must be re-read and all token consumers must share the same per-session lock. The nearest mirrored 0.9.12 core already has 60-second previous-token recovery; this candidate complements it rather than removing it.
+Detailed runtime patch order and promotion gates are documented in `INTEGRATION.md`. Current candidate status/blockers are recorded in `PR_STATUS.md`.
 
 ## Critical-auth invariant
 
