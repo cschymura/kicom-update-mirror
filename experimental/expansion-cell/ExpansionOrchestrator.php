@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__.'/ExpansionProtocol.php';
 require_once __DIR__.'/ExpansionRegistry.php';
 require_once __DIR__.'/ExpansionFtpDeployer.php';
+require_once __DIR__.'/ExpansionLocalFilesystemDeployer.php';
 require_once __DIR__.'/ExpansionCronRelay.php';
 require_once __DIR__.'/ExpansionCellPackageBuilder.php';
 require_once __DIR__.'/ExpansionHttpTransport.php';
@@ -60,6 +61,20 @@ final class KiComExpansionOrchestrator
     }
 
     /** @param array<string,mixed> $prepared */
+    public function deployPreparedLocal(array $prepared,string $localWebRoot,string $packageDir): array
+    {
+        $local=new KiComExpansionLocalFilesystemDeployer();
+        try {
+            $r=$local->deploy($packageDir,$localWebRoot);
+        } finally {
+            $this->builder->destroy($packageDir);
+        }
+        if(empty($r['ok'])) return $r;
+        $mark=$this->registry->markDeployed((string)$prepared['expansion_id']);
+        return empty($mark['ok'])?$mark:$r+['expansion_id'=>$prepared['expansion_id']];
+    }
+
+    /** @param array<string,mixed> $prepared */
     public function activatePrepared(array $prepared,KiComExpansionTransport $http): array
     {
         $id=(string)($prepared['expansion_id']??'');$childBase=rtrim((string)($prepared['child_base_url']??''),'/');
@@ -91,6 +106,16 @@ final class KiComExpansionOrchestrator
         $x=$this->preparePackage($targetBaseUrl,$remoteWebRoot,$ttl); if(empty($x['ok'])) return $x;
         $prep=(array)$x['prepared'];$pkg=(array)$x['package'];
         $d=$this->deployPrepared($prep,$ftp,(string)$pkg['directory']); if(empty($d['ok'])) return ['ok'=>false,'code'=>'EXPANSION_DEPLOY_FAILED','detail'=>$d];
+        $http=new KiComExpansionHttpsTransport((string)$prep['child_base_url']);
+        return $this->activatePrepared($prep,$http)+['deployment'=>$d];
+    }
+
+    /** @return array<string,mixed> */
+    public function expandLocal(string $targetBaseUrl,string $localWebRoot,int $ttl=3600): array
+    {
+        $x=$this->preparePackage($targetBaseUrl,'/',$ttl); if(empty($x['ok'])) return $x;
+        $prep=(array)$x['prepared'];$pkg=(array)$x['package'];
+        $d=$this->deployPreparedLocal($prep,$localWebRoot,(string)$pkg['directory']); if(empty($d['ok'])) return ['ok'=>false,'code'=>'EXPANSION_DEPLOY_FAILED','detail'=>$d];
         $http=new KiComExpansionHttpsTransport((string)$prep['child_base_url']);
         return $this->activatePrepared($prep,$http)+['deployment'=>$d];
     }
