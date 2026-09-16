@@ -55,6 +55,7 @@ jobs:
           php "$root/test_route_helpers_v1.php"
           php "$root/test_release_consistency_status_v1.php"
           php "$root/test_memory_sync_0.9.15.php"
+          php "$root/test_memory_sync_transport_fallback.php"
       - name: Build deterministic v5 living bundle
         run: |
           set -euo pipefail
