@@ -6,6 +6,7 @@ require_once __DIR__.'/ExpansionRegistry.php';
 require_once __DIR__.'/ExpansionCellPackageBuilder.php';
 require_once __DIR__.'/ExpansionFtpDeployer.php';
 require_once __DIR__.'/ExpansionLocalFilesystemDeployer.php';
+require_once __DIR__.'/ExpansionKiComDeployTargetResolver.php';
 require_once __DIR__.'/ExpansionOrchestrator.php';
 
 /**
@@ -32,6 +33,9 @@ final class KiComExpansionService
         $this->varDir=rtrim($varDir,'/');
         $this->sourceDir=rtrim($sourceDir,'/');
         if($deploymentResourceResolver!==null&&!is_callable($deploymentResourceResolver)) throw new InvalidArgumentException('EXPANSION_RESOURCE_RESOLVER_INVALID');
+        if($deploymentResourceResolver===null&&KiComExpansionKiComDeployTargetResolver::available()){
+            $deploymentResourceResolver=[KiComExpansionKiComDeployTargetResolver::class,'resolve'];
+        }
         $this->deploymentResourceResolver=$deploymentResourceResolver;
         if(!is_dir($this->varDir)&&!@mkdir($this->varDir,0700,true)&&!is_dir($this->varDir)) throw new RuntimeException('EXPANSION_STORAGE_UNAVAILABLE');
         @chmod($this->varDir,0700);
@@ -54,8 +58,8 @@ final class KiComExpansionService
 
         try {
             if($mode==='resource'){
-                $name=trim((string)($request['deployment_resource']??''));
-                if($name===''||!preg_match('/^[a-z0-9_.-]{1,64}$/i',$name)) return ['ok'=>false,'code'=>'EXPANSION_DEPLOYMENT_RESOURCE_INVALID'];
+                $name=strtolower(trim((string)($request['deployment_resource']??'')));
+                if($name===''||!preg_match('/^[a-z0-9][a-z0-9_-]{1,31}$/',$name)) return ['ok'=>false,'code'=>'EXPANSION_DEPLOYMENT_RESOURCE_INVALID'];
                 if($this->deploymentResourceResolver===null) return ['ok'=>false,'code'=>'EXPANSION_DEPLOYMENT_RESOURCE_RESOLVER_UNAVAILABLE'];
                 $resolved=($this->deploymentResourceResolver)($name);
                 if(!is_string($resolved)||trim($resolved)==='') return ['ok'=>false,'code'=>'EXPANSION_DEPLOYMENT_RESOURCE_UNAVAILABLE'];
@@ -97,5 +101,15 @@ final class KiComExpansionService
         $ready=$this->identity->ensure();if(empty($ready['ok']))return $ready;
         $parent=(array)$ready['parent'];$registry=new KiComExpansionRegistry($this->varDir.'/registry',$parent);
         return ['ok'=>true,'code'=>'EXPANSION_SERVICE_STATUS','parent'=>$parent,'cells'=>$registry->cells()];
+    }
+
+    /** @return array<string,mixed> */
+    public function deploymentResourceStatus(string $alias): array
+    {
+        $alias=strtolower(trim($alias));
+        if(!preg_match('/^[a-z0-9][a-z0-9_-]{1,31}$/',$alias)) return ['ok'=>false,'code'=>'EXPANSION_DEPLOYMENT_RESOURCE_INVALID'];
+        $row=KiComExpansionKiComDeployTargetResolver::publicDescriptor($alias);
+        if($row===null) return ['ok'=>false,'code'=>'EXPANSION_DEPLOYMENT_RESOURCE_UNAVAILABLE'];
+        return ['ok'=>true,'code'=>'EXPANSION_DEPLOYMENT_RESOURCE_READY','resource'=>$row];
     }
 }
