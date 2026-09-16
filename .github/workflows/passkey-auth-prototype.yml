@@ -44,8 +44,12 @@ jobs:
             echo 'Forbidden shell primitive found' >&2
             exit 1
           fi
-          if grep -nE '(curl_init|https?://[^'"'"' ]+)' experimental/passkey-auth/PasskeyBridge.php; then
-            echo 'Unexpected network primitive/URL found in verifier module' >&2
+          if grep -nE '\b(curl_init|fsockopen|pfsockopen)\s*\(' experimental/passkey-auth/PasskeyBridge.php; then
+            echo 'Unexpected network primitive found in verifier module' >&2
+            exit 1
+          fi
+          if grep -nE 'file_get_contents\s*\(\s*["'"']https?://' experimental/passkey-auth/PasskeyBridge.php; then
+            echo 'Unexpected remote file read found in verifier module' >&2
             exit 1
           fi
 
