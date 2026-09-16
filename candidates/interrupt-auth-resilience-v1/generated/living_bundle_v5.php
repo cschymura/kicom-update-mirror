@@ -390,13 +390,13 @@ function kicomSourceManifestStatusV1(): array {
 }
 /* END source_manifest_status_v1.php */
 
-/* BEGIN route_helpers_v1.php sha256=344af1c9650efc57b84824b2ad1d557163292badee96ed5012d6b7affc1c8c61 */
+/* BEGIN route_helpers_v1.php sha256=6d88940416ba434a9040bd8ea5bd22c918a8071da3353a660320f18515f7f9d9 */
 function kicomClientRequestIdV1(array $get,array $post=[]): string {
-    $v=(string)($post['request_id']??$get['request_id']??'');
+    $v=(string)($post['client_request_id']??$get['client_request_id']??'');
     return preg_match('/^[A-Za-z0-9_.:-]{16,80}$/',$v)?$v:'';
 }
-function kicomRouteAuthSessionOpenV1(string $code,string $requestId): array {
-    if($requestId!=='')return kicomSessionOpenIdempotentV2($code,$requestId);
+function kicomRouteAuthSessionOpenV1(string $code,string $clientRequestId): array {
+    if($clientRequestId!=='')return kicomSessionOpenIdempotentV2($code,$clientRequestId);
     return kicomAutonomySessionOpen($code);
 }
 function kicomRouteApprovalStatusV1(string $approvalId,string $bindingSha256): array {return kicomAuthApprovalStatusReadV1($approvalId,$bindingSha256);}
@@ -404,10 +404,19 @@ function kicomApprovalStatusKclLinesV1(array $r,string $serverRequestId): array 
     if(empty($r['ok']))return [KCL_PROTOCOL,'ERROR auth_approval_status','FACT request_id='.kclString($serverRequestId),'FACT code='.kclString((string)($r['code']??'FAILED')),'END'];
     return [KCL_PROTOCOL,'OK auth_approval_status','FACT request_id='.kclString($serverRequestId),'FACT code="OK"','FACT approval_id='.kclString((string)$r['approval_id']),'FACT action='.kclString((string)$r['action']),'FACT risk='.kclString((string)$r['risk']),'FACT status='.kclString((string)$r['status']),'FACT terminal='.(!empty($r['terminal'])?'true':'false'),'FACT binding_sha256='.kclString((string)$r['binding_sha256']),'FACT expires_at='.(int)$r['expires_at'],'FACT used_at='.kclString((string)$r['used_at']),'FACT result_code='.kclString((string)$r['result_code']),'RULE read-only-no-authorization','END'];
 }
+function kicomRoutePendingInspectAuthorizedV1(string $sessionId,string $token): array {
+    $s=kicomAutonomySessionPeek(strtolower(trim($sessionId)),strtolower(trim($token)));
+    if(empty($s['ok']))return ['ok'=>false,'code'=>(string)($s['code']??'SESSION_REJECTED')];
+    $r=kicomUpdatePendingInspectV1();
+    if(empty($r['ok']))return $r;
+    $r['authorized_session_id']=(string)($s['session_id']??'');
+    return $r;
+}
 function kicomPendingInspectKclLinesV1(array $r,string $serverRequestId): array {
+    if(empty($r['ok']))return [KCL_PROTOCOL,'ERROR update_pending_inspect','FACT request_id='.kclString($serverRequestId),'FACT code='.kclString((string)($r['code']??'FAILED')),'RULE authorized-read-only','END'];
     $lines=[KCL_PROTOCOL,'OK update_pending_inspect','FACT request_id='.kclString($serverRequestId),'FACT code='.kclString((string)($r['code']??'OK')),'FACT pending='.(!empty($r['pending'])?'true':'false')];
     if(!empty($r['pending'])){foreach(['from_version','to_version','zip_sha256','manifest_sha256','genome_id','genome_sha256','source','risk_class','created_at'] as $k)$lines[]='FACT '.$k.'='.kclString((string)($r[$k]??''));$lines[]='FACT kernel_update='.(!empty($r['kernel_update'])?'true':'false');$lines[]='FACT files_count='.(int)($r['files_count']??0);$lines[]='FACT install_files_count='.(int)($r['install_files_count']??0);foreach(($r['risk_reasons']??[]) as $i=>$x)$lines[]='RISK #'.($i+1).'. reason='.kclString((string)$x);foreach(($r['changed_paths']??[]) as $i=>$x)$lines[]='CHANGED #'.($i+1).'. path='.kclString((string)$x);}
-    $lines[]='RULE read-only-no-package-mutation';$lines[]='END';return $lines;
+    $lines[]='RULE authorized-read-only-no-token-rotation';$lines[]='RULE read-only-no-package-mutation';$lines[]='END';return $lines;
 }
 function kicomSourceManifestKclLinesV1(array $r,string $serverRequestId): array {
     $lines=[KCL_PROTOCOL,'OK source_manifest_status','FACT request_id='.kclString($serverRequestId),'FACT version='.kclString((string)($r['version']??'')),'FACT manifest_sha256='.kclString((string)($r['manifest_sha256']??'')),'FACT files='.count($r['files']??[])];
