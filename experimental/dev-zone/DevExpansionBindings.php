@@ -2,7 +2,8 @@
 declare(strict_types=1);
 
 /**
- * Narrow DEV binding for the first real Expansion Cell test.
+ * Narrow DEV binding for the first real Expansion Cell test and its managed
+ * repair path.
  *
  * This adapter is intentionally fixed to the existing allowlisted KiCom
  * deployment resource `sandbox` and its HTTPS origin. It cannot select an
@@ -12,6 +13,7 @@ final class KiComDevExpansionBindings
 {
     private const RESOURCE_ALIAS='sandbox';
     private const TARGET_BASE_URL='https://sandbox.rurtalbahn.info';
+    private const EXPECTED_BUGGY_FEDERATION_SHA='d648b1b20c41f39049aa4cabd23ced3d9794cf2c1e92e602886b2e2674730653';
 
     private string $sourceDir;
     private string $parentBaseUrl;
@@ -50,6 +52,28 @@ final class KiComDevExpansionBindings
             'deployment_resource'=>self::RESOURCE_ALIAS,
             'ttl'=>3600,
         ]);
+    }
+
+    /**
+     * Repair exactly the known first-child federation endpoint. The old hash is
+     * bound here so this DEV action cannot silently overwrite an unexpected
+     * target version.
+     *
+     * @return array<string,mixed>
+     */
+    public function repairSandboxFederation(): array
+    {
+        $service=$this->service();
+        $ready=$service->deploymentResourceStatus(self::RESOURCE_ALIAS);
+        if(empty($ready['ok'])) return $ready;
+        $resource=(array)($ready['resource']??[]);
+        if(($resource['class']??'')!=='test'||empty($resource['writable'])) return ['ok'=>false,'code'=>'DEV_EXPANSION_SANDBOX_NOT_READY'];
+
+        return $service->repairFederationEndpoint(
+            self::RESOURCE_ALIAS,
+            self::TARGET_BASE_URL,
+            self::EXPECTED_BUGGY_FEDERATION_SHA
+        );
     }
 
     private function service(): KiComExpansionService
