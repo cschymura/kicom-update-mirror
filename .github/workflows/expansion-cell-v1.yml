@@ -45,8 +45,11 @@ jobs:
             echo 'Secret-like material found in expansion candidate' >&2
             exit 1
           fi
-          grep -q 'never the plaintext enrollment token' experimental/expansion-cell/ExpansionRegistry.php
+          grep -q "enrollmentVerifier" experimental/expansion-cell/ExpansionRegistry.php
+          grep -q "unset(\$row\['enrollment_verifier'\])" experimental/expansion-cell/ExpansionRegistry.php
           grep -q 'Credentials are method arguments only' experimental/expansion-cell/ExpansionFtpDeployer.php
+          grep -q 'bootstrap.private.json' experimental/expansion-cell/CellNode.php
+          grep -q "unlink(\$this->dir.'/bootstrap.private.json')" experimental/expansion-cell/CellNode.php
 
       - name: Boundary guard
         shell: bash
