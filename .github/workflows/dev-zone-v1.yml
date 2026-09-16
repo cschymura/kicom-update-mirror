@@ -1,0 +1,59 @@
+name: KiCom DEV zone checks
+
+on:
+  pull_request:
+    paths:
+      - 'experimental/dev-zone/**'
+      - 'experimental/passkey-auth/**'
+      - '.github/workflows/dev-zone-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dev-zone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure PHP CLI
+        shell: bash
+        run: |
+          if ! command -v php >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y php-cli php-common
+          fi
+          php -v
+
+      - name: Require crypto extensions
+        run: >-
+          php -r '$missing=[]; foreach (["openssl","sodium"] as $e) if (!extension_loaded($e)) $missing[]=$e;
+          if ($missing) { fwrite(STDERR,"Missing extensions: ".implode(",",$missing)."\n"); exit(1); }
+          echo "openssl+sodium available\n";'
+
+      - name: PHP syntax
+        run: |
+          php -l experimental/dev-zone/DevSession.php
+          php -l experimental/dev-zone/DevAuthAdapter.php
+          php -l experimental/dev-zone/dev-selftest.php
+
+      - name: DEV boundary static checks
+        shell: bash
+        run: |
+          if grep -RniE '\b(exec|shell_exec|system|passthru|proc_open|popen)\s*\(' experimental/dev-zone; then
+            echo 'Forbidden shell primitive in DEV zone' >&2
+            exit 1
+          fi
+          if grep -RniE '\b(curl_init|fsockopen|pfsockopen)\s*\(' experimental/dev-zone; then
+            echo 'Unexpected network primitive in DEV zone' >&2
+            exit 1
+          fi
+          if grep -RniE 'production\.write|self_update\.install|kernel\.write|recovery\.write|secrets\.read' experimental/dev-zone/DevSession.php; then
+            echo 'Forbidden authority literal in DEV session manager' >&2
+            exit 1
+          fi
+
+      - name: DEV session and passkey selftest
+        run: php experimental/dev-zone/dev-selftest.php
