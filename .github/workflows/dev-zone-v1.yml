@@ -23,7 +23,7 @@ jobs:
         run: |
           if ! command -v php >/dev/null 2>&1; then
             sudo apt-get update
-            sudo apt-get install -y php-cli php-common
+            sudo apt-get install -y php-cli php-common zip
           fi
           php -v
 
@@ -40,6 +40,10 @@ jobs:
           php -l experimental/dev-zone/DevRouter.php
           php -l experimental/dev-zone/dev-selftest.php
           php -l experimental/dev-zone/dev-router-selftest.php
+
+      - name: Validate candidate manifest
+        run: |
+          php -r '$j=json_decode(file_get_contents("experimental/dev-zone/manifest.json"),true); if(!is_array($j)||($j["schema"]??0)!==1||($j["status"]??"")!=="candidate") exit(1); echo "manifest ok\n";'
 
       - name: DEV boundary static checks
         shell: bash
@@ -66,3 +70,30 @@ jobs:
 
       - name: DEV router boundary selftest
         run: php experimental/dev-zone/dev-router-selftest.php
+
+      - name: Build candidate bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist/kicom-dev-zone-v1/passkey dist/kicom-dev-zone-v1/dev-zone
+          cp experimental/passkey-auth/PasskeyBridge.php dist/kicom-dev-zone-v1/passkey/
+          cp experimental/passkey-auth/browser.js dist/kicom-dev-zone-v1/passkey/
+          cp experimental/dev-zone/DevSession.php dist/kicom-dev-zone-v1/dev-zone/
+          cp experimental/dev-zone/DevAuthAdapter.php dist/kicom-dev-zone-v1/dev-zone/
+          cp experimental/dev-zone/DevRouter.php dist/kicom-dev-zone-v1/dev-zone/
+          cp experimental/dev-zone/dev-client.js dist/kicom-dev-zone-v1/dev-zone/
+          cp experimental/dev-zone/manifest.json dist/kicom-dev-zone-v1/
+          cp experimental/dev-zone/README.md dist/kicom-dev-zone-v1/
+          (cd dist && zip -qr kicom-dev-zone-v1.zip kicom-dev-zone-v1)
+          sha256sum dist/kicom-dev-zone-v1.zip | tee dist/kicom-dev-zone-v1.zip.sha256
+
+      - name: Upload candidate bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: kicom-dev-zone-v1
+          path: |
+            dist/kicom-dev-zone-v1.zip
+            dist/kicom-dev-zone-v1.zip.sha256
+          if-no-files-found: error
+          retention-days: 14
