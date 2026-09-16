@@ -1,0 +1,9 @@
+<?php
+declare(strict_types=1);
+require_once __DIR__.'/request_guard_v5.php';
+require_once __DIR__.'/session_consume_resilient_v3.php';
+function kicomGuardedNormalActionV5(string $sessionId,string $presentedToken,string $requestId,string $operation,array $params,callable $action): array {
+    $g=kicomRequestGuardBeginV5($sessionId,$requestId,$operation,$params,$presentedToken);if(empty($g['ok']))return $g;$mode=(string)($g['mode']??'');if($mode==='REPLAY')return is_array($g['response']??null)?$g['response']:['ok'=>false,'code'=>'REQUEST_REPLAY_INVALID'];if($mode==='IN_FLIGHT')return ['ok'=>false,'code'=>'REQUEST_IN_FLIGHT','retry_same_request'=>true,'request_id'=>$requestId];if($mode==='UNCERTAIN')return ['ok'=>false,'code'=>'REQUEST_UNCERTAIN','inspect_required'=>true,'request_id'=>$requestId];if($mode!=='EXECUTE')return ['ok'=>false,'code'=>'REQUEST_GUARD_MODE_INVALID'];$claim=(string)($g['claim']??'');$ss=kicomAutonomySessionConsumeResilientV3($sessionId,$presentedToken,$requestId);
+    if(empty($ss['ok'])){$response=$ss;$done=kicomRequestGuardCompleteV5($sessionId,$requestId,$operation,$params,$presentedToken,$claim,$response);return empty($done['ok'])?($done+['original_response'=>$response]):$response;}
+    try{$response=$action($ss);if(!is_array($response))$response=['ok'=>false,'code'=>'ACTION_RESPONSE_INVALID'];}catch(Throwable $e){$response=['ok'=>false,'code'=>'ACTION_EXCEPTION'];}$response['session_id']=(string)$ss['session_id'];$response['next_token']=(string)$ss['next_token'];$response['expires_at']=(int)$ss['expires_at'];$response['idle_expires_at']=(int)$ss['idle_expires_at'];$done=kicomRequestGuardCompleteV5($sessionId,$requestId,$operation,$params,$presentedToken,$claim,$response);if(empty($done['ok']))return ['ok'=>false,'code'=>'REQUEST_REPLAY_PERSIST_FAILED','detail'=>(string)($done['code']??'UNKNOWN'),'action_response'=>$response,'inspect_required'=>true];return $response;
+}
