@@ -23,7 +23,7 @@ Live base SHA: `dc6420812118d31076384642ee2d7a8dc334a246885f8be84650ef0c52123391
 3. Add the compatibility bridge under the canonical name:
    - if no deferred `client_request_id` context exists: call `kicomAutonomySessionConsumeLegacyV5()` exactly, preserving legacy behavior;
    - if a deferred context exists: call `kicomAutonomySessionConsumeResilientV3(..., client_request_id)`.
-4. Include the read-only helpers:
+4. Include the diagnostic helpers:
    - `kicomAuthApprovalStatusReadV1`
    - `kicomUpdatePendingInspectV1`
    - `kicomSourceManifestStatusV1`
@@ -55,11 +55,11 @@ Live base SHA before any index patch: `b798947e5601d943108e01592590e87b941ba03b3
 4. Change `AUTH_SESSION_OPEN` only when `client_request_id` is supplied:
    - with client id => `kicomSessionOpenIdempotentV2(code, client_request_id)`;
    - without client id => existing `kicomAutonomySessionOpen(code)` unchanged.
-5. Add read-only routes:
-   - `AUTH_APPROVAL_STATUS&approval_id=...&binding_sha256=...`
-   - `UPDATE_PENDING_INSPECT`
-   - `SOURCE_MANIFEST_STATUS`
-6. Existing `FACT request_id` remains the server-generated request id. `client_request_id` is a separate caller-supplied idempotency key.
+5. Add diagnostic routes:
+   - `AUTH_APPROVAL_STATUS&approval_id=...&binding_sha256=...` — read-only exact-binding capability lookup.
+   - `UPDATE_PENDING_INSPECT&session_id=...&token=...` — **authorized nonrotating read** using `kicomAutonomySessionPeek`; never call the rotating consumer for this route.
+   - `SOURCE_MANIFEST_STATUS` — public hashes-only metadata, never source content.
+6. Existing `FACT request_id` remains the server-generated request id. `client_request_id` is a separate caller-supplied idempotency key; never substitute one for the other.
 
 ### GET rotation map verified on live 0.9.14
 
@@ -69,7 +69,7 @@ Live base SHA before any index patch: `b798947e5601d943108e01592590e87b941ba03b3
 
 Special rotating GETs requiring explicit preflight: `AUTONOMY_TX_COMMIT`, `AUTONOMY_CB_EXEC`.
 
-Nonrotating special flows must remain nonrotating: TX begin/append/backoff/status/abort and CB begin/validate/status.
+Nonrotating special flows must remain nonrotating: TX begin/append/backoff/status/abort and CB begin/validate/status. `UPDATE_PENDING_INSPECT` joins the nonrotating diagnostic class and uses only session peek.
 
 ## Patch group C — `api.php`
 
@@ -96,7 +96,7 @@ Live base SHA before any API patch: `9c55813ea725e8f1e537094c1c9c22be7e870f72bb8
 Read-only. Requires `approval_id` + exact `binding_sha256`. Returns only action/risk/status/expiry/used_at/result_code. It never executes or authorizes an approval.
 
 ### `UPDATE_PENDING_INSPECT`
-Read-only. Returns sanitized pending metadata already present in `pending.json`: from/to version, package/manifest/genome hashes, kernel flag, source, risk class/reasons and changed paths. It must never return internal package filesystem paths.
+Authorized, read-only and nonrotating. Requires the **current valid normal-session token** and verifies it with `kicomAutonomySessionPeek`, not consume. Only after successful peek may it return sanitized metadata already present in `pending.json`: from/to version, package/manifest/genome hashes, kernel flag, source, risk class/reasons and changed paths. It must never return internal package filesystem paths. An invalid session must perform no pending read.
 
 ### `SOURCE_MANIFEST_STATUS`
 Public read-only hashes only: path, bytes, SHA-256 and aggregate manifest SHA. Never source content. Purpose: cryptographically compare a mirror snapshot to live even when authenticated source transport is unavailable.
@@ -116,9 +116,10 @@ Public read-only hashes only: path, bytes, SHA-256 and aggregate manifest SHA. N
 6. Crash window stays `IN_FLIGHT`, later becomes `UNCERTAIN`, never auto re-executes.
 7. Idempotent session-open retry does not consume FreeOTP twice and cannot roll back a later action token.
 8. Lost RED execute response is resolved by read-only `AUTH_APPROVAL_STATUS`, not another FreeOTP code.
-9. `UPDATE_PENDING_INSPECT` explains the currently unknown 0.9.15 before any new finalize.
-10. Genome/manifest verifier passes; drift/unknown remain zero after eventual install.
-11. Critical RED/production/kernel approval semantics are unchanged and fresh current-counter TOTP remains mandatory.
+9. `UPDATE_PENDING_INSPECT` rejects invalid session before reading pending state, uses nonrotating session peek, and explains the currently unknown 0.9.15 before any new finalize.
+10. Server `request_id` and caller `client_request_id` remain distinct.
+11. Genome/manifest verifier passes; drift/unknown remain zero after eventual install.
+12. Critical RED/production/kernel approval semantics are unchanged and fresh current-counter TOTP remains mandatory.
 
 ## Finalization rule
 
