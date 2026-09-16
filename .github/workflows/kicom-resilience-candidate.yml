@@ -1,0 +1,34 @@
+name: KiCom resilience candidate
+
+on:
+  pull_request:
+    paths:
+      - 'candidates/interrupt-auth-resilience-v1/**'
+      - '.github/workflows/kicom-resilience-candidate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  php-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP runtime
+        run: php -v
+      - name: Syntax checks
+        run: |
+          php -l candidates/interrupt-auth-resilience-v1/interrupt_resilience_v1.php
+          php -l candidates/interrupt-auth-resilience-v1/session_recovery_v1.php
+          php -l candidates/interrupt-auth-resilience-v1/session_open_resilient_v1.php
+          php -l candidates/interrupt-auth-resilience-v1/session_consume_resilient_v1.php
+      - name: Job and receipt regression
+        run: php candidates/interrupt-auth-resilience-v1/test_candidate.php
+      - name: Session recovery regression
+        run: php candidates/interrupt-auth-resilience-v1/test_session_recovery.php
+      - name: Idempotent session-open regression
+        run: php candidates/interrupt-auth-resilience-v1/test_session_open_resilient.php
+      - name: Locked session-consume regression
+        run: php candidates/interrupt-auth-resilience-v1/test_session_consume_resilient.php
