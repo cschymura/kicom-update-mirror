@@ -1,7 +1,7 @@
 # Interrupt/Auth Resilience — current checkpoint
 
 Date: 2026-09-16
-State: LIVE_0_9_14_INTEGRATION_MAPPED; deterministic v5 bundle persisted; authenticated mutation transport intermittently blocked; unknown RED pending 0.9.15 remains release blocker
+State: LIVE_0_9_14_INTEGRATION_MAPPED; pending 0.9.15 identified as intended workspace-proposal-batch release; deterministic resilience v5 bundle persisted
 
 ## Completed
 
@@ -36,15 +36,17 @@ State: LIVE_0_9_14_INTEGRATION_MAPPED; deterministic v5 bundle persisted; authen
 - Bundle: 42,750 bytes; SHA-256 `8e4cbc006b02d03f07edd4ea2a6db17d755141d54364bf973f44199a70dfad2d`.
 - Superseded recovery-handle symbols are absent from the generated bundle; required promote symbols are present.
 - Build bot persisted the generated bundle on the candidate branch under `generated/` (commit `f004c424213332316eff8c21227c92c548199b12`), so progress no longer depends on a temporary Actions artifact.
+- Pending 0.9.15 is now identified from the KiCom admin risk-reason display plus PR #12 integration contract as the intended transaction-bound FreeOTP workspace-proposal-batch candidate. Its RED reasons match exactly the expected release footprint: `security-boundary-change:index.php`, `reviewed-code-or-memory-change:living.php`, `reviewed-code-or-memory-change:memory/changelog.kcl`, `reviewed-code-or-memory-change:memory/project_state.kcl`, plus `version-metadata-only`. No kernel/recovery/api boundary reason is shown. PR #12 requires living.php + index.php integration and normal release memory/version metadata updates.
 
 ## Live authoritative state
 
 - KiCom runtime: 0.9.14.
-- Existing unknown self-update pending: 0.9.15, RED, source `autonomy:server-build`.
-- 0.9.15 remains untouched; do not finalize another update while it would replace pending.json.
-- An isolated non-executable build was created from live 0.9.14: build id `244fea5ac5c1f2141605`; it may expire and can be recreated from the recorded live hashes.
-- External Keenable/fetch transport currently allows public/read-lease operations but intermittently denies authenticated mutation URLs before KiCom.
-- A second built-in web transport was tested for authenticated build status and also rejected the dynamic auth URL before KiCom; it is not a usable mutation fallback.
+- Self-update pending: 0.9.15, RED, source `autonomy:server-build`.
+- 0.9.15 is no longer considered unknown; it is the intended workspace-proposal-batch release candidate corresponding to Draft-PR #12 / the earlier server-build work.
+- 0.9.15 remains uninstalled until exact RED binding + fresh current-counter FreeOTP.
+- Do not overwrite pending.json with a resilience release before 0.9.15 is either installed or otherwise explicitly resolved.
+- An isolated non-executable resilience build was created from live 0.9.14: build id `244fea5ac5c1f2141605`; it may expire and can be recreated from the recorded live hashes.
+- External Keenable/fetch transport allows public/read-lease operations but intermittently denies authenticated mutation URLs before KiCom.
 - These denials are transport failures, not KiCom execution results. No blind retry is allowed for an ambiguous mutation.
 
 ## Exact live source hashes used for integration
@@ -57,12 +59,12 @@ State: LIVE_0_9_14_INTEGRATION_MAPPED; deterministic v5 bundle persisted; authen
 
 ## Next safe actions
 
-1. When authenticated mutation transport is reachable, patch only an isolated build, never live files directly.
-2. Living patch: preserve legacy consumer under `kicomAutonomySessionConsumeLegacyV5`, insert the persisted v5 bundle, and bridge canonical consume so resilient request-binding is used only when a deferred client_request_id context exists.
-3. Index patch: central deferred guard in `requireAutonomySession()` + completion hook in `out()`; small preflight hooks for `AUTONOMY_TX_COMMIT` and `AUTONOMY_CB_EXEC`; idempotent `AUTH_SESSION_OPEN` when client_request_id is supplied; add read-only approval/pending/source-manifest status routes.
-4. API patch: completion hook in `apiOut()`; resilient preflight for `AUTONOMY_BATCH`; raw upload fingerprint binds body SHA256 + filename + length before token consume.
-5. Audit/resolve unknown RED pending 0.9.15 without deleting its package/history and without overwriting pending.json.
-6. Run isolated-build validation, verifier/genome checks and deliberate lost-response smoke tests.
-7. Only then prepare/finalize a release. RED/production/kernel install remains exact-bound fresh current-counter FreeOTP.
+1. Prepare an exact RED approval binding for the already-verified pending 0.9.15; do not install without a fresh current-counter FreeOTP.
+2. After 0.9.15 installation, verify BOOTSTRAP/genome/LKG/drift/unknown and smoke-test `workspace_proposal_batch` preparation without applying arbitrary proposals.
+3. Rebase/recreate the isolated resilience build from the resulting 0.9.15 baseline, because index.php/living.php hashes will intentionally change.
+4. Apply resilience v5 only to an isolated build using the explicit promotion manifest and the newly re-read 0.9.15 hashes.
+5. Run verifier/genome/lost-response smoke tests.
+6. Finalize resilience as the next release only after pending.json is free and exact live hashes match.
+7. RED/production/kernel install remains exact-bound fresh current-counter FreeOTP.
 
 No authentication material, session tokens, TOTP values, passwords or recovery secrets are stored in this checkpoint.
