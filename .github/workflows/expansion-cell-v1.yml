@@ -5,6 +5,7 @@ on:
     paths:
       - 'experimental/expansion-cell/**'
       - 'docs/goals/KICOM_EXPANSION_FEDERATION.*'
+      - 'docs/checkpoints/KICOM_2026-09-16_EXPANSION_FEDERATION_START.md'
       - '.github/workflows/expansion-cell-v1.yml'
   workflow_dispatch:
 
@@ -17,6 +18,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Runtime inventory
         run: |
@@ -38,14 +41,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -RniE '(ftp_password|ftp_pass|enrollment_token)[[:space:]]*[:=][[:space:]]*["'"'][^"'"']+' docs/goals experimental/expansion-cell
-          ! grep -RniE 'BEGIN (RSA|OPENSSH|EC|PRIVATE) PRIVATE KEY' docs/goals experimental/expansion-cell
+          if grep -RniE 'BEGIN (RSA|OPENSSH|EC|PRIVATE) PRIVATE KEY|AKIA[0-9A-Z]{16}' docs/goals experimental/expansion-cell; then
+            echo 'Secret-like material found in expansion candidate' >&2
+            exit 1
+          fi
+          grep -q 'never the plaintext enrollment token' experimental/expansion-cell/ExpansionRegistry.php
+          grep -q 'Credentials are method arguments only' experimental/expansion-cell/ExpansionFtpDeployer.php
 
       - name: Boundary guard
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -RniE '\b(shell_exec|exec|system|passthru|proc_open|popen)\s*\(' experimental/expansion-cell
-          ! grep -RniE 'kicomReceiveSelfUpdatePackage|self_update\.install|kernel\.write|recovery\.write|secrets\.read' experimental/expansion-cell
+          if grep -RniE '\b(shell_exec|exec|system|passthru|proc_open|popen)\s*\(' experimental/expansion-cell; then
+            echo 'Unexpected shell primitive in expansion candidate' >&2
+            exit 1
+          fi
+          if grep -RniE 'kicomReceiveSelfUpdatePackage|self_update\.install|kernel\.write|recovery\.write|secrets\.read' experimental/expansion-cell; then
+            echo 'Production/recovery authority must not exist in expansion candidate' >&2
+            exit 1
+          fi
           grep -q 'FTP credentials are supplied transiently' docs/goals/KICOM_EXPANSION_FEDERATION.md
           grep -q 'FEDERATION_TICK' docs/goals/KICOM_EXPANSION_FEDERATION.md
