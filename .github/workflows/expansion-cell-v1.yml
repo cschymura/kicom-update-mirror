@@ -37,6 +37,8 @@ jobs:
           php -l experimental/expansion-cell/ExpansionCellPackageBuilder.php
           php -l experimental/expansion-cell/ExpansionHttpTransport.php
           php -l experimental/expansion-cell/ExpansionOrchestrator.php
+          php -l experimental/expansion-cell/ExpansionParentIdentity.php
+          php -l experimental/expansion-cell/ExpansionService.php
           php -l experimental/expansion-cell/cell-runtime/common.php
           php -l experimental/expansion-cell/cell-runtime/bootstrap.php
           php -l experimental/expansion-cell/cell-runtime/federation.php
@@ -44,6 +46,7 @@ jobs:
           php -l experimental/expansion-cell/expansion-selftest.php
           php -l experimental/expansion-cell/expansion-cron-selftest.php
           php -l experimental/expansion-cell/orchestrator-selftest.php
+          php -l experimental/expansion-cell/service-selftest.php
 
       - name: Expansion/federation selftest
         run: php experimental/expansion-cell/expansion-selftest.php
@@ -53,6 +56,9 @@ jobs:
 
       - name: Orchestrator/package selftest
         run: php experimental/expansion-cell/orchestrator-selftest.php
+
+      - name: Parent service selftest
+        run: php experimental/expansion-cell/service-selftest.php
 
       - name: Secret persistence guard
         shell: bash
@@ -68,6 +74,18 @@ jobs:
           grep -q 'bootstrap.private.json' experimental/expansion-cell/CellNode.php
           grep -q "unlink(\$this->dir.'/bootstrap.private.json')" experimental/expansion-cell/CellNode.php
           grep -q 'builder->destroy($packageDir)' experimental/expansion-cell/ExpansionOrchestrator.php
+          grep -q 'sodium_memzero' experimental/expansion-cell/ExpansionService.php
+
+      - name: Shared-hosting package guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -q '<DirectoryMatch' experimental/expansion-cell/cell-runtime/.htaccess; then
+            echo 'DirectoryMatch is not valid in ordinary shared-host .htaccess context' >&2
+            exit 1
+          fi
+          grep -q 'Require all denied' experimental/expansion-cell/ExpansionCellPackageBuilder.php
+          grep -q 'bootstrap.config.php' experimental/expansion-cell/cell-runtime/.htaccess
 
       - name: Boundary guard
         shell: bash
