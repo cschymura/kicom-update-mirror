@@ -1,5 +1,5 @@
 {
-  "schema": 3,
+  "schema": 4,
   "candidate": "interrupt-auth-resilience-v5",
   "authority": "candidate-only; live KiCom remains authoritative",
   "runtime_include": [
@@ -13,6 +13,7 @@
     "guarded_action_v5.php",
     "approval_status_v1.php",
     "update_pending_inspect_v1.php",
+    "source_manifest_status_v1.php",
     "route_helpers_v1.php"
   ],
   "runtime_exclude_superseded": [
@@ -36,7 +37,8 @@
     "replay receipts contain no plaintext session id, old token or next token",
     "session-open replay cannot roll a later token backward",
     "critical approval status is read-only and exact-binding-sha protected",
-    "pending update inspector is read-only and hides internal package path"
+    "pending update inspector is read-only and hides internal package path",
+    "public source manifest status exposes hashes only, never source content"
   ],
   "rules": [
     "Do not promote files merely because they exist on the candidate branch.",
