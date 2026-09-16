@@ -1,0 +1,24 @@
+{
+    "schema": 2,
+    "candidate": "interrupt-auth-resilience-v5",
+    "promotion_manifest_sha256": "85a800b8a1c2b8f80c6a8a40a01fc278ae51622d725735024cd99e3bfb741669",
+    "bundle": "living_bundle_v5.php",
+    "bytes": 42750,
+    "sha256": "8e4cbc006b02d03f07edd4ea2a6db17d755141d54364bf973f44199a70dfad2d",
+    "sources": {
+        "interrupt_resilience_v1.php": "6c688291410de65fd0720a1dc5162bdbdadb700338383f400072f4bf7f4901fe",
+        "interrupt_resilience_v2.php": "2b6d7e2781b41fea755367652ece86f18612e688984fd5cf2c6ba262161b87d4",
+        "request_replay_v3.php": "723ad755124f5d4b7c97a44e8833ccd1ee8d575add51689be1606df1f3481bf0",
+        "request_guard_v5.php": "e582fb1db7cb5cf110b78655ef8d01875e64da0c8fb7b2c38f78d4ca907f04fe",
+        "session_lock_v2.php": "034cb873a5255a83288f832640b9c40ec5b5c396455b227e813cc3f216cb750d",
+        "session_consume_resilient_v3.php": "f25c5fe53f463f0036f3279c52ee9dc412058da46e33b6058ae3fe6e9e6010d7",
+        "session_consume_bridge_v1.php": "9403a72d7dfc28856569b7cb46b6a5ff223b896ea5f58bb9da3eebb955163b20",
+        "session_open_resilient_v2.php": "b1e99757d0ce096fd8f0a4ddb5d9e99dea2878295c0efd7398247ebe2b87f159",
+        "guarded_action_v5.php": "84f09d23eeae1fba2cf55ecbd9249775dd162dd462a2095ed2a3d8659b05033a",
+        "router_deferred_guard_v1.php": "05065534191e7a5e17928be4a095f1339a1d073554babc12aa99121824cc50be",
+        "approval_status_v1.php": "198a1c494b2e7fcc4a74553f4b5bde8236e32f0ce83b0293c885bea73891e139",
+        "update_pending_inspect_v1.php": "de952b0b8a45a9378c2a1a670558f54a5c01a052775253c83c6f92ecffcabc0a",
+        "source_manifest_status_v1.php": "f35dedaf1dfa7134cfc695de6131546f7efe5fd577c9b9d60251fc3d15997750",
+        "route_helpers_v1.php": "344af1c9650efc57b84824b2ad1d557163292badee96ed5012d6b7affc1c8c61"
+    }
+}
