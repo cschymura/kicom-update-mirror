@@ -18,40 +18,38 @@ jobs:
       - uses: actions/checkout@v4
       - name: PHP runtime
         run: php -v
-      - name: Syntax checks — promote allowlist
+      - name: Validate promotion manifest and syntax-check exact allowlist
         run: |
           set -euo pipefail
           root=candidates/interrupt-auth-resilience-v1
-          for f in \
-            interrupt_resilience_v1.php \
-            interrupt_resilience_v2.php \
-            request_replay_v3.php \
-            request_guard_v5.php \
-            session_lock_v2.php \
-            session_consume_resilient_v3.php \
-            session_open_resilient_v2.php \
-            guarded_action_v5.php \
-            approval_status_v1.php \
-            update_pending_inspect_v1.php \
-            route_helpers_v1.php \
-            build_runtime_bundle.php; do
-            php -l "$root/$f"
-          done
-      - name: Existing focused regressions
+          php -r '
+            $root=$argv[1];
+            $m=json_decode(file_get_contents("$root/PROMOTION_MANIFEST.json"),true);
+            if(!is_array($m)||!is_array($m["runtime_include"]??null)) exit(2);
+            $ex=array_fill_keys(array_values(array_filter($m["runtime_exclude_superseded"]??[],"is_string")),true);
+            foreach($m["runtime_include"] as $f){
+              if(!is_string($f)||isset($ex[$f])||!preg_match("/^[A-Za-z0-9_.-]+\\.php$/",$f)||!is_file("$root/$f")) exit(3);
+              echo "$root/$f\n";
+            }
+          ' "$root" > /tmp/promote-php-files.txt
+          cat /tmp/promote-php-files.txt
+          while IFS= read -r f; do php -l "$f"; done < /tmp/promote-php-files.txt
+          php -l "$root/build_runtime_bundle.php"
+      - name: Current focused regressions
         run: |
           set -euo pipefail
           root=candidates/interrupt-auth-resilience-v1
           php "$root/test_candidate.php"
-          php "$root/test_session_v2.php"
-          php "$root/test_request_replay_v2.php"
-          php "$root/test_request_guard_v2.php"
-          php "$root/test_guarded_action_v2.php"
+          php "$root/test_session_v3.php"
+          php "$root/test_router_deferred_guard_v1.php"
+          php "$root/test_session_consume_bridge_v1.php"
       - name: Build deterministic v5 living bundle
         run: |
           set -euo pipefail
           root=candidates/interrupt-auth-resilience-v1
-          mkdir -p "$root/generated"
-          php "$root/build_runtime_bundle.php" | tee "$root/generated/build.log"
+          rm -rf "$root/generated"
+          php "$root/build_runtime_bundle.php" | tee /tmp/resilience-build.log
+          cp /tmp/resilience-build.log "$root/generated/build.log"
           php -l "$root/generated/living_bundle_v5.php"
           cd "$root/generated"
           sha256sum -c living_bundle_v5.sha256
