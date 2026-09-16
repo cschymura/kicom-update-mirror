@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "captured_at": "2026-09-16",
+  "authority": "live KiCom 0.9.14 source manifest and read lease",
+  "runtime_version": "0.9.14",
+  "live_source_sha256": {
+    "index.php": "b798947e5601d943108e01592590e87b941ba03b3a065c27ad399a16e1b2bd54",
+    "api.php": "9c55813ea725e8f1e537094c1c9c22be7e870f72bb8217066c96d029b1e65421",
+    "living.php": "dc6420812118d31076384642ee2d7a8dc334a246885f8be84650ef0c52123391",
+    "lib.php": "425a16b74b3c179c5bfa0db3c1896d9568072325a1987a53a6afac59a03be2e8",
+    "genome/genome.json": "08e8de68fa35dac2fe1a08e25eb037580aedc0904d0a8266b56d7bf830290776"
+  },
+  "isolated_build": {
+    "build_id": "244fea5ac5c1f2141605",
+    "base_version": "0.9.14",
+    "state_when_recorded": "created_non_executable_no_resilience_patch_committed",
+    "note": "build ids are ephemeral; recreate from live 0.9.14 if expired"
+  },
+  "canonical_memory": {
+    "decision": "D024",
+    "status": "confirmed_written",
+    "decisions_sha256_after_write": "48bbda6275a0441870e0ce5f1362adcb021e4b4336a55e930acbfccc6e3aa532",
+    "title": "Treat chat/stream interruption as normal"
+  },
+  "rolling_token_consumers": {
+    "central_get_wrapper": {
+      "function": "index.php::requireAutonomySession",
+      "covered_cases": [
+        "AUTONOMY_READ_LEASE",
+        "AUTONOMY_SOURCE_LIST",
+        "AUTONOMY_SOURCE_READ",
+        "AUTONOMY_UPLOAD_BEGIN",
+        "AUTONOMY_UPLOAD_CHUNK",
+        "AUTONOMY_UPLOAD_FINISH",
+        "AUTONOMY_COMPACT_BATCH",
+        "AUTONOMY_MEMORY_PATCH",
+        "AUTONOMY_WORKSPACE_PATCH",
+        "AUTONOMY_BUILD_BEGIN",
+        "AUTONOMY_BUILD_PATCH",
+        "AUTONOMY_BUILD_STATUS",
+        "AUTONOMY_BUILD_PREPARE_RELEASE",
+        "AUTONOMY_BUILD_FINALIZE",
+        "AUTONOMY_DEPLOY",
+        "AUTONOMY_DEPLOY_ROLLBACK",
+        "AUTONOMY_TEST_HTTP",
+        "AUTONOMY_GOAL",
+        "AUTH_APPROVAL_PREPARE",
+        "ARCHIVE_BACKFILL",
+        "PRIMARY_PUBLISH_CURRENT"
+      ]
+    },
+    "special_get_rotators": ["AUTONOMY_TX_COMMIT", "AUTONOMY_CB_EXEC"],
+    "post_rotators": ["AUTONOMY_UPDATE_UPLOAD", "AUTONOMY_BATCH"],
+    "nonrotating_specials": [
+      "AUTONOMY_TX_BEGIN",
+      "AUTONOMY_TX_APPEND",
+      "AUTONOMY_TX_BACKOFF",
+      "AUTONOMY_TX_STATUS",
+      "AUTONOMY_TX_ABORT",
+      "AUTONOMY_CB_BEGIN",
+      "AUTONOMY_CB_VALIDATE",
+      "AUTONOMY_CB_STATUS"
+    ]
+  },
+  "integration_strategy": {
+    "living": [
+      "rename current kicomAutonomySessionConsume to kicomAutonomySessionConsumeLegacyV5",
+      "insert v5 resilience core",
+      "define bridge kicomAutonomySessionConsume that uses request-bound v3 consumer only when deferred client_request_id context exists; otherwise call legacy",
+      "add approval-status, pending-inspect and source-manifest read-only helpers"
+    ],
+    "index": [
+      "add client_request_id preflight to requireAutonomySession",
+      "add completion hook to central out()",
+      "add preflight for AUTONOMY_TX_COMMIT and AUTONOMY_CB_EXEC",
+      "make AUTH_SESSION_OPEN idempotent when client_request_id is supplied, legacy otherwise",
+      "add read-only AUTH_APPROVAL_STATUS, UPDATE_PENDING_INSPECT and SOURCE_MANIFEST_STATUS routes"
+    ],
+    "api": [
+      "add completion hook to apiOut()",
+      "add client_request_id preflight around AUTONOMY_BATCH",
+      "for AUTONOMY_UPDATE_UPLOAD fingerprint bounded body SHA256 + filename/length before token consume"
+    ]
+  },
+  "external_protocol": {
+    "client_id_parameter": "client_request_id",
+    "server_response_request_id": "existing FACT request_id remains server-generated",
+    "retry_rule": "same client_request_id + same operation/fingerprint + same presented old token may retrieve only exact prior response",
+    "uncertain_rule": "expired IN_PROGRESS becomes UNCERTAIN and is never automatically re-executed"
+  },
+  "pending_update_blocker": {
+    "version": "0.9.15",
+    "risk": "red",
+    "source": "autonomy:server-build",
+    "package_sha256_prefix": "64361995",
+    "status": "untouched",
+    "rule": "do not finalize another update while this pending pointer would be overwritten"
+  },
+  "critical_boundary": {
+    "red_production_kernel": "fresh current-counter exact-bound FreeOTP remains mandatory",
+    "approval_status": "read-only status may use approval_id + exact binding_sha256 after a lost response; it grants no authority"
+  },
+  "transport_observation": "Current external fetch gateway allows public/read-lease access but intermittently denies authenticated mutation URLs before KiCom. Do not treat gateway denial as KiCom execution failure and do not blind-retry mutating calls."
+}
