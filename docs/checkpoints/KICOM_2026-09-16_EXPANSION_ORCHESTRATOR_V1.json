@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "project": "KiCom",
+  "goal": "expansion_federation",
+  "status": "candidate_green",
+  "recorded": "2026-09-16",
+  "validated_head": "bb3444c12de9c456da28913731dac884465ccba5",
+  "validated_ci_run": 35126635995,
+  "flow": ["prepare", "package", "deploy", "probe", "enroll", "activate", "federation_tick"],
+  "target_directory": "kicom/",
+  "bootstrap_transport": "FTPS preferred; FTP explicit opt-in only",
+  "federation_transport": "signed HTTPS",
+  "parent_cron_relay": true,
+  "live_production_modified": false,
+  "next_milestone": "controlled real-target test with operator-supplied temporary FTP/FTPS credentials"
+}
