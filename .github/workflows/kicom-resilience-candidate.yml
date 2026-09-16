@@ -52,6 +52,7 @@ jobs:
           php "$root/test_session_v3.php"
           php "$root/test_router_deferred_guard_v1.php"
           php "$root/test_session_consume_bridge_v1.php"
+          php "$root/test_route_helpers_v1.php"
       - name: Build deterministic v5 living bundle
         run: |
           set -euo pipefail
