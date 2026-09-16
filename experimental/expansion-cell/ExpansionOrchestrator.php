@@ -100,6 +100,39 @@ final class KiComExpansionOrchestrator
         return ['ok'=>true,'code'=>'EXPANSION_ACTIVE','cell'=>$cell,'tick'=>$tickCheck];
     }
 
+    /**
+     * Resume a cell that was already copied into a sibling webroot but could not
+     * be reached by HTTPS yet. The deployer only repairs a directory carrying
+     * KiCom's own cell markers and never replaces arbitrary existing content.
+     *
+     * @return array<string,mixed>
+     */
+    public function resumeExistingLocal(string $targetBaseUrl,string $localWebRoot): array
+    {
+        $local=new KiComExpansionLocalFilesystemDeployer();
+        $repair=$local->repairExisting($localWebRoot);
+        if(empty($repair['ok'])) return $repair;
+
+        $id=(string)($repair['expansion_id']??'');
+        $childBase=rtrim((string)($repair['child_base_url']??''),'/');
+        if($childBase==='') $childBase=rtrim($targetBaseUrl,'/').'/kicom';
+
+        if($id===''){
+            $http=new KiComExpansionHttpsTransport($childBase);
+            $status=$http->getJson($childBase.'/status.php');
+            if(!empty($status['ok'])&&($status['state']??'')==='active'){
+                return ['ok'=>true,'code'=>'EXPANSION_ALREADY_ACTIVE','cell'=>$status,'deployment'=>$repair,'resumed'=>true];
+            }
+            return ['ok'=>false,'code'=>'EXPANSION_EXISTING_CELL_NOT_RESUMABLE','detail'=>$status['code']??'UNKNOWN','deployment'=>$repair];
+        }
+
+        $http=new KiComExpansionHttpsTransport($childBase);
+        $active=$this->activatePrepared(['expansion_id'=>$id,'child_base_url'=>$childBase],$http);
+        $active['deployment']=$repair;
+        $active['resumed']=true;
+        return $active;
+    }
+
     /** @param array<string,mixed> $ftp @return array<string,mixed> */
     public function expand(string $targetBaseUrl,array $ftp,string $remoteWebRoot='/',int $ttl=3600): array
     {
