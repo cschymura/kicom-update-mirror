@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "candidate": "interrupt-auth-resilience-v3",
+  "authority": "candidate-only; live KiCom remains authoritative",
+  "runtime_include": [
+    "interrupt_resilience_v1.php",
+    "interrupt_resilience_v2.php",
+    "request_replay_v2.php",
+    "request_guard_v4.php",
+    "session_lock_v2.php",
+    "session_consume_resilient_v2.php",
+    "session_open_resilient_v2.php",
+    "guarded_action_v3.php",
+    "approval_status_v1.php",
+    "route_helpers_v1.php"
+  ],
+  "runtime_exclude_superseded": [
+    "session_recovery_v1.php",
+    "session_open_resilient_v1.php",
+    "session_consume_resilient_v1.php",
+    "request_guard_v2.php",
+    "request_guard_v3.php",
+    "guarded_action_v2.php"
+  ],
+  "rules": [
+    "Do not promote files merely because they exist on the candidate branch.",
+    "Exact live 0.9.14+ callsites must be re-read before integration.",
+    "RED/production/kernel FreeOTP execution semantics must remain unchanged.",
+    "Do not finalize a new self-update while unknown RED pending 0.9.15 would be overwritten.",
+    "Canonical interruption/auth-resilience decision must be written to KiCom memory before release promotion."
+  ]
+}
