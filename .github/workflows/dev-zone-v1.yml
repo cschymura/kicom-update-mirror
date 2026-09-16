@@ -38,8 +38,10 @@ jobs:
           php -l experimental/dev-zone/DevSession.php
           php -l experimental/dev-zone/DevAuthAdapter.php
           php -l experimental/dev-zone/DevRouter.php
+          php -l experimental/dev-zone/DevHttpAdapter.php
           php -l experimental/dev-zone/dev-selftest.php
           php -l experimental/dev-zone/dev-router-selftest.php
+          php -l experimental/dev-zone/dev-http-selftest.php
 
       - name: Validate candidate manifest
         run: |
@@ -71,6 +73,9 @@ jobs:
       - name: DEV router boundary selftest
         run: php experimental/dev-zone/dev-router-selftest.php
 
+      - name: DEV HTTP adapter selftest
+        run: php experimental/dev-zone/dev-http-selftest.php
+
       - name: Build candidate bundle
         shell: bash
         run: |
@@ -82,6 +87,7 @@ jobs:
           cp experimental/dev-zone/DevSession.php dist/kicom-dev-zone-v1/dev-zone/
           cp experimental/dev-zone/DevAuthAdapter.php dist/kicom-dev-zone-v1/dev-zone/
           cp experimental/dev-zone/DevRouter.php dist/kicom-dev-zone-v1/dev-zone/
+          cp experimental/dev-zone/DevHttpAdapter.php dist/kicom-dev-zone-v1/dev-zone/
           cp experimental/dev-zone/dev-client.js dist/kicom-dev-zone-v1/dev-zone/
           cp experimental/dev-zone/manifest.json dist/kicom-dev-zone-v1/
           cp experimental/dev-zone/README.md dist/kicom-dev-zone-v1/
