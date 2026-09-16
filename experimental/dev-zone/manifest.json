@@ -27,24 +27,52 @@
     "DevHttpAdapter.php",
     "DevKiComBindings.php",
     "DevDiagnostics.php",
+    "DevExpansionBindings.php",
     "dev-client.js",
     "dev-auth.php",
     "dev-api.php",
+    "dev-expansion.php",
     "dev-bridge.php",
     "agent/index.php",
-    "index.html"
+    "index.html",
+    "expansion/*"
   ],
   "runtime": {
     "ui": "dev/index.html",
     "auth_endpoint": "dev/dev-auth.php",
     "api_endpoint": "dev/dev-api.php",
+    "expansion_endpoint": "dev/dev-expansion.php",
     "agent_bridge": "dev/agent/",
     "agent_bridge_delegate": "dev/dev-bridge.php",
     "one_time_enrollment": "existing FreeOTP verifier",
     "normal_entry": "WebAuthn passkey",
     "bridge_link": "one-click copy from first-party DEV UI",
-    "diagnostics": ["dev_audit", "living_experience"]
+    "diagnostics": ["dev_audit", "living_experience"],
+    "sandbox_expansion": {
+      "resource_alias": "sandbox",
+      "target_base_url": "https://sandbox.rurtalbahn.info",
+      "deploy_mode": "resource",
+      "allowed_target_class": "test",
+      "agent_get_execute": false
+    }
   },
+  "capabilities": [
+    "source.snapshot.read",
+    "workspace.read",
+    "workspace.write",
+    "workspace.delete",
+    "workspace.history",
+    "build.begin",
+    "build.patch",
+    "build.status",
+    "build.test",
+    "build.finalize_candidate",
+    "candidate.read",
+    "candidate.discard",
+    "logs.read",
+    "expansion.resource.status",
+    "expansion.test.execute"
+  ],
   "candidate_export": {
     "uses_existing_verifier": true,
     "creates_production_pending": false,
@@ -52,6 +80,7 @@
   },
   "forbidden_authority": [
     "production deploy",
+    "production expansion",
     "self-update install",
     "kernel mutation",
     "recovery mutation",
