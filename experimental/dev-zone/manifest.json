@@ -17,12 +17,20 @@
     "DevSession.php",
     "DevAuthAdapter.php",
     "DevRouter.php",
+    "DevHttpAdapter.php",
+    "DevKiComBindings.php",
     "dev-client.js"
   ],
   "requires": [
     "../passkey-auth/PasskeyBridge.php",
-    "../passkey-auth/browser.js"
+    "../passkey-auth/browser.js",
+    "KiCom lib.php + living.php runtime primitives"
   ],
+  "candidate_export": {
+    "uses_existing_verifier": true,
+    "creates_production_pending": false,
+    "promotion_is_separate": true
+  },
   "forbidden_authority": [
     "production deploy",
     "self-update install",
