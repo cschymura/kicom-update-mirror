@@ -75,6 +75,11 @@ jobs:
             echo 'Preferred DEV browser client must not put credentials in query strings' >&2
             exit 1
           fi
+          if grep -q "endpoint = '/dev-api.php'" experimental/dev-zone/dev-client.js; then
+            echo 'DEV browser client must stay inside the /dev/ install root' >&2
+            exit 1
+          fi
+          grep -q "endpoint = 'dev-api.php'" experimental/dev-zone/dev-client.js
           if grep -Rni '\$_GET' experimental/dev-zone/runtime/dev-auth.php experimental/dev-zone/runtime/dev-api.php; then
             echo 'Primary DEV auth/API endpoints must not accept query-string credentials or operations' >&2
             exit 1
