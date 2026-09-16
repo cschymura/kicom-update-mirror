@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once __DIR__.'/DevSession.php';
 require_once __DIR__.'/DevAuthAdapter.php';
+require_once __DIR__.'/DevAuthFlow.php';
 
 function dfail(string $m): never { fwrite(STDERR,"FAIL: $m\n"); exit(1); }
 function dok(bool $v,string $m): void { if(!$v) dfail($m); echo "OK: $m\n"; }
@@ -59,22 +60,21 @@ $clientReg=json_encode(['type'=>'webauthn.create','challenge'=>$regChallenge,'or
 $reg=['id'=>db($credId),'rawId'=>db($credId),'type'=>'public-key','response'=>['clientDataJSON'=>db((string)$clientReg),'attestationObject'=>db($att)]];
 $rr=$passkeys->completeRegistration((string)$en['enrollment_id'],$reg,'DEV key');dok(($rr['ok']??false)===true,'passkey enrolled');
 
-$clientKeypair=sodium_crypto_box_keypair();
-$clientPub=sodium_crypto_box_publickey($clientKeypair);
-$challenge=$passkeys->createAuthChallenge(db($clientPub));dok(($challenge['ok']??false)===true,'passkey auth challenge created');
+$adapter=new KiComDevAuthAdapter($passkeys,$sessions,$root.'/locks');
+$flow=new KiComDevAuthFlow($passkeys,$adapter);
+$challenge=$flow->begin();dok(($challenge['ok']??false)===true&&($challenge['flow']??'')==='same-origin-dev','same-origin passkey DEV challenge created');
 $cid=(string)$challenge['challenge_id'];
-$ao=$passkeys->assertionOptions($cid);$webChallenge=(string)$ao['publicKey']['challenge'];
+$ao=$flow->options($cid);$webChallenge=(string)$ao['publicKey']['challenge'];
 $clientGet=json_encode(['type'=>'webauthn.get','challenge'=>$webChallenge,'origin'=>'https://kicom.rurtalbahn.info'],JSON_UNESCAPED_SLASHES);
 $authData=hash('sha256','kicom.rurtalbahn.info',true).chr(0x05).pack('N',1);
 $signed=$authData.hash('sha256',(string)$clientGet,true);$sig='';dok(openssl_sign($signed,$sig,$pkey,OPENSSL_ALGO_SHA256)===true,'assertion signed');
 $assertion=['id'=>db($credId),'rawId'=>db($credId),'type'=>'public-key','response'=>['clientDataJSON'=>db((string)$clientGet),'authenticatorData'=>db($authData),'signature'=>db($sig),'userHandle'=>null]];
-$adapter=new KiComDevAuthAdapter($passkeys,$sessions,$root.'/locks');
-$dev=$adapter->verifyAndIssue($cid,$assertion,'Passkey DEV');
+$dev=$flow->complete($cid,$assertion,'Passkey DEV');
 dok(($dev['ok']??false)===true&&($dev['scope']??'')==='dev','passkey issues DEV-scoped session');
 dok(($dev['token_rotates']??true)===false,'passkey DEV session is non-rotating');
 $devAuth=$sessions->authenticate((string)$dev['session_id'],(string)$dev['token'],'workspace.write');
 dok(($devAuth['ok']??false)===true,'passkey DEV credential usable for workspace development');
-$replay=$adapter->verifyAndIssue($cid,$assertion,'Replay');
+$replay=$flow->complete($cid,$assertion,'Replay');
 dok(($replay['ok']??true)===false,'same passkey challenge cannot mint a second DEV session');
 
 echo "DEV ZONE SELFTEST PASS\n";
