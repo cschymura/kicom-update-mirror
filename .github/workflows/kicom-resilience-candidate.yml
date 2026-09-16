@@ -1,6 +1,13 @@
 name: KiCom resilience candidate v5
 
 on:
+  push:
+    branches:
+      - 'candidate/interrupt-auth-resilience-v1'
+    paths:
+      - 'candidates/interrupt-auth-resilience-v1/*.php'
+      - 'candidates/interrupt-auth-resilience-v1/PROMOTION_MANIFEST.json'
+      - '.github/workflows/kicom-resilience-candidate.yml'
   pull_request:
     paths:
       - 'candidates/interrupt-auth-resilience-v1/**'
@@ -8,7 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   php-regression:
@@ -16,6 +23,8 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
       - name: PHP runtime
         run: php -v
       - name: Validate promotion manifest and syntax-check exact allowlist
@@ -54,6 +63,15 @@ jobs:
           cd "$root/generated"
           sha256sum -c living_bundle_v5.sha256
           cat living_bundle_v5.json
+      - name: Persist deterministic bundle on candidate branch
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          git config user.name 'kicom-build-bot'
+          git config user.email 'kicom-build-bot@users.noreply.github.com'
+          git add candidates/interrupt-auth-resilience-v1/generated
+          git commit -m 'Refresh KiCom resilience v5 deterministic bundle' || exit 0
+          git push origin HEAD:${{ github.ref_name }}
       - name: Upload deterministic bundle
         uses: actions/upload-artifact@v4
         with:
