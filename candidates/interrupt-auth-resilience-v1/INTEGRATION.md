@@ -1,96 +1,80 @@
-# KiCom Interrupt/Auth Resilience v1 — runtime integration contract
+# KiCom Interrupt/Auth Resilience v2 — runtime integration contract
 
 Candidate only. Live KiCom remains authoritative.
 
-## Load order
+## Objective
 
-Add a trusted resilience component immediately after `living.php` is loaded by `lib.php`.
+Treat chat/stream interruption as a normal operating condition. Long work must be checkpointable and normal-autonomy authentication must survive lost responses without creating a second standing bearer credential.
 
-Recommended runtime split:
+## Runtime components
 
-- `interrupt_resilience_v1.php` — jobs/checkpoints + idempotent non-secret request receipts
-- `session_recovery_v1.php` — recovery-handle provisioning/recovery/status
-- `session_consume_resilient_v1.php` — locked rolling-token consumer
-- `session_open_resilient_v1.php` — idempotent FreeOTP session-open
+Promote only these concepts/components:
 
-All four must be included before any request path invokes them. The release verifier/genome must include every added runtime component.
+- `interrupt_resilience_v1.php` — persistent non-secret jobs/checkpoints and pre-execution request claims
+- `request_replay_v2.php` — encrypted exact-response replay for an already executed normal-autonomy request
+- `session_consume_resilient_v1.php` — per-session locked rolling-token consumer preserving current/previous-token semantics
+- `session_open_resilient_v1.php` — short-lived idempotent FreeOTP session-open replay, only after exact live-core review
 
-## Existing call sites that must use the locked consumer
+`session_recovery_v1.php` is superseded development history and MUST NOT be loaded, routed or promoted. A long-lived recovery handle would create a second bearer credential.
 
-Nearest mirrored 0.9.12 core shows these direct consumers:
+## Exact request replay flow
+
+For every normal-autonomy mutation/read that rotates the rolling token and carries a client-generated `request_id`:
+
+1. Canonicalize operation + non-secret parameters into a request fingerprint.
+2. Before consuming the rolling token, acquire the per-session/request lock and create an `IN_PROGRESS` receipt bound to:
+   - session
+   - request_id
+   - operation/fingerprint
+   - SHA-256 of the presented token
+3. If an unexpired receipt already exists:
+   - fingerprint/token mismatch => reject
+   - completed replay receipt => decrypt with a key derived from the same presented token + request_id and return exactly the prior response
+   - `IN_PROGRESS` => do not execute again; return an explicit indeterminate/in-flight status so the caller can inspect operation state
+4. On a fresh claim, call the normal locked rolling-token consumer once.
+5. Execute the requested bounded operation once.
+6. Build the exact KCL/result payload, including `next_token` where applicable.
+7. Encrypt the replayable response at rest using AES-256-GCM with a key derived from the presented old token + request_id. Never persist old or next token in plaintext.
+8. Mark the receipt `DONE` and return the response.
+
+Recommended replay TTL: 30 minutes, maximum 60 minutes. Replay never extends the underlying session absolute or idle TTL.
+
+## Security properties
+
+- Same request_id cannot authorize a different operation or parameter fingerprint.
+- Same request_id with another presented token is rejected.
+- The old token is not made valid for a new request; it can only decrypt/retrieve the exact prior response.
+- Replay never creates a new autonomy session.
+- Replay does not grant RED/production/kernel authority.
+- Critical approval execution still requires a fresh current-counter FreeOTP bound to the exact transaction.
+- Existing 60-second previous-token recovery remains as a short compatibility safety net.
+
+## Existing token-consume call sites
+
+Nearest mirrored 0.9.12 core shows direct consumers around:
 
 1. `index.php::requireAutonomySession()`
 2. `living.php::kicomAutonomyTxCommit()`
 3. `api.php::AUTONOMY_UPDATE_UPLOAD`
 4. `api.php::AUTONOMY_BATCH`
 
-Before promotion, search the exact live 0.9.14+ source again for every `kicomAutonomySessionConsume(` occurrence, including codebook paths added after 0.9.12. Every runtime consumer must either call `kicomAutonomySessionConsumeResilient()` or use the same per-session lock.
+Before promotion, enumerate every `kicomAutonomySessionConsume(` occurrence in the exact live 0.9.14+ source, including codebook/build paths added after 0.9.12. Every runtime consumer must use the same session lock and request-replay wrapper where response loss can strand a token.
 
-## KCL routing
+## Session-open handling
 
-### AUTH_SESSION_OPEN
+FreeOTP session opening is itself vulnerable to response loss. A separate short-lived open-receipt design may reproduce only the exact already-authorized session-open response for the same request_id. It must:
 
-Backward-compatible behavior:
-
-- with `request_id`: call `kicomSessionOpenIdempotent(code, request_id)`
-- without `request_id`: retain legacy session-open or wrap it with recovery provisioning
-
-New successful facts may include:
-
-- session_id
-- token / next normal action token
-- recovery_handle (sensitive; returned only to the authenticated client, never logged to canonical memory)
-- recovery_limit
-- replayed=true|false
-
-### AUTH_SESSION_RECOVER
-
-Inputs:
-
-- session_id
-- recovery_handle
-- request_id (16..80 chars, stable for retry)
-
-Output on success:
-
-- next_token
-- absolute/idle expiry
-- replayed=true|false
-
-No FreeOTP is consumed because this operation cannot create a session or cross a trust boundary. The original normal session must still be active.
-
-### AUTH_SESSION_RECOVERY_STATUS
-
-Optional read-only endpoint. Returns only configured/count/limit/expiries. Never returns recovery_handle or tokens.
-
-## Critical boundary unchanged
-
-`AUTH_APPROVAL_PREPARE` remains a normal-session operation.
-
-`AUTH_APPROVAL_EXECUTE` remains independent and requires a fresh current-counter FreeOTP code bound to the exact action/version/target/package hash. A recovery handle or recovered normal token never substitutes for this.
-
-## Session-open replay storage
-
-`var/auth/session_open_resilience/master.key`
-
-- 32 random bytes
-- mode 0600
-- server-only, never returned
-- used only to HMAC-bind short-lived open receipts and deterministically reproduce the original already-authorized response
-
-Open receipts expire after 180 seconds and contain no plaintext TOTP/session token/recovery handle.
-
-## Concurrency
-
-Use one lock namespace per normal session: `<session>.recovery.lock`.
-
-Normal rolling-token consumption, recovery and open replay must all serialize on this lock. This prevents concurrent responses from silently overwriting newer token state.
+- expire quickly (target 180 seconds)
+- store no plaintext TOTP or session token
+- never accept the receipt as authority for any other operation
+- retain current+configured-past-counter rules for normal session open only
+- leave critical current-counter rules unchanged
 
 ## Interrupt-safe jobs
 
-Long multi-step development should create/update a non-secret job checkpoint after meaningful phases. Job state may include build IDs, SHAs, phases and next action, but never authentication material.
+Long multi-step development creates a non-secret job checkpoint after meaningful phases. Allowed state includes build IDs, SHAs, phase, completed step, next step and verifier status. Authentication material is forbidden.
 
-Recommended states:
+States:
 
 - RUNNING
 - WAITING_HUMAN_APPROVAL
@@ -104,12 +88,14 @@ At RED/production/kernel boundaries, checkpoint `WAITING_HUMAN_APPROVAL` and sto
 
 1. Re-read live BOOTSTRAP and canonical memory.
 2. Re-read exact live auth/session source and enumerate all token-consume call sites.
-3. Apply candidate only to an isolated non-executable server build.
-4. PHP lint / hosting-tolerant validation.
-5. Regression tests for normal consume, previous-token recovery, recovery-handle retry, open-response retry, expiry/revocation and concurrent token progression.
-6. Verify critical approval code is byte-for-byte semantically unchanged except normal-session prepare transport.
-7. Verify genome/manifest contains new components and no unknown/drift files.
-8. Do not finalize while an unknown existing self-update pending package would be overwritten.
-9. Finalize through the normal self-update verifier only.
-10. Install only after exact RED binding + fresh current-counter FreeOTP.
-11. Immediately verify BOOTSTRAP, genome/LKG, drift, unknown files, session open/recover smoke tests and critical gate behavior.
+3. Canonical memory records interruption/auth-resilience as an accepted operating decision.
+4. Audit the existing unknown RED pending 0.9.15 before any finalize that could replace `pending.json`.
+5. Apply only to an isolated non-executable server build.
+6. PHP lint / hosting-tolerant validation.
+7. Regression tests: normal consume, previous-token recovery, exact response replay, fingerprint mismatch, token mismatch, `IN_PROGRESS` crash window, expiry/revocation and concurrent progression.
+8. Simulate: server executes request, client loses response, same request_id/old token retrieves prior response and next token without executing again.
+9. Confirm critical approval code and semantics remain unchanged.
+10. Verify genome/manifest contains new trusted components and no unknown/drift files.
+11. Finalize only through the normal self-update verifier.
+12. Install only after exact RED binding + fresh current-counter FreeOTP.
+13. Immediately verify BOOTSTRAP, genome/LKG, drift, unknown files and replay smoke tests.
