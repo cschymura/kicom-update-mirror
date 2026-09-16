@@ -35,7 +35,9 @@ window.KiComDev = (() => {
 
   const clear = () => localStorage.removeItem(KEY);
 
-  const request = async (operation, payload = {}, endpoint = '/dev-api.php') => {
+  // Relative endpoint is intentional: the DEV zone is installed under /dev/.
+  // A root-absolute /dev-api.php would escape that directory and return 404.
+  const request = async (operation, payload = {}, endpoint = 'dev-api.php') => {
     const session = load();
     if (!session) throw new Error('DEV session required');
     const response = await fetch(endpoint, {
