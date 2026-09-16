@@ -24,7 +24,7 @@ Every step binds:
 - unique find/replace patch
 - exact expected resulting SHA-256
 
-A tick executes at most one patch. Any base/content/result mismatch stops the job. Jobs are append/history preserving: terminal records are retained, not hard-deleted.
+A tick executes at most one patch. Any base/content/result mismatch stops the job. The complete stored plan is re-hashed on every tick and must still match `plan_sha256`. Jobs are append/history preserving: terminal records are retained, not hard-deleted. At most 16 active/uncertain delegated jobs are accepted.
 
 ## Authorization model
 
@@ -35,14 +35,40 @@ Delegation lifetime is bounded to the earlier of:
 - original session absolute expiry
 - 60 minutes after job creation
 
-Idle expiry of the chat session does not revoke an already-created immutable job; that is the explicit purpose of delegation. The delegated authority cannot expand beyond the prevalidated patch plan and ends before any release/finalize/trust-boundary operation.
+The job is also bound to the KiCom runtime version present at creation. A runtime/version change causes `JOB_RUNTIME_CHANGED` and no patch is executed.
+
+Idle expiry of the chat session is intended not to revoke an already-created immutable job; that is the purpose of delegation. The delegated authority cannot expand beyond the prevalidated patch plan and ends before any release/finalize/trust-boundary operation.
+
+**Promotion blocker:** explicit security revocation semantics are not yet resolved. Before promotion, a deliberate session/delegation revocation must invalidate outstanding jobs even when the runtime version is unchanged, without making ordinary idle expiry defeat delegation.
 
 ## Interrupt behavior
 
-The local runner writes a durable checkpoint after every step. After a chat/platform interruption, status is reconstructed from the job record; the client does not need to reopen a normal session merely to learn whether a build patch completed.
+The local runner writes a durable checkpoint before and after every step. After a chat/platform interruption, status is reconstructed from the job record; the client does not need to reopen a normal session merely to learn whether a build patch completed.
 
-States: `READY`, `RUNNING`, `COMPLETED`, `FAILED`, `EXPIRED`.
+States: `READY`, `RUNNING`, `UNCERTAIN`, `COMPLETED`, `FAILED`, `EXPIRED`.
+
+A persisted `RUNNING` state observed by a later tick is **never retried**. It is converted to `UNCERTAIN` and requires inspection. This implements D024's rule that an ambiguous mutation is not blindly re-executed.
+
+## Validation
+
+CI regression currently covers:
+
+- ordinary two-step execution, one patch per tick
+- terminal retention / no hard delete
+- forbidden non-build step rejection
+- expected-result SHA mismatch failure
+- expiry before execution
+- `RUNNING -> UNCERTAIN` without re-execution
+- immutable-plan hash verification / tamper rejection
+- runtime-version binding
+- absence of FreeOTP / rolling-token secret fields from job records and status
 
 ## Promotion rule
 
-Do not promote this prototype with Resilience v5 automatically. It is a separate capability candidate and requires isolated server validation plus explicit architectural review because it delegates bounded authority beyond ordinary session idle.
+Do not promote this prototype with Resilience v5 automatically. It is a separate capability candidate. Promotion requires:
+
+1. Resilience v5 installed and stable first.
+2. Explicit revocation semantics resolved and tested.
+3. Exact live Fast-Build ownership/lifecycle checks reviewed against the target KiCom version.
+4. Isolated server validation with deliberate interruption tests.
+5. No widening of RED, production, kernel, deploy, update, memory or arbitrary-execution authority.
