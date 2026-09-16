@@ -1,13 +1,17 @@
-# Standing operational rule
+# Standing KiCom operational rule — interruption-safe work
 
-Chat/stream interruption is a normal operating condition for KiCom work. Platform-side review or transport failure can interrupt delivery at any time, and continuation cannot be assumed.
+Human instruction, 2026-09-16:
 
-Therefore:
-- KiCom must persist non-secret resumable job/checkpoint state server-side.
-- Bounded steps must be idempotent and safely retryable.
-- FreeOTP codes are time-sensitive and should be consumed immediately when actually needed, before long analysis.
-- Ordinary work should resume without a new TOTP when a still-valid session can be safely recovered.
-- RED, production and kernel actions remain exact transaction-bound current-counter FreeOTP gates.
-- No TOTP codes, session tokens, passwords, secrets or API keys may be stored in job/checkpoint state.
+Chat/stream output can be interrupted unpredictably by platform-side review. KiCom and ChatGPT work must therefore treat interruption as a normal operating condition, never assume a streamed response will complete, and persist non-secret progress/checkpoints so work can resume safely.
 
-This candidate note mirrors the human instruction until the canonical KiCom memory write path is reachable again. Canonical server memory remains authoritative once updated.
+Authentication latency materially limits development throughput. Normal-session authentication should therefore minimize repeated FreeOTP prompts without weakening trust boundaries:
+
+- FreeOTP session-open gets priority when a code is supplied.
+- Session-open should be idempotently replayable for the same short-lived request ID after a lost response.
+- An already-valid normal autonomy session should be recoverable with a dedicated recovery handle if the rolling token response is lost.
+- Recovery must never create/revive an expired session or grant new scope.
+- RED, production and recovery-kernel execution remain exact-transaction-bound and require a fresh current-counter FreeOTP code.
+- No TOTP, session token, recovery handle, password or equivalent secret belongs in resumable jobs/checkpoints or canonical project memory.
+- Project experience is superseded/archived, not hard-deleted.
+
+This file is a non-authoritative mirror candidate until the same rule is written into KiCom canonical memory.
