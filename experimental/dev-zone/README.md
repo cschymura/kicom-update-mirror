@@ -12,14 +12,17 @@ First-time passkey enrollment is intentionally separate: the existing FreeOTP ve
 
 The install-oriented bundle places the module under `dev/`:
 
-- `dev/index.html` — small first-party control page for passkey enrollment, connection, status and logout.
+- `dev/index.html` — first-party control page for passkey enrollment, connection, agent-link copy, status and logout.
 - `dev/dev-auth.php` — enrollment and passkey authentication endpoint.
-- `dev/dev-api.php` — header-authenticated DEV API.
+- `dev/dev-api.php` — preferred header-authenticated DEV API.
+- `dev/dev-bridge.php` — GET-only bridge for development tooling that cannot send custom headers.
 - `dev/browser.js` — WebAuthn browser codec.
 - `dev/dev-client.js` — reusable browser DEV client.
 - PHP modules for session, auth flow, router, HTTP transport and bindings to KiCom's existing workspace/source/build primitives.
 
-DEV credentials are sent as `X-KiCom-Dev-Session` and `X-KiCom-Dev-Token` headers. Query-string credentials are not used.
+The browser API sends credentials as `X-KiCom-Dev-Session` and `X-KiCom-Dev-Token` headers. `dev-auth.php` and `dev-api.php` do not accept query operations or credentials.
+
+The optional agent bridge is an explicit usability exception: its URL contains the reusable **DEV-only** credential because some external development transports are GET-only. That credential cannot call production deployment, install an update, mutate kernel/recovery/auth state or read secrets. The first-party UI can copy a ready-to-use agent link with one tap, and revoking the DEV session invalidates the link as well.
 
 ## Fixed DEV capabilities
 
@@ -33,6 +36,8 @@ The router implements `DEV_SESSION_STATUS`, `DEV_SESSION_REVOKE`, `DEV_SOURCE_SN
 
 Workspace writes keep KiCom's exact-base concurrency semantics and history. Source reads reuse the trusted installed-source allowlist. Builds reuse the protected KiCom fast-build area.
 
+The GET bridge uses `sid`, `key`, `op` and a base64url-encoded JSON `p` payload. It invokes the same router and the same capability checks as the header API; it does not implement a second authority model.
+
 ## Candidate boundary
 
 `DEV_BUILD_FINALIZE_CANDIDATE` is intentionally **not** the existing production-oriented fast-build finalize call. DEV performs release preparation, validates the isolated tree with KiCom's existing package verifier and exports a candidate ZIP inside the protected build area. It does **not** call `kicomReceiveSelfUpdatePackage`, does not create a production pending update and cannot install anything.
@@ -45,4 +50,4 @@ Passkey verification/session issuance is serialized per WebAuthn challenge, so o
 
 ## Development rules
 
-The DEV zone deliberately favors iteration speed. It does not provide arbitrary shell access or arbitrary filesystem access, and it cannot cross into production authority. CI checks syntax, crypto/runtime dependencies, capability boundaries, header-only credential transport, WebAuthn/session behavior, DEV router behavior, HTTP behavior and KiCom runtime bindings, then builds an install-oriented candidate artifact.
+The DEV zone deliberately favors iteration speed. It does not provide arbitrary shell access or arbitrary filesystem access, and it cannot cross into production authority. CI checks syntax, crypto/runtime dependencies, capability boundaries, WebAuthn/session behavior, DEV router behavior, HTTP behavior and KiCom runtime bindings, then builds an install-oriented candidate artifact.
