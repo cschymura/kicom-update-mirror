@@ -37,7 +37,9 @@ jobs:
         run: |
           php -l experimental/dev-zone/DevSession.php
           php -l experimental/dev-zone/DevAuthAdapter.php
+          php -l experimental/dev-zone/DevRouter.php
           php -l experimental/dev-zone/dev-selftest.php
+          php -l experimental/dev-zone/dev-router-selftest.php
 
       - name: DEV boundary static checks
         shell: bash
@@ -54,6 +56,13 @@ jobs:
             echo 'Forbidden authority literal in DEV session manager' >&2
             exit 1
           fi
+          if grep -RniE '(session_id|token)=' experimental/dev-zone/dev-client.js; then
+            echo 'DEV browser client must not put credentials in query strings' >&2
+            exit 1
+          fi
 
       - name: DEV session and passkey selftest
         run: php experimental/dev-zone/dev-selftest.php
+
+      - name: DEV router boundary selftest
+        run: php experimental/dev-zone/dev-router-selftest.php
