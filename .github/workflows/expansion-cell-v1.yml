@@ -67,7 +67,7 @@ jobs:
           grep -q 'Credentials are method arguments only' experimental/expansion-cell/ExpansionFtpDeployer.php
           grep -q 'bootstrap.private.json' experimental/expansion-cell/CellNode.php
           grep -q "unlink(\$this->dir.'/bootstrap.private.json')" experimental/expansion-cell/CellNode.php
-          grep -q 'never retain it after a deploy attempt' experimental/expansion-cell/ExpansionOrchestrator.php
+          grep -q 'builder->destroy($packageDir)' experimental/expansion-cell/ExpansionOrchestrator.php
 
       - name: Boundary guard
         shell: bash
