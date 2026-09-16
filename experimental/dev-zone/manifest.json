@@ -14,7 +14,8 @@
     "rolling_token": false,
     "reusable_token": true,
     "storage": "server-side hash only",
-    "transport": "X-KiCom-Dev-Session + X-KiCom-Dev-Token headers"
+    "browser_transport": "X-KiCom-Dev-Session + X-KiCom-Dev-Token headers",
+    "agent_transport": "DEV-only GET bridge; credential may appear in URL and is intentionally incapable of production authority"
   },
   "files": [
     "PasskeyBridge.php",
@@ -28,14 +29,17 @@
     "dev-client.js",
     "dev-auth.php",
     "dev-api.php",
+    "dev-bridge.php",
     "index.html"
   ],
   "runtime": {
     "ui": "dev/index.html",
     "auth_endpoint": "dev/dev-auth.php",
     "api_endpoint": "dev/dev-api.php",
+    "agent_bridge": "dev/dev-bridge.php",
     "one_time_enrollment": "existing FreeOTP verifier",
-    "normal_entry": "WebAuthn passkey"
+    "normal_entry": "WebAuthn passkey",
+    "bridge_link": "one-click copy from first-party DEV UI"
   },
   "candidate_export": {
     "uses_existing_verifier": true,
