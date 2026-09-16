@@ -1,11 +1,11 @@
 # Interrupt/Auth Resilience — current checkpoint
 
 Date: 2026-09-16
-State: LIVE_0_9_14_INTEGRATION_MAPPED; authenticated mutation transport intermittently blocked; unknown RED pending 0.9.15 remains release blocker
+State: LIVE_0_9_14_INTEGRATION_MAPPED; deterministic v5 bundle persisted; authenticated mutation transport intermittently blocked; unknown RED pending 0.9.15 remains release blocker
 
 ## Completed
 
-- Standing operating rule is now canonical in KiCom memory as DECISION D024: chat/stream interruption is a normal operating condition; never rely on the live stream as process state.
+- Standing operating rule is canonical in KiCom memory as DECISION D024: chat/stream interruption is a normal operating condition; never rely on the live stream as process state.
 - Canonical DECISIONS SHA after D024 write: `48bbda6275a0441870e0ce5f1362adcb021e4b4336a55e930acbfccc6e3aa532`.
 - Persistent non-secret jobs/checkpoints with CAS revision protection implemented.
 - Promote core advanced to v5 with explicit allowlist/denylist.
@@ -15,8 +15,8 @@ State: LIVE_0_9_14_INTEGRATION_MAPPED; authenticated mutation transport intermit
 - Expired IN_PROGRESS becomes UNCERTAIN and is never automatically re-executed.
 - Shared normal-session lock implemented.
 - Request-bound previous-token fallback implemented: an old token cannot authorize a different resilient client_request_id.
+- Legacy-compatible session consume bridge implemented: no client_request_id => original session-consume path.
 - Idempotent FreeOTP session-open v2 implemented without a secondary recovery bearer.
-- Common guarded normal-action v5 implemented.
 - Deferred router guard implemented and locally tested for EXECUTE / exact REPLAY / IN_FLIGHT / UNCERTAIN / exact HTTP+KCL status.
 - Read-only approval-status recovery implemented for lost critical-execute responses using approval_id + exact binding_sha256.
 - Read-only pending-update inspector implemented: versions/package+manifest+genome hashes/risk reasons/changed paths, no package mutation or internal package path.
@@ -30,16 +30,22 @@ State: LIVE_0_9_14_INTEGRATION_MAPPED; authenticated mutation transport intermit
   - TX begin/append/backoff/status/abort and CB begin/validate/status do not rotate the main token.
 - Live approval record/execute semantics were re-read and match the read-only approval-status candidate.
 - Live pending.json structure was re-read and already stores risk_reasons + changed_paths, so the new inspector can be tiny/read-only.
+- Exact isolated-build patch sequence is stored in `LIVE_PATCH_PLAN_0.9.14.md`.
+- CI regression run #52 passed.
+- Deterministic living bundle is generated from `PROMOTION_MANIFEST.json`, PHP-linted and SHA-verified.
+- Bundle: 42,750 bytes; SHA-256 `8e4cbc006b02d03f07edd4ea2a6db17d755141d54364bf973f44199a70dfad2d`.
+- Superseded recovery-handle symbols are absent from the generated bundle; required promote symbols are present.
+- Build bot persisted the generated bundle on the candidate branch under `generated/` (commit `f004c424213332316eff8c21227c92c548199b12`), so progress no longer depends on a temporary Actions artifact.
 
 ## Live authoritative state
 
 - KiCom runtime: 0.9.14.
-- Genome baseline remains trusted/LKG from the previously verified 0.9.14 install.
-- Existing unknown self-update pending: 0.9.15, RED, source `autonomy:server-build`; it remains untouched.
-- Package SHA prefix previously bound for 0.9.15: `64361995...`; no install/discard was performed.
-- An isolated non-executable build was created from live 0.9.14: build id `244fea5ac5c1f2141605`. It had no resilience patch committed when recorded and may expire; recreate from live baseline if needed.
-- Current external fetch gateway allows public/read-lease access but intermittently denies authenticated mutation URLs before KiCom. These denials are transport failures, not KiCom execution failures.
-- No blind retry is allowed for an ambiguous mutating request.
+- Existing unknown self-update pending: 0.9.15, RED, source `autonomy:server-build`.
+- 0.9.15 remains untouched; do not finalize another update while it would replace pending.json.
+- An isolated non-executable build was created from live 0.9.14: build id `244fea5ac5c1f2141605`; it may expire and can be recreated from the recorded live hashes.
+- External Keenable/fetch transport currently allows public/read-lease operations but intermittently denies authenticated mutation URLs before KiCom.
+- A second built-in web transport was tested for authenticated build status and also rejected the dynamic auth URL before KiCom; it is not a usable mutation fallback.
+- These denials are transport failures, not KiCom execution results. No blind retry is allowed for an ambiguous mutation.
 
 ## Exact live source hashes used for integration
 
@@ -51,10 +57,10 @@ State: LIVE_0_9_14_INTEGRATION_MAPPED; authenticated mutation transport intermit
 
 ## Next safe actions
 
-1. When authenticated mutation transport is reachable, patch only the isolated build, never live files directly.
-2. Living patch: preserve legacy consumer under `kicomAutonomySessionConsumeLegacyV5`, insert v5 resilience helpers, and bridge `kicomAutonomySessionConsume()` so resilient request-binding is used only when a deferred `client_request_id` context exists; legacy clients remain unchanged.
-3. Index patch: central deferred guard in `requireAutonomySession()` + completion hook in `out()`; small preflight hooks for `AUTONOMY_TX_COMMIT` and `AUTONOMY_CB_EXEC`; idempotent `AUTH_SESSION_OPEN` when `client_request_id` is supplied; add read-only approval/pending/source-manifest status routes.
-4. API patch: completion hook in `apiOut()`; resilient preflight for `AUTONOMY_BATCH`; raw upload fingerprint must bind body SHA256 + filename + length before token consume.
+1. When authenticated mutation transport is reachable, patch only an isolated build, never live files directly.
+2. Living patch: preserve legacy consumer under `kicomAutonomySessionConsumeLegacyV5`, insert the persisted v5 bundle, and bridge canonical consume so resilient request-binding is used only when a deferred client_request_id context exists.
+3. Index patch: central deferred guard in `requireAutonomySession()` + completion hook in `out()`; small preflight hooks for `AUTONOMY_TX_COMMIT` and `AUTONOMY_CB_EXEC`; idempotent `AUTH_SESSION_OPEN` when client_request_id is supplied; add read-only approval/pending/source-manifest status routes.
+4. API patch: completion hook in `apiOut()`; resilient preflight for `AUTONOMY_BATCH`; raw upload fingerprint binds body SHA256 + filename + length before token consume.
 5. Audit/resolve unknown RED pending 0.9.15 without deleting its package/history and without overwriting pending.json.
 6. Run isolated-build validation, verifier/genome checks and deliberate lost-response smoke tests.
 7. Only then prepare/finalize a release. RED/production/kernel install remains exact-bound fresh current-counter FreeOTP.
