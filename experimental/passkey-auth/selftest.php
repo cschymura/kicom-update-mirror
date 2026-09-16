@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/PasskeyBridge.php';
+require_once __DIR__.'/RuntimeAdapter.php';
 
 function fail(string $m): never { fwrite(STDERR,"FAIL: $m\n"); exit(1); }
 function ok(bool $v,string $m): void { if(!$v) fail($m); echo "OK: $m\n"; }
@@ -20,7 +21,33 @@ function cborInt(int $n): string {
 
 $dir=sys_get_temp_dir().'/kicom-passkey-selftest-'.bin2hex(random_bytes(4));
 $bridge=new KiComPasskeyBridge($dir);
-ok(($bridge->ready()['ok']??false)===true,'bridge ready');
+$totpCalls=0;$mintCalls=0;
+$adapter=new KiComPasskeyRuntimeAdapter(
+    $bridge,
+    function(string $code,string $purpose) use (&$totpCalls): array {
+        $totpCalls++;
+        if($code==='654321'&&$purpose==='passkey_enrollment')return ['ok'=>true,'code'=>'OK'];
+        return ['ok'=>false,'code'=>'TOTP_CODE_REJECTED'];
+    },
+    function(array $context) use (&$mintCalls): array {
+        $mintCalls++;
+        if(($context['auth_method']??'')!=='passkey'||($context['scope']??'')!=='autonomy')return ['ok'=>false,'code'=>'CONTEXT_INVALID'];
+        return [
+            'ok'=>true,
+            'session_id'=>str_repeat('a',24),
+            'token'=>str_repeat('b',64),
+            'expires_in'=>28800,
+            'idle_expires_in'=>1800,
+        ];
+    }
+);
+ok(($adapter->ready()['ok']??false)===true,'bridge ready');
+
+$denied=$adapter->beginEnrollment('000000','Christoph');
+ok(($denied['ok']??true)===false&&($denied['code']??'')==='TOTP_CODE_REJECTED','enrollment rejects untrusted TOTP gate');
+$en=$adapter->beginEnrollment('654321','Christoph');
+ok(($en['ok']??false)===true,'enrollment ticket created only after trusted gate');
+ok($totpCalls===2,'enrollment gate invoked exactly once per request');
 
 $pkey=openssl_pkey_new(['private_key_type'=>OPENSSL_KEYTYPE_EC,'curve_name'=>'prime256v1']);
 ok($pkey!==false,'P-256 key generated');
@@ -34,9 +61,7 @@ $cose=chr(0xA5)
     .cborInt(-1).cborInt(1)
     .cborInt(-2).cborBytes($x)
     .cborInt(-3).cborBytes($y);
-$en=$bridge->createEnrollmentTicket('Christoph');
-ok(($en['ok']??false)===true,'enrollment ticket created');
-$opts=$bridge->registrationOptions((string)$en['enrollment_id']);
+$opts=$adapter->registrationOptions((string)$en['enrollment_id']);
 ok(($opts['ok']??false)===true,'registration options generated');
 $regChallenge=(string)$opts['publicKey']['challenge'];
 $authDataReg=hash('sha256','kicom.rurtalbahn.info',true).chr(0x45).pack('N',0).str_repeat("\0",16).pack('n',strlen($credId)).$credId.$cose;
@@ -49,18 +74,19 @@ $reg=[
     'id'=>b($credId),'rawId'=>b($credId),'type'=>'public-key',
     'response'=>['clientDataJSON'=>b($clientReg),'attestationObject'=>b($attObj)]
 ];
-$rr=$bridge->completeRegistration((string)$en['enrollment_id'],$reg,'Synthetic selftest');
+$rr=$adapter->completeRegistration((string)$en['enrollment_id'],$reg,'Synthetic selftest');
 ok(($rr['ok']??false)===true,'synthetic passkey registration verified');
 ok($bridge->credentialCount()===1,'credential persisted');
 
 $kp=sodium_crypto_box_keypair();
 $pub=sodium_crypto_box_publickey($kp);
-$created=$bridge->createAuthChallenge(b($pub));
-ok(($created['ok']??false)===true,'challenge created');
+$created=$adapter->createChallenge(b($pub));
+ok(($created['ok']??false)===true,'challenge created without minting a session');
+ok($mintCalls===0,'no session before passkey assertion');
 $id=(string)$created['challenge_id'];
-$status=$bridge->challengeStatus($id);
+$status=$adapter->status($id);
 ok(($status['state']??'')==='pending','challenge pending');
-$ao=$bridge->assertionOptions($id);
+$ao=$adapter->assertionOptions($id);
 ok(($ao['ok']??false)===true,'assertion options generated');
 $challenge=(string)$ao['publicKey']['challenge'];
 $clientGet=json_encode(['type'=>'webauthn.get','challenge'=>$challenge,'origin'=>'https://kicom.rurtalbahn.info'],JSON_UNESCAPED_SLASHES);
@@ -76,19 +102,26 @@ $assertion=[
         'userHandle'=>null,
     ],
 ];
-$vr=$bridge->verifyAssertion($id,$assertion);
-ok(($vr['ok']??false)===true,'synthetic WebAuthn assertion verified');
+$vr=$adapter->verifyAndMint($id,$assertion);
+ok(($vr['ok']??false)===true&&($vr['code']??'')==='PASSKEY_SESSION_APPROVED','assertion mints and seals bounded session');
+ok($mintCalls===1,'session minter invoked exactly once after verification');
 
-$payload=['session_id'=>bin2hex(random_bytes(12)),'token'=>bin2hex(random_bytes(32)),'scope'=>'autonomy'];
-$ap=$bridge->approveWithEncryptedPayload($id,$payload);
-ok(($ap['ok']??false)===true,'payload sealed');
-$status=$bridge->challengeStatus($id);
+$expected=[
+    'session_id'=>str_repeat('a',24),
+    'token'=>str_repeat('b',64),
+    'scope'=>'autonomy',
+    'auth_method'=>'passkey',
+    'expires_in'=>28800,
+    'idle_expires_in'=>1800,
+];
+$status=$adapter->status($id);
 ok(($status['state']??'')==='approved' && isset($status['ciphertext']),'ciphertext published');
+ok(!isset($status['token'])&&!isset($status['session_id']),'status never exposes plaintext session credentials');
 $cipher=KiComPasskeyBridge::b64uDecode((string)$status['ciphertext']);
 ok(is_string($cipher),'ciphertext decodes');
 $plain=sodium_crypto_box_seal_open($cipher,$kp);
 ok(is_string($plain),'ciphertext decrypts');
-ok(json_decode($plain,true)===$payload,'payload roundtrip exact');
+ok(json_decode($plain,true)===$expected,'sealed session payload roundtrip exact');
 
 $r=random_bytes(73);ok(KiComPasskeyBridge::b64uDecode(KiComPasskeyBridge::b64uEncode($r))===$r,'base64url roundtrip');
 
