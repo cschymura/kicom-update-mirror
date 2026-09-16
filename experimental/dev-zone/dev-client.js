@@ -35,9 +35,7 @@ window.KiComDev = (() => {
 
   const clear = () => localStorage.removeItem(KEY);
 
-  // Relative endpoint is intentional: the DEV zone is installed under /dev/.
-  // A root-absolute /dev-api.php would escape that directory and return 404.
-  const request = async (operation, payload = {}, endpoint = 'dev-api.php') => {
+  const postAuthenticated = async (endpoint, body) => {
     const session = load();
     if (!session) throw new Error('DEV session required');
     const response = await fetch(endpoint, {
@@ -49,7 +47,7 @@ window.KiComDev = (() => {
         'X-KiCom-Dev-Session': session.session_id,
         'X-KiCom-Dev-Token': session.token,
       },
-      body: JSON.stringify({ operation, payload }),
+      body: JSON.stringify(body),
     });
     const text = await response.text();
     let data;
@@ -60,11 +58,21 @@ window.KiComDev = (() => {
     return { http_status: response.status, ...data };
   };
 
+  // Relative endpoint is intentional: the DEV zone is installed under /dev/.
+  // A root-absolute /dev-api.php would escape that directory and return 404.
+  const request = (operation, payload = {}, endpoint = 'dev-api.php') =>
+    postAuthenticated(endpoint, { operation, payload });
+
+  const expansionRequest = (operation) =>
+    postAuthenticated('dev-expansion.php', { operation });
+
   const status = () => request('DEV_SESSION_STATUS');
+  const expansionStatus = () => expansionRequest('STATUS');
+  const expandSandbox = () => expansionRequest('EXECUTE_SANDBOX');
   const revoke = async (reason = 'browser logout') => {
     try { return await request('DEV_SESSION_REVOKE', { reason }); }
     finally { clear(); }
   };
 
-  return { load, save, clear, request, status, revoke };
+  return { load, save, clear, request, status, expansionStatus, expandSandbox, revoke };
 })();
