@@ -15,7 +15,7 @@
     "reusable_token": true,
     "storage": "server-side hash only",
     "browser_transport": "X-KiCom-Dev-Session + X-KiCom-Dev-Token headers",
-    "agent_transport": "DEV-only GET bridge; credential may appear in URL and is intentionally incapable of production authority"
+    "agent_transport": "DEV-only GET bridge through extensionless directory endpoint; credential may appear in URL and is intentionally incapable of production authority"
   },
   "files": [
     "PasskeyBridge.php",
@@ -31,13 +31,15 @@
     "dev-auth.php",
     "dev-api.php",
     "dev-bridge.php",
+    "agent/index.php",
     "index.html"
   ],
   "runtime": {
     "ui": "dev/index.html",
     "auth_endpoint": "dev/dev-auth.php",
     "api_endpoint": "dev/dev-api.php",
-    "agent_bridge": "dev/dev-bridge.php",
+    "agent_bridge": "dev/agent/",
+    "agent_bridge_delegate": "dev/dev-bridge.php",
     "one_time_enrollment": "existing FreeOTP verifier",
     "normal_entry": "WebAuthn passkey",
     "bridge_link": "one-click copy from first-party DEV UI",
