@@ -50,6 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           root=candidates/interrupt-auth-resilience-v1
+          mkdir -p "$root/generated"
           php "$root/build_runtime_bundle.php" | tee "$root/generated/build.log"
           php -l "$root/generated/living_bundle_v5.php"
           cd "$root/generated"
