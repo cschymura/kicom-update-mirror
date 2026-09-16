@@ -1,5 +1,5 @@
 {
-  "schema": 1,
+  "schema": 2,
   "target_runtime": "0.9.15",
   "target_genome_id": "kicom-0.9.15-g16",
   "target_genome_generation": 16,
@@ -30,13 +30,22 @@
       "kind": "memory_patch",
       "resource": "NEXT",
       "base_sha256": "25c899e99b232171da6dd7bdd0d1f72f4fbf50563e57dc7d9f5e2fd50abc37db",
-      "find": "PRIORITY 1 goal=\"Operate on KiCom 0.9.14 as the trusted baseline; keep genome healthy, trusted, LKG OK, drift=0 and unknown=0; use KCL-CODEBOOK/1 where it materially reduces transport overhead\"\nPRIORITY 2 goal=\"Prototype the learning codebook and KiCom Cellular Architecture: measure repeated semantic patterns and candidate macro gains; design cell identity, lineage, peer discovery/trust, signed bidirectional messaging, TTL/sequence heartbeat gossip, reproduction/bootstrap and project-genesis flows while preserving local trust gates and preferring fixed-cost/self-hosted paths.\"\nPRIORITY 3 goal=\"Prefer adaptive low-roundtrip paths: read-lease, transaction buffer, compact batch and server-side build/release_prepare; keep forward-only release archival automatic\"\nPRIORITY 4 goal=\"Prefer RTB-controlled first-party feed and sandbox/archive infrastructure; keep GitHub optional only\"\nPRIORITY 5 goal=\"Use session-open TOTP grace only for normal autonomy-session establishment; keep RED, production and kernel execution current-counter-only and transaction-bound\"\nPRIORITY 6 goal=\"Continue experience-driven evolution: experience -> insight -> hypothesis -> candidate -> fitness -> promotion -> new experience\"\nPRIORITY 2A goal=\"Review prepared isolated KiCom 0.9.16-g16 build for workspace proposal batch approval plus authorized UPDATE_PENDING_INSPECT; do not finalize while unknown 0.9.15 RED pending remains unaudited\"",
-      "replace": "PRIORITY 1 goal=\"Operate on KiCom 0.9.15 / genome g16 as the trusted baseline; keep genome healthy, trusted, LKG OK, drift=0 and unknown=0; preserve the live workspace_proposal_batch trust boundary\"\nPRIORITY 2 goal=\"Prototype the learning codebook and KiCom Cellular Architecture: measure repeated semantic patterns and candidate macro gains; design cell identity, lineage, peer discovery/trust, signed bidirectional messaging, TTL/sequence heartbeat gossip, reproduction/bootstrap and project-genesis flows while preserving local trust gates and preferring fixed-cost/self-hosted paths.\"\nPRIORITY 3 goal=\"Promote Interrupt/Auth Resilience v5 only through an isolated 0.9.16 / genome g17 build after canonical-memory synchronization, workspace-batch regression, verifier/genome checks and deliberate lost-response tests\"\nPRIORITY 4 goal=\"Repair the RTB-controlled primary update feed currently returning HTTP 403 while retaining the GitHub mirror as independent fallback; do not weaken TLS or URL allowlists\"\nPRIORITY 5 goal=\"Use session-open TOTP grace only for normal autonomy-session establishment; keep RED, production and kernel execution current-counter-only and transaction-bound\"\nPRIORITY 6 goal=\"Continue experience-driven evolution: experience -> insight -> hypothesis -> candidate -> fitness -> promotion -> new experience\"\nPRIORITY 2A goal=\"Reduce authentication and stream friction through idempotent request replay and persistent non-secret checkpoints; delegated isolated-build jobs remain a separate post-Resilience candidate\""
+      "find": "PRIORITY 1 goal=\"Operate on KiCom 0.9.14 as the trusted baseline; keep genome healthy, trusted, LKG OK, drift=0 and unknown=0; use KCL-CODEBOOK/1 where it materially reduces transport overhead\"",
+      "replace": "PRIORITY 1 goal=\"Operate on KiCom 0.9.15 / genome g16 as the trusted baseline; keep genome healthy, trusted, LKG OK, drift=0 and unknown=0; preserve the live workspace_proposal_batch trust boundary\""
+    },
+    {
+      "kind": "memory_patch",
+      "resource": "NEXT",
+      "base_sha256": "b7596f525a855432294e64f6822adf8e89e77f71114c72a29188549c587a4063",
+      "find": "PRIORITY 2A goal=\"Review prepared isolated KiCom 0.9.16-g16 build for workspace proposal batch approval plus authorized UPDATE_PENDING_INSPECT; do not finalize while unknown 0.9.15 RED pending remains unaudited\"",
+      "replace": "PRIORITY 2A goal=\"Promote Interrupt/Auth Resilience v5 only through an isolated KiCom 0.9.16 / genome g17 build after workspace-batch regression, verifier/genome and deliberate lost-response tests; delegated isolated-build jobs remain a separate post-Resilience candidate\""
     }
   ],
+  "expected_final_next_sha256": "0aab01dd07b29f3fd5372b08bae69ae5cf9150033e91f4c29030e6b6a22d06e9",
   "rules": [
     "Do not execute if any current resource SHA differs from the recorded base_sha256.",
-    "Prefer one compact/codebook batch so the normal autonomy session rotates once.",
+    "The second NEXT patch is valid only after the first NEXT patch yields its recorded intermediate SHA-256.",
+    "Prefer one compact/codebook batch when the transport is safe; otherwise use the CI-verified short-phase fallback with ordinary session rotations only.",
     "Ordered batch failure must stop immediately; verify every resource after execution.",
     "DECISIONS is intentionally untouched because D024 is already canonical and current.",
     "No operation in this plan changes runtime permissions or authorization policy."
