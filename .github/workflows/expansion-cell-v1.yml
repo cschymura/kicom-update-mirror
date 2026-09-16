@@ -1,0 +1,51 @@
+name: KiCom Expansion Cell v1
+
+on:
+  pull_request:
+    paths:
+      - 'experimental/expansion-cell/**'
+      - 'docs/goals/KICOM_EXPANSION_FEDERATION.*'
+      - '.github/workflows/expansion-cell-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  expansion-cell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Runtime inventory
+        run: |
+          php -v
+          php -r 'foreach (["sodium","ftp"] as $e) { if (!extension_loaded($e)) { fwrite(STDERR,"Missing extension: $e\n"); exit(1); } } echo "sodium+ftp available\n";'
+
+      - name: PHP syntax
+        run: |
+          php -l experimental/expansion-cell/ExpansionProtocol.php
+          php -l experimental/expansion-cell/ExpansionRegistry.php
+          php -l experimental/expansion-cell/ExpansionFtpDeployer.php
+          php -l experimental/expansion-cell/CellNode.php
+          php -l experimental/expansion-cell/expansion-selftest.php
+
+      - name: Expansion/federation selftest
+        run: php experimental/expansion-cell/expansion-selftest.php
+
+      - name: Secret persistence guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RniE '(ftp_password|ftp_pass|enrollment_token)[[:space:]]*[:=][[:space:]]*["'"'][^"'"']+' docs/goals experimental/expansion-cell
+          ! grep -RniE 'BEGIN (RSA|OPENSSH|EC|PRIVATE) PRIVATE KEY' docs/goals experimental/expansion-cell
+
+      - name: Boundary guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RniE '\b(shell_exec|exec|system|passthru|proc_open|popen)\s*\(' experimental/expansion-cell
+          ! grep -RniE 'kicomReceiveSelfUpdatePackage|self_update\.install|kernel\.write|recovery\.write|secrets\.read' experimental/expansion-cell
+          grep -q 'FTP credentials are supplied transiently' docs/goals/KICOM_EXPANSION_FEDERATION.md
+          grep -q 'FEDERATION_TICK' docs/goals/KICOM_EXPANSION_FEDERATION.md
