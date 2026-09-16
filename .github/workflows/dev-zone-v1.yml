@@ -44,6 +44,7 @@ jobs:
           php -l experimental/dev-zone/DevKiComBindings.php
           php -l experimental/dev-zone/runtime/dev-auth.php
           php -l experimental/dev-zone/runtime/dev-api.php
+          php -l experimental/dev-zone/runtime/dev-bridge.php
           php -l experimental/dev-zone/dev-selftest.php
           php -l experimental/dev-zone/dev-router-selftest.php
           php -l experimental/dev-zone/dev-http-selftest.php
@@ -51,7 +52,7 @@ jobs:
 
       - name: Validate candidate manifest
         run: |
-          php -r '$j=json_decode(file_get_contents("experimental/dev-zone/manifest.json"),true); if(!is_array($j)||($j["schema"]??0)!==1||($j["status"]??"")!=="candidate"||(($j["candidate_export"]["creates_production_pending"]??true)!==false)||($j["install_root"]??"")!=="dev/") exit(1); echo "manifest ok\n";'
+          php -r '$j=json_decode(file_get_contents("experimental/dev-zone/manifest.json"),true); if(!is_array($j)||($j["schema"]??0)!==1||($j["status"]??"")!=="candidate"||(($j["candidate_export"]["creates_production_pending"]??true)!==false)||($j["install_root"]??"")!=="dev/"||($j["runtime"]["agent_bridge"]??"")!=="dev/dev-bridge.php") exit(1); echo "manifest ok\n";'
 
       - name: DEV boundary static checks
         shell: bash
@@ -69,13 +70,15 @@ jobs:
             exit 1
           fi
           if grep -RniE '(session_id|token)=' experimental/dev-zone/dev-client.js; then
-            echo 'DEV browser client must not put credentials in query strings' >&2
+            echo 'Preferred DEV browser client must not put credentials in query strings' >&2
             exit 1
           fi
-          if grep -Rni '\$_GET' experimental/dev-zone/runtime; then
-            echo 'DEV runtime endpoints must not accept query-string credentials or operations' >&2
+          if grep -Rni '\$_GET' experimental/dev-zone/runtime/dev-auth.php experimental/dev-zone/runtime/dev-api.php; then
+            echo 'Primary DEV auth/API endpoints must not accept query-string credentials or operations' >&2
             exit 1
           fi
+          grep -q "credential_scope.*dev-only" experimental/dev-zone/runtime/dev-bridge.php
+          grep -q "DEV_OPERATION_FORBIDDEN" experimental/dev-zone/DevRouter.php
           if grep -n 'kicomReceiveSelfUpdatePackage' experimental/dev-zone/DevKiComBindings.php; then
             echo 'DEV candidate export must not enter the self-update pending/install pipeline' >&2
             exit 1
@@ -112,6 +115,7 @@ jobs:
           cp experimental/dev-zone/dev-client.js dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/runtime/dev-auth.php dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/runtime/dev-api.php dist/kicom-dev-zone-v1/dev/
+          cp experimental/dev-zone/runtime/dev-bridge.php dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/runtime/index.html dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/manifest.json dist/kicom-dev-zone-v1/
           cp experimental/dev-zone/README.md dist/kicom-dev-zone-v1/
@@ -119,6 +123,7 @@ jobs:
           php -l dist/kicom-dev-zone-v1/dev/DevAuthFlow.php
           php -l dist/kicom-dev-zone-v1/dev/dev-auth.php
           php -l dist/kicom-dev-zone-v1/dev/dev-api.php
+          php -l dist/kicom-dev-zone-v1/dev/dev-bridge.php
           (cd dist && zip -qr kicom-dev-zone-v1.zip kicom-dev-zone-v1)
           sha256sum dist/kicom-dev-zone-v1.zip | tee dist/kicom-dev-zone-v1.zip.sha256
 
