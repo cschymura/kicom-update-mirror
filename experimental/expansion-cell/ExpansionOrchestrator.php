@@ -115,12 +115,15 @@ final class KiComExpansionOrchestrator
 
         $id=(string)($repair['expansion_id']??'');
         $childBase=rtrim((string)($repair['child_base_url']??''),'/');
-        if($childBase==='') $childBase=rtrim($targetBaseUrl,'/').'/kicom';
+        $expectedBase=rtrim($targetBaseUrl,'/').'/kicom';
+        if($childBase==='') $childBase=$expectedBase;
+        elseif(!hash_equals($expectedBase,$childBase)) return ['ok'=>false,'code'=>'EXPANSION_EXISTING_CELL_BASE_MISMATCH'];
 
         if($id===''){
             $http=new KiComExpansionHttpsTransport($childBase);
             $status=$http->getJson($childBase.'/status.php');
-            if(!empty($status['ok'])&&($status['state']??'')==='active'){
+            $state=(string)($status['cell']['state']??($status['state']??''));
+            if(!empty($status['ok'])&&$state==='active'){
                 return ['ok'=>true,'code'=>'EXPANSION_ALREADY_ACTIVE','cell'=>$status,'deployment'=>$repair,'resumed'=>true];
             }
             return ['ok'=>false,'code'=>'EXPANSION_EXISTING_CELL_NOT_RESUMABLE','detail'=>$status['code']??'UNKNOWN','deployment'=>$repair];
