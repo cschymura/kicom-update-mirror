@@ -1,5 +1,5 @@
 {
-  "schema": 6,
+  "schema": 7,
   "candidate": "interrupt-auth-resilience-v5",
   "authority": "candidate-only; live KiCom remains authoritative",
   "runtime_include": [
@@ -36,12 +36,13 @@
     "expired in-progress request becomes UNCERTAIN and is never automatically re-executed",
     "previous rolling token is client_request_id-bound for resilient requests",
     "legacy clients without client_request_id remain on the original session-consume path",
+    "server request_id is never reused as the client idempotency key",
     "nested parameter order canonicalizes recursively and nested secret fields are excluded from fingerprints",
     "replay receipts contain no plaintext session id, old token or next token",
     "session-open replay cannot roll a later token backward",
     "deferred router guard preserves exact response status and lines",
     "critical approval status is read-only and exact-binding-sha protected",
-    "pending update inspector is read-only and hides internal package path",
+    "pending update inspector requires a valid normal-session peek, does not rotate the session token, and hides internal package path",
     "public source manifest status exposes hashes only, never source content"
   ],
   "live_0_9_14_review": {
@@ -60,6 +61,7 @@
   "rules": [
     "Do not promote files merely because they exist on the candidate branch.",
     "Apply only against a live source state whose hashes match LIVE_INTEGRATION_0.9.14.json, or re-read/rebase the integration map first.",
+    "UPDATE_PENDING_INSPECT is an authorized nonrotating session-peek diagnostic, not a public package metadata endpoint.",
     "RED/production/kernel FreeOTP execution semantics must remain unchanged.",
     "Do not finalize a new self-update while unknown RED pending 0.9.15 would be overwritten.",
     "Authenticated mutation transport denial is not evidence that KiCom executed a request; never blind-retry an ambiguous mutation.",
