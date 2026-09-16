@@ -5,6 +5,7 @@ $root=dirname(__DIR__);
 require_once $root.'/lib.php';
 require_once __DIR__.'/DevSession.php';
 require_once __DIR__.'/DevExpansionBindings.php';
+require_once __DIR__.'/DevObserver.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, max-age=0');
@@ -46,15 +47,27 @@ $sessions=new KiComDevSessionManager(kicomVarDir().'/dev_zone/sessions');
 $auth=$sessions->authenticate($sid,$token,$capability);
 if(empty($auth['ok'])) devExpansionOut($auth,401);
 
+$observer=new KiComDevObserver(kicomVarDir().'/dev_observer');
+$opId=$observer->begin($operation,['capability'=>$capability]);
+$observer->stage($opId,'AUTH','OK');
+
 try{
     $bindings=new KiComDevExpansionBindings(__DIR__.'/expansion','https://kicom.rurtalbahn.info');
+    $observer->stage($opId,'BINDINGS','OK');
     $result=$operation==='STATUS'?$bindings->resourceStatus():$bindings->executeSandbox();
+    $observer->finish($opId,!empty($result['ok']),(string)($result['code']??'UNKNOWN'),[
+        'operation'=>$operation,
+        'scope'=>'dev',
+        'target'=>'sandbox',
+    ]);
 }catch(Throwable $e){
-    devExpansionOut(['ok'=>false,'code'=>'DEV_EXPANSION_RUNTIME_FAILED'],500);
+    $observer->finish($opId,false,'DEV_EXPANSION_RUNTIME_FAILED',['exception'=>get_class($e)]);
+    devExpansionOut(['ok'=>false,'code'=>'DEV_EXPANSION_RUNTIME_FAILED','operation_id'=>$opId],500);
 }
 
 $status=!empty($result['ok'])?200:422;
 $result['scope']='dev';
 $result['capability']=$capability;
 $result['operation']=$operation;
+$result['operation_id']=$opId;
 devExpansionOut($result,$status);
