@@ -1,0 +1,27 @@
+name: KiCom delegated build jobs v1
+
+on:
+  push:
+    branches:
+      - 'candidate/delegated-build-jobs-v1'
+    paths:
+      - 'candidates/delegated-build-jobs-v1/**'
+      - '.github/workflows/kicom-delegated-build-jobs-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  php-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax
+        run: |
+          set -euo pipefail
+          php -l candidates/delegated-build-jobs-v1/delegated_build_jobs_v1.php
+          php -l candidates/delegated-build-jobs-v1/test_delegated_build_jobs_v1.php
+      - name: Regression
+        run: php candidates/delegated-build-jobs-v1/test_delegated_build_jobs_v1.php
