@@ -38,6 +38,7 @@ jobs:
           php -l experimental/passkey-auth/PasskeyBridge.php
           php -l experimental/passkey-auth/RuntimeAdapter.php
           php -l experimental/passkey-auth/selftest.php
+          php -l experimental/passkey-auth/security-selftest.php
 
       - name: Reject obvious network or shell primitives
         shell: bash
@@ -59,3 +60,6 @@ jobs:
 
       - name: Synthetic WebAuthn + bounded-session sealed handoff selftest
         run: php experimental/passkey-auth/selftest.php
+
+      - name: WebAuthn negative security regressions
+        run: php experimental/passkey-auth/security-selftest.php
