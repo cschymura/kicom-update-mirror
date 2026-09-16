@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<title>KiCom DEV</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:light dark;--bg:#f4f6f8;--card:#fff;--text:#17202a;--muted:#667085;--line:#d9dee5;--accent:#1264a3;--good:#16794b;--bad:#b42318}@media(prefers-color-scheme:dark){:root{--bg:#101418;--card:#171c22;--text:#eef2f6;--muted:#98a2b3;--line:#303843;--accent:#62a8e5;--good:#5dd49a;--bad:#ff7b72}}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text)}main{max-width:720px;margin:0 auto;padding:28px 16px 60px}.head{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}h1{font-size:1.55rem;margin:0}.tag{font-size:.78rem;border:1px solid var(--line);border-radius:999px;padding:5px 9px;color:var(--muted)}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin:12px 0;box-shadow:0 5px 18px rgba(0,0,0,.04)}h2{font-size:1rem;margin:0 0 8px}.status{font-weight:650;margin:6px 0}.muted{color:var(--muted);font-size:.9rem;line-height:1.45}.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}button,input{font:inherit;border-radius:10px;border:1px solid var(--line);padding:11px 13px}button{background:var(--accent);color:white;border-color:transparent;font-weight:650;cursor:pointer}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}button.danger{background:transparent;color:var(--bad);border-color:var(--line)}button:disabled{opacity:.55;cursor:default}input{background:transparent;color:var(--text);min-width:160px;flex:1}pre{white-space:pre-wrap;word-break:break-word;font-size:.78rem;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;max-height:220px;overflow:auto}.ok{color:var(--good)}.err{color:var(--bad)}
+</style>
+</head>
+<body>
+<main>
+  <div class="head"><h1>KiCom DEV</h1><span class="tag">Development Zone</span></div>
+
+  <section class="card">
+    <h2>Entwicklerzugang</h2>
+    <div id="status" class="status">Status wird geprüft …</div>
+    <div id="details" class="muted">Passkey öffnet eine wiederverwendbare DEV-Sitzung. Kein Rolling-Token pro Request.</div>
+    <div class="row">
+      <button id="connect">Mit Passkey verbinden</button>
+      <button id="refresh" class="secondary">Status prüfen</button>
+      <button id="logout" class="danger">DEV-Sitzung beenden</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Passkey einmalig einrichten</h2>
+    <div class="muted">Nur für die erste Registrierung. Dafür wird einmal der vorhandene FreeOTP-Code verwendet; danach genügt der Passkey für DEV.</div>
+    <div class="row">
+      <input id="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-stelliger FreeOTP-Code">
+      <button id="enroll" class="secondary">Passkey einrichten</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Diagnose</h2>
+    <pre id="log">bereit</pre>
+  </section>
+</main>
+<script src="browser.js"></script>
+<script src="dev-client.js"></script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const log=(x)=>{$('log').textContent=typeof x==='string'?x:JSON.stringify(x,null,2)};
+const post=async(operation,payload={})=>{
+  const r=await fetch('dev-auth.php',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({operation,payload})});
+  const j=await r.json().catch(()=>({ok:false,code:'JSON_RESPONSE_INVALID'}));
+  if(!r.ok||!j.ok) throw Object.assign(new Error(j.code||('HTTP '+r.status)),{data:j});
+  return j;
+};
+async function refresh(){
+  const saved=KiComDev.load();
+  if(!saved){$('status').textContent='Nicht verbunden';$('status').className='status';$('details').textContent='Passkey öffnen, dann kann die DEV-Sitzung bis zu 7 Tage genutzt werden.';return;}
+  try{
+    const s=await KiComDev.status();
+    if(!s.ok) throw Object.assign(new Error(s.code||'Statusfehler'),{data:s});
+    $('status').textContent='DEV verbunden';$('status').className='status ok';
+    const exp=s.expires_at?new Date(s.expires_at*1000).toLocaleString():'–';
+    $('details').textContent=`Sitzung aktiv · absolute Laufzeit bis ${exp}`;
+    log(s);
+  }catch(e){$('status').textContent='DEV-Sitzung nicht gültig';$('status').className='status err';$('details').textContent=e.message;log(e.data||e.message);}
+}
+$('connect').addEventListener('click',async()=>{
+  const b=$('connect');b.disabled=true;
+  try{
+    const c=await post('DEV_AUTH_BEGIN');
+    const o=await post('DEV_AUTH_OPTIONS',{challenge_id:c.challenge_id});
+    const credential=await KiComPasskey.approve(o.publicKey);
+    const s=await post('DEV_AUTH_COMPLETE',{challenge_id:c.challenge_id,credential,label:'Browser DEV'});
+    KiComDev.save(s);log({ok:true,code:s.code,scope:s.scope,expires_in:s.expires_in,idle_expires_in:s.idle_expires_in});await refresh();
+  }catch(e){log(e.data||e.message);$('status').textContent='Verbindung fehlgeschlagen';$('status').className='status err';}
+  finally{b.disabled=false;}
+});
+$('enroll').addEventListener('click',async()=>{
+  const b=$('enroll');const code=$('otp').value.replace(/\D/g,'');if(code.length!==6){log('Bitte einen 6-stelligen Code eingeben.');return;}b.disabled=true;
+  try{
+    const e=await post('DEV_ENROLL_BEGIN',{code,account:'Christoph'});$('otp').value='';
+    const o=await post('DEV_ENROLL_OPTIONS',{enrollment_id:e.enrollment_id});
+    const credential=await KiComPasskey.enroll(o.publicKey);
+    const r=await post('DEV_ENROLL_COMPLETE',{enrollment_id:e.enrollment_id,credential,label:'KiCom DEV Passkey'});
+    log(r);$('status').textContent='Passkey eingerichtet';$('status').className='status ok';
+  }catch(e){log(e.data||e.message);}
+  finally{b.disabled=false;}
+});
+$('refresh').addEventListener('click',refresh);
+$('logout').addEventListener('click',async()=>{try{const r=await KiComDev.revoke('browser logout');log(r);}catch(e){KiComDev.clear();log(e.data||e.message);}await refresh();});
+refresh();
+</script>
+</body>
+</html>
