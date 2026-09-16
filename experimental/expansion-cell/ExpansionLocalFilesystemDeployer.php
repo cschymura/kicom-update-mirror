@@ -6,7 +6,8 @@ declare(strict_types=1);
  *
  * Intended for sibling vhosts/webroots on the same hosting account where KiCom
  * already has filesystem write authority. It never guesses a target path: the
- * caller must provide the exact authorized web root.
+ * caller must provide the exact authorized web root. Absolute server paths are
+ * deliberately never returned in public result arrays.
  */
 final class KiComExpansionLocalFilesystemDeployer
 {
@@ -21,7 +22,7 @@ final class KiComExpansionLocalFilesystemDeployer
         if(!is_writable($root)) return ['ok'=>false,'code'=>'EXPANSION_LOCAL_WEBROOT_NOT_WRITABLE'];
 
         $target=$root.'/kicom';
-        if(file_exists($target)) return ['ok'=>false,'code'=>'EXPANSION_TARGET_EXISTS','local_directory'=>$target];
+        if(file_exists($target)) return ['ok'=>false,'code'=>'EXPANSION_TARGET_EXISTS','target'=>'kicom/'];
 
         $stage=$root.'/.kicom-stage-'.bin2hex(random_bytes(6));
         if(!@mkdir($stage,0700,true)) return ['ok'=>false,'code'=>'EXPANSION_LOCAL_STAGE_CREATE_FAILED'];
@@ -45,13 +46,13 @@ final class KiComExpansionLocalFilesystemDeployer
                 if(!hash_equals((string)$row['sha256'],$actual)) return ['ok'=>false,'code'=>'EXPANSION_LOCAL_COPY_HASH_MISMATCH','path'=>$rel,'files'=>$copied];
                 $copied++;
             }
-            if(!@rename($stage,$target)) return ['ok'=>false,'code'=>'EXPANSION_LOCAL_ACTIVATE_RENAME_FAILED','files'=>$copied,'stage_directory'=>$stage];
+            if(!@rename($stage,$target)) return ['ok'=>false,'code'=>'EXPANSION_LOCAL_ACTIVATE_RENAME_FAILED','files'=>$copied];
             @chmod($target,0700);
             return [
                 'ok'=>true,
                 'code'=>'EXPANSION_DEPLOYED_LOCAL',
                 'transport'=>'local-filesystem',
-                'local_directory'=>$target,
+                'target'=>'kicom/',
                 'files'=>$copied,
                 'tree_sha256'=>$inventory['tree_sha256'],
             ];
