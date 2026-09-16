@@ -80,12 +80,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -q '<DirectoryMatch' experimental/expansion-cell/cell-runtime/.htaccess; then
+          if grep -Fq '<DirectoryMatch' experimental/expansion-cell/cell-runtime/.htaccess; then
             echo 'DirectoryMatch is not valid in ordinary shared-host .htaccess context' >&2
             exit 1
           fi
-          grep -q 'Require all denied' experimental/expansion-cell/ExpansionCellPackageBuilder.php
-          grep -q 'bootstrap.config.php' experimental/expansion-cell/cell-runtime/.htaccess
+          grep -Fq 'Require all denied' experimental/expansion-cell/ExpansionCellPackageBuilder.php
+          grep -Fq 'bootstrap\.config\.php' experimental/expansion-cell/cell-runtime/.htaccess
 
       - name: Boundary guard
         shell: bash
