@@ -1,5 +1,5 @@
 {
-  "schema": 5,
+  "schema": 6,
   "candidate": "interrupt-auth-resilience-v5",
   "authority": "candidate-only; live KiCom remains authoritative",
   "runtime_include": [
@@ -9,6 +9,7 @@
     "request_guard_v5.php",
     "session_lock_v2.php",
     "session_consume_resilient_v3.php",
+    "session_consume_bridge_v1.php",
     "session_open_resilient_v2.php",
     "guarded_action_v5.php",
     "router_deferred_guard_v1.php",
@@ -34,6 +35,7 @@
     "same resilient request replays exact prior response and next token without re-execution",
     "expired in-progress request becomes UNCERTAIN and is never automatically re-executed",
     "previous rolling token is client_request_id-bound for resilient requests",
+    "legacy clients without client_request_id remain on the original session-consume path",
     "nested parameter order canonicalizes recursively and nested secret fields are excluded from fingerprints",
     "replay receipts contain no plaintext session id, old token or next token",
     "session-open replay cannot roll a later token backward",
@@ -45,6 +47,7 @@
   "live_0_9_14_review": {
     "status": "completed",
     "map": "LIVE_INTEGRATION_0.9.14.json",
+    "patch_plan": "LIVE_PATCH_PLAN_0.9.14.md",
     "central_get_consumer_count": 21,
     "special_get_rotators": ["AUTONOMY_TX_COMMIT", "AUTONOMY_CB_EXEC"],
     "post_rotators": ["AUTONOMY_UPDATE_UPLOAD", "AUTONOMY_BATCH"]
