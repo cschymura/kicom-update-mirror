@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "name": "kicom-dev-zone-v1",
+  "type": "development-zone-module",
+  "target": "KiCom",
+  "target_runtime": "0.9.15+",
+  "status": "candidate",
+  "auth_entry": "passkey",
+  "session": {
+    "scope": "dev",
+    "absolute_ttl_seconds": 604800,
+    "idle_ttl_seconds": 86400,
+    "rolling_token": false,
+    "reusable_token": true
+  },
+  "files": [
+    "DevSession.php",
+    "DevAuthAdapter.php",
+    "DevRouter.php",
+    "dev-client.js"
+  ],
+  "requires": [
+    "../passkey-auth/PasskeyBridge.php",
+    "../passkey-auth/browser.js"
+  ],
+  "forbidden_authority": [
+    "production deploy",
+    "self-update install",
+    "kernel mutation",
+    "recovery mutation",
+    "auth administration",
+    "secret-store access"
+  ],
+  "promotion": "separate production approval"
+}
