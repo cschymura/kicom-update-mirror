@@ -34,14 +34,25 @@ jobs:
           php -l experimental/expansion-cell/CellNode.php
           php -l experimental/expansion-cell/ExpansionCellRuntime.php
           php -l experimental/expansion-cell/ExpansionCronRelay.php
+          php -l experimental/expansion-cell/ExpansionCellPackageBuilder.php
+          php -l experimental/expansion-cell/ExpansionHttpTransport.php
+          php -l experimental/expansion-cell/ExpansionOrchestrator.php
+          php -l experimental/expansion-cell/cell-runtime/common.php
+          php -l experimental/expansion-cell/cell-runtime/bootstrap.php
+          php -l experimental/expansion-cell/cell-runtime/federation.php
+          php -l experimental/expansion-cell/cell-runtime/status.php
           php -l experimental/expansion-cell/expansion-selftest.php
           php -l experimental/expansion-cell/expansion-cron-selftest.php
+          php -l experimental/expansion-cell/orchestrator-selftest.php
 
       - name: Expansion/federation selftest
         run: php experimental/expansion-cell/expansion-selftest.php
 
       - name: Cron federation selftest
         run: php experimental/expansion-cell/expansion-cron-selftest.php
+
+      - name: Orchestrator/package selftest
+        run: php experimental/expansion-cell/orchestrator-selftest.php
 
       - name: Secret persistence guard
         shell: bash
@@ -56,6 +67,7 @@ jobs:
           grep -q 'Credentials are method arguments only' experimental/expansion-cell/ExpansionFtpDeployer.php
           grep -q 'bootstrap.private.json' experimental/expansion-cell/CellNode.php
           grep -q "unlink(\$this->dir.'/bootstrap.private.json')" experimental/expansion-cell/CellNode.php
+          grep -q 'never retain it after a deploy attempt' experimental/expansion-cell/ExpansionOrchestrator.php
 
       - name: Boundary guard
         shell: bash
@@ -71,3 +83,5 @@ jobs:
           fi
           grep -q 'FTP credentials are supplied transiently' docs/goals/KICOM_EXPANSION_FEDERATION.md
           grep -q 'FEDERATION_TICK' docs/goals/KICOM_EXPANSION_FEDERATION.md
+          grep -q "follow_location'=>0" experimental/expansion-cell/ExpansionHttpTransport.php
+          grep -q 'EXPANSION_ACTIVE' experimental/expansion-cell/ExpansionOrchestrator.php
