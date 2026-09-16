@@ -20,9 +20,12 @@ try {
     mustLocal(is_file($web.'/kicom/bootstrap.php'),'bootstrap copied');
     mustLocal(is_file($web.'/kicom/lib/test.php'),'nested file copied');
     mustLocal(($r['transport']??'')==='local-filesystem','transport marker');
+    mustLocal(($r['target']??'')==='kicom/','relative target marker');
+    mustLocal(!isset($r['local_directory'],$r['stage_directory']),'server paths not returned');
 
     $again=$d->deploy($pkg,$web);
     mustLocal(empty($again['ok'])&&($again['code']??'')==='EXPANSION_TARGET_EXISTS','existing target is not overwritten');
+    mustLocal(!isset($again['local_directory'],$again['stage_directory']),'existing-target error hides server paths');
 
     $bad=$d->deploy($pkg,$base.'/missing');
     mustLocal(empty($bad['ok'])&&($bad['code']??'')==='EXPANSION_LOCAL_WEBROOT_INVALID','unknown webroot rejected');
