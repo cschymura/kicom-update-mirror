@@ -1,0 +1,130 @@
+name: KiCom Build Cell v1
+
+on:
+  pull_request:
+    paths:
+      - 'experimental/build-cell/**'
+      - '.github/workflows/build-cell-v1.yml'
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'Build-cell profile'
+        required: false
+        default: 'full'
+        type: choice
+        options:
+          - verify
+          - full
+
+permissions:
+  contents: read
+
+jobs:
+  build-cell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      KICOM_BUILD_CELL_REPORT: ${{ github.workspace }}/build-cell-report.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Runtime inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -v
+          git --version
+          zip -v | head -n 2 || true
+          composer --version || true
+
+      - name: Build-cell PHP syntax
+        run: |
+          php -l experimental/build-cell/BuildCellVerifier.php
+          php -l experimental/build-cell/build-cell.php
+          php -l experimental/build-cell/build-cell-selftest.php
+
+      - name: Build-cell selftest
+        run: php experimental/build-cell/build-cell-selftest.php
+
+      - name: Native repository verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          php experimental/build-cell/build-cell.php . verify
+
+      - name: Install Composer CLI if project needs it
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f composer.json ] && ! command -v composer >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y composer
+          fi
+
+      - name: Composer validation and isolated dependency materialization
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f composer.json ]; then
+            composer validate --strict --no-check-publish
+            composer install --no-interaction --no-ansi --no-progress --prefer-dist --no-scripts --no-plugins
+          else
+            echo 'No root composer.json; composer phase skipped.'
+          fi
+
+      - name: PHP syntax across project
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' f; do
+            php -l "$f" >/dev/null
+          done < <(find . -type f -name '*.php' -not -path './.git/*' -not -path './vendor/*' -print0)
+          echo 'PHP syntax pass.'
+
+      - name: Test runner inside disposable CI cell
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -x vendor/bin/phpunit ]; then
+            timeout 120 vendor/bin/phpunit --do-not-cache-result
+          elif [ -f phpunit.phar ]; then
+            timeout 120 php phpunit.phar --do-not-cache-result
+          else
+            echo 'No PHPUnit runner present; project-specific tests skipped.'
+          fi
+
+      - name: Secret-material packaging guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          bad="$(find . -type f \( -name '.env' -o -name '*.pem' -o -name '*.key' -o -name 'id_rsa' -o -name 'id_ed25519' \) -not -path './.git/*' -not -path './vendor/*' -print -quit)"
+          if [ -n "$bad" ]; then
+            echo "Forbidden secret-like file in build tree: $bad" >&2
+            exit 1
+          fi
+
+      - name: Build immutable cell artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .build-cell
+          mkdir -p .build-cell/package
+          git archive --format=zip --output=.build-cell/package/kicom-build-cell-source.zip HEAD
+          sha256sum .build-cell/package/kicom-build-cell-source.zip > .build-cell/package/kicom-build-cell-source.zip.sha256
+          cp build-cell-report.json .build-cell/package/build-cell-report.json
+          cat > .build-cell/package/CELL-METADATA.txt <<EOF
+          KiCom Build Cell v1
+          commit=${GITHUB_SHA}
+          run_id=${GITHUB_RUN_ID}
+          runner=${RUNNER_OS}/${RUNNER_ARCH}
+          authority=development-only
+          production_credentials=none
+          EOF
+
+      - name: Upload build-cell result
+        uses: actions/upload-artifact@v4
+        with:
+          name: kicom-build-cell-v1
+          path: .build-cell/package/
+          if-no-files-found: error
+          retention-days: 14
