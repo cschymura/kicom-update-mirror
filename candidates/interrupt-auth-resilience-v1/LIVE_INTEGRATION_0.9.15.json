@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "captured_at": "2026-09-16T07:00:00Z",
+  "authority": "live KiCom server; candidate copy only",
+  "runtime": {
+    "version": "0.9.15",
+    "genome_id": "kicom-0.9.15-g16",
+    "healthy": true,
+    "trusted": true,
+    "lkg_ok": true,
+    "drift_count": 0,
+    "unknown_count": 0,
+    "next_release_target": "0.9.16",
+    "next_genome_generation": 17
+  },
+  "source_hashes": {
+    "index.php": "560e4252d8555210bb834a4a3dbc8cdfacbf67bca867f5f1e84317201fa8bd6f",
+    "api.php": "9c55813ea725e8f1e537094c1c9c22be7e870f72bb8217066c96d029b1e65421",
+    "living.php": "07d4e95280c0b9c2efecded71671502043f8b9d4d85feb9de09d99ebf4b7febd",
+    "lib.php": "9e4616c95839d0bdc133bd0c347244e82c9703f3bb29018b7fa6b61efa997b14",
+    "genome/genome.json": "c5191b1b025bde8fa0420319c412222758478b212c96f0290adcd36366dfd3a3"
+  },
+  "workspace_batch": {
+    "live": true,
+    "prepare_action": "workspace_proposal_batch",
+    "prepare_parameter": "proposal_ids",
+    "max_items": 16,
+    "kind": "workspace_write",
+    "base": "NEW",
+    "router": "AUTH_APPROVAL_PREPARE",
+    "execute": "AUTH_APPROVAL_EXECUTE",
+    "critical_freeotp_required": true,
+    "preserve_during_resilience_rebase": true
+  },
+  "canonical_memory": {
+    "stale_after_release": true,
+    "project_state_sha256": "fc910f18d32d2689b45f005e9d6d657a71d2303e926cefdce543c172b76d0d55",
+    "protocol_sha256": "cdb3d35583034776ccab9fa1156acddc6ec501a4808c163705f1b9c9c26d3516",
+    "decisions_sha256": "48bbda6275a0441870e0ce5f1362adcb021e4b4336a55e930acbfccc6e3aa532",
+    "changelog_sha256": "bd8e71818f006adef543e32418b016c64aaeeb7f2df62d2dcfe3b650ede8d572",
+    "next_sha256": "25c899e99b232171da6dd7bdd0d1f72f4fbf50563e57dc7d9f5e2fd50abc37db",
+    "decision_d024_present": true,
+    "required_sync": ["PROJECT_STATE", "PROTOCOL", "CHANGELOG", "NEXT"]
+  },
+  "transport_observation": {
+    "public_kcl_reads": "working",
+    "authenticated_query_urls": "intermittently denied before KiCom",
+    "direct_container_dns": "unavailable",
+    "mirror_feed": "working",
+    "primary_feed": "HTTP 403 from KiCom"
+  },
+  "rules": [
+    "Do not weaken FreeOTP, RED, production or kernel gates.",
+    "Do not overwrite the live workspace-proposal-batch implementation during resilience rebase.",
+    "Use exact live hashes as optimistic-concurrency anchors before server-side build patches.",
+    "Synchronize canonical memory as a mandatory post-release checkpoint.",
+    "Never persist authentication tokens, TOTP values or session secrets in this file."
+  ]
+}
