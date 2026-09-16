@@ -1,4 +1,4 @@
-name: KiCom resilience candidate
+name: KiCom resilience candidate v5
 
 on:
   pull_request:
@@ -13,22 +13,56 @@ permissions:
 jobs:
   php-regression:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
       - name: PHP runtime
         run: php -v
-      - name: Syntax checks
+      - name: Syntax checks — promote allowlist
         run: |
-          php -l candidates/interrupt-auth-resilience-v1/interrupt_resilience_v1.php
-          php -l candidates/interrupt-auth-resilience-v1/session_recovery_v1.php
-          php -l candidates/interrupt-auth-resilience-v1/session_open_resilient_v1.php
-          php -l candidates/interrupt-auth-resilience-v1/session_consume_resilient_v1.php
-      - name: Job and receipt regression
-        run: php candidates/interrupt-auth-resilience-v1/test_candidate.php
-      - name: Session recovery regression
-        run: php candidates/interrupt-auth-resilience-v1/test_session_recovery.php
-      - name: Idempotent session-open regression
-        run: php candidates/interrupt-auth-resilience-v1/test_session_open_resilient.php
-      - name: Locked session-consume regression
-        run: php candidates/interrupt-auth-resilience-v1/test_session_consume_resilient.php
+          set -euo pipefail
+          root=candidates/interrupt-auth-resilience-v1
+          for f in \
+            interrupt_resilience_v1.php \
+            interrupt_resilience_v2.php \
+            request_replay_v3.php \
+            request_guard_v5.php \
+            session_lock_v2.php \
+            session_consume_resilient_v3.php \
+            session_open_resilient_v2.php \
+            guarded_action_v5.php \
+            approval_status_v1.php \
+            update_pending_inspect_v1.php \
+            route_helpers_v1.php \
+            build_runtime_bundle.php; do
+            php -l "$root/$f"
+          done
+      - name: Existing focused regressions
+        run: |
+          set -euo pipefail
+          root=candidates/interrupt-auth-resilience-v1
+          php "$root/test_candidate.php"
+          php "$root/test_session_v2.php"
+          php "$root/test_request_replay_v2.php"
+          php "$root/test_request_guard_v2.php"
+          php "$root/test_guarded_action_v2.php"
+      - name: Build deterministic v5 living bundle
+        run: |
+          set -euo pipefail
+          root=candidates/interrupt-auth-resilience-v1
+          php "$root/build_runtime_bundle.php" | tee "$root/generated/build.log"
+          php -l "$root/generated/living_bundle_v5.php"
+          cd "$root/generated"
+          sha256sum -c living_bundle_v5.sha256
+          cat living_bundle_v5.json
+      - name: Upload deterministic bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: kicom-resilience-v5-bundle
+          path: |
+            candidates/interrupt-auth-resilience-v1/generated/living_bundle_v5.php
+            candidates/interrupt-auth-resilience-v1/generated/living_bundle_v5.json
+            candidates/interrupt-auth-resilience-v1/generated/living_bundle_v5.sha256
+            candidates/interrupt-auth-resilience-v1/generated/build.log
+          if-no-files-found: error
+          retention-days: 7
