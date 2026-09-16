@@ -45,7 +45,7 @@
   </section>
 </main>
 <script src="browser.js"></script>
-<script src="dev-client.js?v=20260916-2"></script>
+<script src="dev-client.js?v=20260916-3"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -58,7 +58,7 @@ const post=async(operation,payload={})=>{
 };
 const bridgeUrl=()=>{
   const s=KiComDev.load();if(!s)throw new Error('DEV session required');
-  const u=new URL('dev-bridge.php',location.href);
+  const u=new URL('agent/',location.href);
   u.searchParams.set('sid',s.session_id);
   u.searchParams.set('key',s.token);
   u.searchParams.set('op','DEV_SESSION_STATUS');
