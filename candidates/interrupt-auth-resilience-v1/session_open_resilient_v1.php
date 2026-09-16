@@ -35,7 +35,7 @@ function kicomSessionOpenReceiptFile(string $requestId): ?string {
 }
 
 function kicomSessionOpenResilienceCleanup(): void {
-    $now=time();foreach(glob(kicomSessionOpenResilienceReceiptsDir().'/*.json')?:[] as $f){$r=kicomAuthJsonRead($f);if(!is_array($r)||(int)($r['expires_at']??0)<$now)@unlink($f);}
+    $now=time();foreach(glob(kicomSessionOpenResilienceReceiptsDir().'/*.json')?:[] as $f){$r=kicomAuthJsonRead($f);if(!is_array($r)||(int)($r['expires_at']??0)<$now){@unlink($f);@unlink($f.'.lock');}}
 }
 
 function kicomSessionOpenDerive(string $master,string $label,string $sessionId,string $requestId,string $nonce): string {
@@ -47,20 +47,26 @@ function kicomSessionOpenIdempotent(string $code,string $requestId): array {
     $master=kicomSessionOpenResilienceKey();if($master===null)return ['ok'=>false,'code'=>'SESSION_OPEN_RESILIENCE_UNAVAILABLE'];
     kicomSessionOpenResilienceCleanup();
     $receiptFile=kicomSessionOpenReceiptFile($requestId);if($receiptFile===null)return ['ok'=>false,'code'=>'SESSION_OPEN_REQUEST_ID_INVALID'];
-    $lock=@fopen($receiptFile.'.lock','c+');if($lock===false||!@flock($lock,LOCK_EX)){if(is_resource($lock))@fclose($lock);return ['ok'=>false,'code'=>'SESSION_OPEN_LOCK_FAILED'];}
+    $lock=@fopen($receiptFile.'.lock','c+');if(is_resource($lock))@chmod($receiptFile.'.lock',0600);if($lock===false||!@flock($lock,LOCK_EX)){if(is_resource($lock))@fclose($lock);return ['ok'=>false,'code'=>'SESSION_OPEN_LOCK_FAILED'];}
     try{
         $now=time();$codeTag=hash_hmac('sha256',$code,$master);$old=kicomAuthJsonRead($receiptFile);
         if(is_array($old)&&(int)($old['expires_at']??0)>=$now){
             if(!hash_equals((string)($old['code_tag']??''),$codeTag))return ['ok'=>false,'code'=>'SESSION_OPEN_REQUEST_CONFLICT'];
-            $sid=(string)($old['session_id']??'');$nonce=(string)($old['nonce']??'');$row=kicomAuthJsonRead(kicomAutonomySessionFile($sid));
-            if(!is_array($row))return ['ok'=>false,'code'=>'SESSION_OPEN_REPLAY_SESSION_MISSING'];
-            if((int)($row['absolute_expires_at']??0)<$now||(int)($row['idle_expires_at']??0)<$now)return ['ok'=>false,'code'=>'SESSION_EXPIRED'];
-            $token=kicomSessionOpenDerive($master,'token',$sid,$requestId,$nonce);$handle=kicomSessionOpenDerive($master,'recovery',$sid,$requestId,$nonce);
-            if(!hash_equals((string)($row['token_hash']??''),hash('sha256',$token)))return ['ok'=>false,'code'=>'SESSION_OPEN_REPLAY_SUPERSEDED'];
-            if(!hash_equals((string)($row['recovery_handle_hash']??''),hash('sha256',$handle)))return ['ok'=>false,'code'=>'SESSION_OPEN_REPLAY_RECOVERY_MISMATCH'];
-            return ['ok'=>true,'code'=>'SESSION_OPEN_REPLAY','session_id'=>$sid,'token'=>$token,'recovery_handle'=>$handle,
-                    'expires_in'=>max(0,(int)$row['absolute_expires_at']-$now),'idle_expires_in'=>max(0,(int)$row['idle_expires_at']-$now),
-                    'replayed'=>true,'recovery_limit'=>(int)($row['recovery_limit']??16)];
+            $sid=(string)($old['session_id']??'');$nonce=(string)($old['nonce']??'');
+            if(!preg_match('/^[a-f0-9]{24}$/',$sid))return ['ok'=>false,'code'=>'SESSION_OPEN_REPLAY_SESSION_MISSING'];
+            $sessionLock=@fopen(kicomSessionRecoveryLockFile($sid),'c+');if(is_resource($sessionLock))@chmod(kicomSessionRecoveryLockFile($sid),0600);
+            if($sessionLock===false||!@flock($sessionLock,LOCK_EX)){if(is_resource($sessionLock))@fclose($sessionLock);return ['ok'=>false,'code'=>'SESSION_LOCK_FAILED'];}
+            try{
+                $row=kicomAuthJsonRead(kicomAutonomySessionFile($sid));
+                if(!is_array($row))return ['ok'=>false,'code'=>'SESSION_OPEN_REPLAY_SESSION_MISSING'];
+                if((int)($row['absolute_expires_at']??0)<$now||(int)($row['idle_expires_at']??0)<$now)return ['ok'=>false,'code'=>'SESSION_EXPIRED'];
+                $token=kicomSessionOpenDerive($master,'token',$sid,$requestId,$nonce);$handle=kicomSessionOpenDerive($master,'recovery',$sid,$requestId,$nonce);
+                if(!hash_equals((string)($row['token_hash']??''),hash('sha256',$token)))return ['ok'=>false,'code'=>'SESSION_OPEN_REPLAY_SUPERSEDED'];
+                if(!hash_equals((string)($row['recovery_handle_hash']??''),hash('sha256',$handle)))return ['ok'=>false,'code'=>'SESSION_OPEN_REPLAY_RECOVERY_MISMATCH'];
+                return ['ok'=>true,'code'=>'SESSION_OPEN_REPLAY','session_id'=>$sid,'token'=>$token,'recovery_handle'=>$handle,
+                        'expires_in'=>max(0,(int)$row['absolute_expires_at']-$now),'idle_expires_in'=>max(0,(int)$row['idle_expires_at']-$now),
+                        'replayed'=>true,'recovery_limit'=>(int)($row['recovery_limit']??16)];
+            }finally{@flock($sessionLock,LOCK_UN);@fclose($sessionLock);}
         }
         $policy=kicomAutonomyPolicy();if(empty($policy['enabled']))return ['ok'=>false,'code'=>'AUTONOMY_DISABLED'];
         $grace=max(0,min(4,(int)($policy['session_totp_past_steps']??2)));$v=kicomTotpVerifyConsumeWindow($code,'autonomy_session_open',$grace);if(empty($v['ok']))return $v;
