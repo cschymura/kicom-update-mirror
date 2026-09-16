@@ -63,12 +63,20 @@ final class KiComExpansionService
                 if($this->deploymentResourceResolver===null) return ['ok'=>false,'code'=>'EXPANSION_DEPLOYMENT_RESOURCE_RESOLVER_UNAVAILABLE'];
                 $resolved=($this->deploymentResourceResolver)($name);
                 if(!is_string($resolved)||trim($resolved)==='') return ['ok'=>false,'code'=>'EXPANSION_DEPLOYMENT_RESOURCE_UNAVAILABLE'];
+
+                // A previous local copy may already exist if the first HTTPS
+                // bootstrap failed after deployment. Resume/repair only a
+                // directory that carries KiCom's own Expansion Cell markers.
+                if(is_dir(rtrim($resolved,'/').'/kicom')){
+                    return $orchestrator->resumeExistingLocal($target,$resolved);
+                }
                 return $orchestrator->expandLocal($target,$resolved,(int)($request['ttl']??3600));
             }
 
             if($mode==='local'){
                 $localRoot=trim((string)($request['local_web_root']??''));
                 if($localRoot==='') return ['ok'=>false,'code'=>'EXPANSION_LOCAL_WEBROOT_REQUIRED'];
+                if(is_dir(rtrim($localRoot,'/').'/kicom')) return $orchestrator->resumeExistingLocal($target,$localRoot);
                 return $orchestrator->expandLocal($target,$localRoot,(int)($request['ttl']??3600));
             }
 
