@@ -5,7 +5,7 @@ on:
     paths:
       - 'experimental/expansion-cell/**'
       - 'docs/goals/KICOM_EXPANSION_FEDERATION.*'
-      - 'docs/checkpoints/KICOM_2026-09-16_EXPANSION_FEDERATION_START.md'
+      - 'docs/checkpoints/KICOM_2026-09-16_EXPANSION_*.md'
       - '.github/workflows/expansion-cell-v1.yml'
   workflow_dispatch:
 
@@ -32,10 +32,16 @@ jobs:
           php -l experimental/expansion-cell/ExpansionRegistry.php
           php -l experimental/expansion-cell/ExpansionFtpDeployer.php
           php -l experimental/expansion-cell/CellNode.php
+          php -l experimental/expansion-cell/ExpansionCellRuntime.php
+          php -l experimental/expansion-cell/ExpansionCronRelay.php
           php -l experimental/expansion-cell/expansion-selftest.php
+          php -l experimental/expansion-cell/expansion-cron-selftest.php
 
       - name: Expansion/federation selftest
         run: php experimental/expansion-cell/expansion-selftest.php
+
+      - name: Cron federation selftest
+        run: php experimental/expansion-cell/expansion-cron-selftest.php
 
       - name: Secret persistence guard
         shell: bash
