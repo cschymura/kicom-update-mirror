@@ -1,7 +1,7 @@
 {
     "schema": 2,
     "candidate": "interrupt-auth-resilience-v5",
-    "promotion_manifest_sha256": "85a800b8a1c2b8f80c6a8a40a01fc278ae51622d725735024cd99e3bfb741669",
+    "promotion_manifest_sha256": "664d1581b9c8d8fb550356eeeaf0e137e6f5a539c44930d6658d101e99274bf0",
     "bundle": "living_bundle_v5.php",
     "bytes": 43473,
     "sha256": "14f6fa40b5596118ce6d1d90e3bf929b490130483900286205a0330deb0c3572",
