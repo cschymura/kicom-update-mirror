@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "captured_at": "2026-09-16T09:00:00Z",
+  "authority": "live KiCom server plus exact live-hash checkpoint already persisted in interrupt-auth-resilience candidate",
+  "runtime": {
+    "version": "0.9.15",
+    "genome_id": "kicom-0.9.15-g16",
+    "healthy": true,
+    "trusted": true,
+    "lkg_ok": true,
+    "drift_count": 0,
+    "unknown_count": 0
+  },
+  "live_source_hashes": {
+    "index.php": "560e4252d8555210bb834a4a3dbc8cdfacbf67bca867f5f1e84317201fa8bd6f",
+    "api.php": "9c55813ea725e8f1e537094c1c9c22be7e870f72bb8217066c96d029b1e65421",
+    "living.php": "07d4e95280c0b9c2efecded71671502043f8b9d4d85feb9de09d99ebf4b7febd",
+    "lib.php": "9e4616c95839d0bdc133bd0c347244e82c9703f3bb29018b7fa6b61efa997b14",
+    "genome/genome.json": "c5191b1b025bde8fa0420319c412222758478b212c96f0290adcd36366dfd3a3"
+  },
+  "candidate": {
+    "name": "passkey-auth-v1",
+    "default_sequence": "after interrupt-auth-resilience-v5",
+    "default_target_version": "0.9.17",
+    "default_target_generation": 18,
+    "alternate_passkey_first_target": "0.9.16/g17 only if resilience v5 is explicitly rebased to 0.9.17/g18 before promotion",
+    "risk_class": "red",
+    "reason": "authentication trust-boundary change"
+  },
+  "scope": {
+    "passkey_normal_autonomy_session": true,
+    "freeotp_fallback_preserved": true,
+    "critical_red_via_passkey": false,
+    "production_via_passkey": false,
+    "kernel_via_passkey": false,
+    "initial_enrollment_requires_current_counter_freeotp": true,
+    "session_handoff": "Curve25519 sealed box to ephemeral chat-side public key"
+  },
+  "required_live_integration": [
+    "Read exact current trusted source through DIRECT_SOURCE/read lease before any build mutation.",
+    "Verify all five live source hashes or stop and rebase.",
+    "Integrate PasskeyBridge and RuntimeAdapter only into an isolated non-executable AUTONOMY_BUILD.",
+    "Mint only the existing normal bounded autonomy session after verified WebAuthn user verification.",
+    "Preserve workspace_proposal_batch, rolling-token semantics, FreeOTP fallback, RED/production/kernel gates and verifier allowlists.",
+    "Add passkey browser approval/enrollment UI on the exact kicom.rurtalbahn.info origin.",
+    "Update genome component set/hashes and manifest; run verifier, selftests, rollback and zero-drift checks.",
+    "Stage as RED and require exact transaction-bound fresh current-counter FreeOTP for installation."
+  ],
+  "secrets": "none"
+}
