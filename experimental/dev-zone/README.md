@@ -1,89 +1,48 @@
 # KiCom Development Zone v1
 
-This candidate separates development authority from production authority.
+This candidate separates development authority from production authority and removes rolling-token friction from normal KiCom development.
 
-## Goal
+## Developer experience
 
-After one strong human authentication (normally a passkey), KiCom issues a DEV-scoped session that is practical for iterative work:
+After one WebAuthn/passkey confirmation KiCom issues a DEV-only bearer session with a 7-day absolute lifetime and 24-hour idle lifetime. The bearer does not rotate per request and can be reused by the browser and approved development tooling. Server-side storage contains only the token hash. A session can be revoked at any time.
 
-- absolute lifetime: 7 days
-- idle lifetime: 24 hours
-- token does not rotate per request
-- one token may be reused across normal DEV requests
-- token is stored server-side only as SHA-256
-- the token may be transported through approved development tooling because it has no production/RED/kernel authority
-- session can be revoked at any time
+First-time passkey enrollment is intentionally separate: the existing FreeOTP verifier is used once to register a passkey. Normal DEV access then uses the passkey only.
 
-The DEV session is intentionally incapable of crossing the production boundary.
+## First-party runtime
+
+The install-oriented bundle places the module under `dev/`:
+
+- `dev/index.html` — small first-party control page for passkey enrollment, connection, status and logout.
+- `dev/dev-auth.php` — enrollment and passkey authentication endpoint.
+- `dev/dev-api.php` — header-authenticated DEV API.
+- `dev/browser.js` — WebAuthn browser codec.
+- `dev/dev-client.js` — reusable browser DEV client.
+- PHP modules for session, auth flow, router, HTTP transport and bindings to KiCom's existing workspace/source/build primitives.
+
+DEV credentials are sent as `X-KiCom-Dev-Session` and `X-KiCom-Dev-Token` headers. Query-string credentials are not used.
 
 ## Fixed DEV capabilities
 
-- source.snapshot.read
-- workspace.read
-- workspace.write
-- workspace.delete
-- workspace.history
-- build.begin
-- build.patch
-- build.status
-- build.test
-- build.finalize_candidate
-- candidate.read
-- candidate.discard
-- logs.read
+`source.snapshot.read`, `workspace.read`, `workspace.write`, `workspace.delete`, `workspace.history`, `build.begin`, `build.patch`, `build.status`, `build.test`, `build.finalize_candidate`, `candidate.read`, `candidate.discard`, and `logs.read`.
 
-Explicitly excluded: production deploy, self-update install, kernel, recovery, auth administration and secrets.
+Explicitly excluded: production deployment, self-update installation, kernel mutation, recovery mutation, auth administration and secret-store access. There is no wildcard capability.
 
-## Intended runtime API
+## Runtime operations
 
-The runtime integration should expose a separate `/dev-api.php` or equivalent DEV router. DEV credentials should preferably be supplied through headers (`X-KiCom-Dev-Session`, `X-KiCom-Dev-Token`), with form/JSON body fallback for clients that cannot set headers. Query-string credentials should be disabled by default.
+The router implements `DEV_SESSION_STATUS`, `DEV_SESSION_REVOKE`, `DEV_SOURCE_SNAPSHOT`, workspace read/write/delete/history, build begin/patch/status/test/finalize-candidate, candidate read/discard and log-read capability routing. Each operation is bound to exactly one fixed capability before its handler runs.
 
-Suggested operations:
+Workspace writes keep KiCom's exact-base concurrency semantics and history. Source reads reuse the trusted installed-source allowlist. Builds reuse the protected KiCom fast-build area.
 
-- `DEV_SESSION_STATUS`
-- `DEV_SESSION_REVOKE`
-- `DEV_SOURCE_SNAPSHOT`
-- `DEV_WORKSPACE_READ`
-- `DEV_WORKSPACE_WRITE`
-- `DEV_WORKSPACE_DELETE`
-- `DEV_WORKSPACE_HISTORY`
-- `DEV_BUILD_BEGIN`
-- `DEV_BUILD_PATCH`
-- `DEV_BUILD_STATUS`
-- `DEV_BUILD_TEST`
-- `DEV_BUILD_FINALIZE_CANDIDATE`
-- `DEV_CANDIDATE_DISCARD`
-- `DEV_LOG_READ`
+## Candidate boundary
 
-Every handler must call `KiComDevSessionManager::authenticate()` with the exact required capability. There must be no catch-all or wildcard capability.
+`DEV_BUILD_FINALIZE_CANDIDATE` is intentionally **not** the existing production-oriented fast-build finalize call. DEV performs release preparation, validates the isolated tree with KiCom's existing package verifier and exports a candidate ZIP inside the protected build area. It does **not** call `kicomReceiveSelfUpdatePackage`, does not create a production pending update and cannot install anything.
 
-## Passkey flow
+The candidate can be read in bounded chunks for CI/review or discarded. Promotion to live KiCom is a separate operation at the production boundary.
 
-1. Browser creates a standard KiCom WebAuthn challenge.
-2. User confirms with Face ID / platform passkey.
-3. `KiComDevAuthAdapter` serializes verification and DEV session issuance for that challenge.
-4. One DEV session ID/token pair is returned.
-5. The same token is reused until revoked, idle-expired or absolutely expired.
+## Concurrency and revocation
 
-No rolling-token relay is used inside DEV.
+Passkey verification/session issuance is serialized per WebAuthn challenge, so one challenge cannot mint two DEV sessions. Authentication and revocation share the same exclusive per-session lock; a concurrent request therefore cannot overwrite a completed revoke with stale active state.
 
-## Production boundary
+## Development rules
 
-Promotion from a DEV candidate to live KiCom remains a separate operation. DEV sessions cannot call production/self-update/kernel/recovery paths. A release can therefore be developed and tested without repeated human interruptions, while the final live promotion can still require one transaction-bound approval.
-
-## Non-goals
-
-- no arbitrary shell
-- no arbitrary filesystem access outside KiCom development roots
-- no secret-store access
-- no direct production writes
-- no weakening of RED/production/kernel approval semantics
-
-## Integration order
-
-1. Install passkey support.
-2. Add DEV session manager and a dedicated DEV router.
-3. Map existing workspace/build/test/log primitives behind fixed DEV capabilities.
-4. Add trusted-source snapshot export into DEV.
-5. Run isolation tests proving DEV credentials cannot reach production handlers.
-6. Only then expose the DEV token to automation tooling.
+The DEV zone deliberately favors iteration speed. It does not provide arbitrary shell access or arbitrary filesystem access, and it cannot cross into production authority. CI checks syntax, crypto/runtime dependencies, capability boundaries, header-only credential transport, WebAuthn/session behavior, DEV router behavior, HTTP behavior and KiCom runtime bindings, then builds an install-oriented candidate artifact.
