@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "target_runtime": "0.9.15",
+  "target_genome_id": "kicom-0.9.15-g16",
+  "target_genome_generation": 16,
+  "authority": "candidate plan only; execute only against exact live base SHA-256 values",
+  "operations": [
+    {
+      "kind": "memory_patch",
+      "resource": "PROJECT_STATE",
+      "base_sha256": "fc910f18d32d2689b45f005e9d6d657a71d2303e926cefdce543c172b76d0d55",
+      "find": "VERSION \"0.9.14\"\nSTATE active\nFACT canonical=true\nFACT canonical_name=\"KiCom\"\nFACT purpose=\"Controlled HTTPS communication, development and bounded-autonomy gateway between ChatGPT and Christoph's RTB web systems\"\nFACT protocol=\"KCL/1\"\nFACT transport=\"HTTPS\"\nFACT direct_shell=false\nFACT arbitrary_remote_fetch=false\nFACT production_write=\"allowlisted-human-approved\"\nFACT canonical_memory_via=\"?q=BOOTSTRAP\"\nFACT mode=\"living-architecture-with-bounded-autonomy\"\nFACT genome_id=\"kicom-0.9.14-g15\"\nFACT genome_generation=15\nFACT genome_trusted=true",
+      "replace": "VERSION \"0.9.15\"\nSTATE active\nFACT canonical=true\nFACT canonical_name=\"KiCom\"\nFACT purpose=\"Controlled HTTPS communication, development and bounded-autonomy gateway between ChatGPT and Christoph's RTB web systems\"\nFACT protocol=\"KCL/1\"\nFACT transport=\"HTTPS\"\nFACT direct_shell=false\nFACT arbitrary_remote_fetch=false\nFACT production_write=\"allowlisted-human-approved\"\nFACT canonical_memory_via=\"?q=BOOTSTRAP\"\nFACT mode=\"living-architecture-with-bounded-autonomy\"\nFACT genome_id=\"kicom-0.9.15-g16\"\nFACT genome_generation=16\nFACT workspace_proposal_batch=\"live in 0.9.15; 1..16 NEW workspace_write proposals; exact proposal/content binding; execution remains transaction-bound to fresh FreeOTP\"\nFACT genome_trusted=true"
+    },
+    {
+      "kind": "memory_patch",
+      "resource": "PROTOCOL",
+      "base_sha256": "cdb3d35583034776ccab9fa1156acddc6ec501a4808c163705f1b9c9c26d3516",
+      "find": "NOTE workspace_batch=\"candidate only; live 0.9.14 AUTH_APPROVAL_PREPARE supports self_update_install only\"",
+      "replace": "AUTH workspace_batch=\"?q=AUTH_APPROVAL_PREPARE&action=workspace_proposal_batch&proposal_ids=<comma-separated-ids>&session_id=<id>&token=<rolling>\"\nRULE \"workspace_proposal_batch accepts 1..16 workspace_write proposals with base NEW and exact proposal/content binding.\"\nRULE \"workspace_proposal_batch execution remains through AUTH_APPROVAL_EXECUTE and requires fresh FreeOTP; it cannot bypass RED/production/kernel trust gates.\""
+    },
+    {
+      "kind": "memory_patch",
+      "resource": "CHANGELOG",
+      "base_sha256": "bd8e71818f006adef543e32418b016c64aaeeb7f2df62d2dcfe3b650ede8d572",
+      "find": "RELEASE \"0.9.14\" date=\"2026-09-16\" change=\"Runtime/genome g15 installed healthy/trusted/LKG; workspace batch candidate not live yet\"",
+      "replace": "RELEASE \"0.9.14\" date=\"2026-09-16\" change=\"Runtime/genome g15 installed healthy/trusted/LKG; workspace batch candidate not live yet\"\nRELEASE \"0.9.15\" date=\"2026-09-16\" change=\"Transaction-bound FreeOTP workspace proposal batch installed; genome kicom-0.9.15-g16 healthy/trusted/LKG with drift=0 and unknown=0; 1..16 NEW workspace_write proposals can be bound as one approval batch\""
+    },
+    {
+      "kind": "memory_patch",
+      "resource": "NEXT",
+      "base_sha256": "25c899e99b232171da6dd7bdd0d1f72f4fbf50563e57dc7d9f5e2fd50abc37db",
+      "find": "PRIORITY 1 goal=\"Operate on KiCom 0.9.14 as the trusted baseline; keep genome healthy, trusted, LKG OK, drift=0 and unknown=0; use KCL-CODEBOOK/1 where it materially reduces transport overhead\"\nPRIORITY 2 goal=\"Prototype the learning codebook and KiCom Cellular Architecture: measure repeated semantic patterns and candidate macro gains; design cell identity, lineage, peer discovery/trust, signed bidirectional messaging, TTL/sequence heartbeat gossip, reproduction/bootstrap and project-genesis flows while preserving local trust gates and preferring fixed-cost/self-hosted paths.\"\nPRIORITY 3 goal=\"Prefer adaptive low-roundtrip paths: read-lease, transaction buffer, compact batch and server-side build/release_prepare; keep forward-only release archival automatic\"\nPRIORITY 4 goal=\"Prefer RTB-controlled first-party feed and sandbox/archive infrastructure; keep GitHub optional only\"\nPRIORITY 5 goal=\"Use session-open TOTP grace only for normal autonomy-session establishment; keep RED, production and kernel execution current-counter-only and transaction-bound\"\nPRIORITY 6 goal=\"Continue experience-driven evolution: experience -> insight -> hypothesis -> candidate -> fitness -> promotion -> new experience\"\nPRIORITY 2A goal=\"Review prepared isolated KiCom 0.9.16-g16 build for workspace proposal batch approval plus authorized UPDATE_PENDING_INSPECT; do not finalize while unknown 0.9.15 RED pending remains unaudited\"",
+      "replace": "PRIORITY 1 goal=\"Operate on KiCom 0.9.15 / genome g16 as the trusted baseline; keep genome healthy, trusted, LKG OK, drift=0 and unknown=0; preserve the live workspace_proposal_batch trust boundary\"\nPRIORITY 2 goal=\"Prototype the learning codebook and KiCom Cellular Architecture: measure repeated semantic patterns and candidate macro gains; design cell identity, lineage, peer discovery/trust, signed bidirectional messaging, TTL/sequence heartbeat gossip, reproduction/bootstrap and project-genesis flows while preserving local trust gates and preferring fixed-cost/self-hosted paths.\"\nPRIORITY 3 goal=\"Promote Interrupt/Auth Resilience v5 only through an isolated 0.9.16 / genome g17 build after canonical-memory synchronization, workspace-batch regression, verifier/genome checks and deliberate lost-response tests\"\nPRIORITY 4 goal=\"Repair the RTB-controlled primary update feed currently returning HTTP 403 while retaining the GitHub mirror as independent fallback; do not weaken TLS or URL allowlists\"\nPRIORITY 5 goal=\"Use session-open TOTP grace only for normal autonomy-session establishment; keep RED, production and kernel execution current-counter-only and transaction-bound\"\nPRIORITY 6 goal=\"Continue experience-driven evolution: experience -> insight -> hypothesis -> candidate -> fitness -> promotion -> new experience\"\nPRIORITY 2A goal=\"Reduce authentication and stream friction through idempotent request replay and persistent non-secret checkpoints; delegated isolated-build jobs remain a separate post-Resilience candidate\""
+    }
+  ],
+  "rules": [
+    "Do not execute if any current resource SHA differs from the recorded base_sha256.",
+    "Prefer one compact/codebook batch so the normal autonomy session rotates once.",
+    "Ordered batch failure must stop immediately; verify every resource after execution.",
+    "DECISIONS is intentionally untouched because D024 is already canonical and current.",
+    "No operation in this plan changes runtime permissions or authorization policy."
+  ]
+}
