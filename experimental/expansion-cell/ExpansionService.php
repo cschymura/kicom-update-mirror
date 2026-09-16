@@ -6,8 +6,11 @@ require_once __DIR__.'/ExpansionRegistry.php';
 require_once __DIR__.'/ExpansionCellPackageBuilder.php';
 require_once __DIR__.'/ExpansionFtpDeployer.php';
 require_once __DIR__.'/ExpansionLocalFilesystemDeployer.php';
+require_once __DIR__.'/ExpansionManagedCellUpdater.php';
 require_once __DIR__.'/ExpansionKiComDeployTargetResolver.php';
 require_once __DIR__.'/ExpansionOrchestrator.php';
+require_once __DIR__.'/ExpansionCronRelay.php';
+require_once __DIR__.'/ExpansionHttpTransport.php';
 
 /**
  * Parent-side command facade for KiCom expansion.
@@ -98,6 +101,93 @@ final class KiComExpansionService
                 if(function_exists('sodium_memzero')) sodium_memzero($ftp['password']); else $ftp['password']='';
                 unset($request['ftp'],$ftpIn);
             }
+        } finally {
+            if(function_exists('sodium_memzero')) sodium_memzero($secret); else $secret='';
+        }
+    }
+
+    /**
+     * Repair the known federation endpoint of an already-active managed child.
+     * This path is intentionally resource-bound and hash-bound: no arbitrary
+     * file path or production target is accepted.
+     *
+     * @return array<string,mixed>
+     */
+    public function repairFederationEndpoint(string $deploymentResource,string $targetBaseUrl,string $expectedBeforeSha256): array
+    {
+        $alias=strtolower(trim($deploymentResource));
+        if(!preg_match('/^[a-z0-9][a-z0-9_-]{1,31}$/',$alias)) return ['ok'=>false,'code'=>'EXPANSION_REPAIR_RESOURCE_INVALID'];
+        $descriptor=KiComExpansionKiComDeployTargetResolver::publicDescriptor($alias);
+        if($descriptor===null||!in_array((string)($descriptor['class']??''),['test','staging'],true)||empty($descriptor['writable'])) return ['ok'=>false,'code'=>'EXPANSION_REPAIR_RESOURCE_UNAVAILABLE'];
+        if($this->deploymentResourceResolver===null) return ['ok'=>false,'code'=>'EXPANSION_REPAIR_RESOURCE_RESOLVER_UNAVAILABLE'];
+        $resolved=($this->deploymentResourceResolver)($alias);
+        if(!is_string($resolved)||$resolved==='') return ['ok'=>false,'code'=>'EXPANSION_REPAIR_RESOURCE_UNAVAILABLE'];
+
+        $targetBaseUrl=rtrim(trim($targetBaseUrl),'/');
+        $p=parse_url($targetBaseUrl);
+        if(!is_array($p)||strtolower((string)($p['scheme']??''))!=='https'||empty($p['host'])||isset($p['user'])||isset($p['pass'])||isset($p['query'])||isset($p['fragment'])) return ['ok'=>false,'code'=>'EXPANSION_REPAIR_TARGET_URL_INVALID'];
+        $childBase=$targetBaseUrl.'/kicom';
+
+        $ready=$this->identity->ensure();if(empty($ready['ok']))return $ready;
+        $parent=(array)$ready['parent'];$secret=$this->identity->secretKeyB64();
+        $registry=new KiComExpansionRegistry($this->varDir.'/registry',$parent);
+        $cell=null;
+        foreach($registry->cells() as $row){
+            if(($row['state']??'')!=='active') continue;
+            if(hash_equals($childBase,rtrim((string)($row['base_url']??''),'/'))){$cell=$row;break;}
+        }
+        if(!is_array($cell)){
+            if(function_exists('sodium_memzero')) sodium_memzero($secret);
+            return ['ok'=>false,'code'=>'EXPANSION_REPAIR_CELL_NOT_REGISTERED'];
+        }
+
+        $http=new KiComExpansionHttpsTransport($childBase);
+        $beforeStatus=$http->getJson($childBase.'/status.php');
+        $liveCell=is_array($beforeStatus['cell']??null)?(array)$beforeStatus['cell']:[];
+        if(empty($beforeStatus['ok'])||($beforeStatus['code']??'')!=='CELL_STATUS'||($liveCell['state']??'')!=='active'
+            ||!hash_equals((string)$cell['cell_id'],(string)($liveCell['cell_id']??''))
+            ||!hash_equals((string)$cell['public_key'],(string)($liveCell['public_key']??''))
+            ||!hash_equals($childBase,rtrim((string)($liveCell['base_url']??''),'/'))){
+            if(function_exists('sodium_memzero')) sodium_memzero($secret);
+            return ['ok'=>false,'code'=>'EXPANSION_REPAIR_LIVE_IDENTITY_MISMATCH'];
+        }
+
+        $source=$this->sourceDir.'/cell-runtime/federation.php';
+        $updater=new KiComExpansionManagedCellUpdater();
+        $update=$updater->replaceFederationEndpoint($resolved,$source,$expectedBeforeSha256,$childBase);
+        if(empty($update['ok'])){
+            if(function_exists('sodium_memzero')) sodium_memzero($secret);
+            return $update;
+        }
+
+        try {
+            $afterStatus=$http->getJson($childBase.'/status.php');
+            $afterCell=is_array($afterStatus['cell']??null)?(array)$afterStatus['cell']:[];
+            if(empty($afterStatus['ok'])||($afterStatus['code']??'')!=='CELL_STATUS'||($afterCell['state']??'')!=='active'||!hash_equals((string)$cell['cell_id'],(string)($afterCell['cell_id']??''))){
+                if(!empty($update['changed'])){
+                    $rollback=$updater->rollbackFederationEndpoint($resolved,$update);
+                    unset($update['rollback_content']);
+                    return ['ok'=>false,'code'=>!empty($rollback['ok'])?'EXPANSION_REPAIR_STATUS_FAILED_ROLLED_BACK':'EXPANSION_REPAIR_STATUS_FAILED_ROLLBACK_FAILED','repair'=>$update,'rollback'=>$rollback];
+                }
+                unset($update['rollback_content']);
+                return ['ok'=>false,'code'=>'EXPANSION_REPAIR_STATUS_FAILED','repair'=>$update];
+            }
+
+            $tick=KiComExpansionCronRelay::createTick($parent,$secret,$cell,['reason'=>'managed-federation-repair']);
+            $reply=$http->postJson($childBase.'/federation.php',$tick);
+            $tickCheck=KiComExpansionCronRelay::verifyTickResult($reply,$parent,$cell);
+            if(empty($tickCheck['ok'])){
+                if(!empty($update['changed'])){
+                    $rollback=$updater->rollbackFederationEndpoint($resolved,$update);
+                    unset($update['rollback_content']);
+                    return ['ok'=>false,'code'=>!empty($rollback['ok'])?'EXPANSION_REPAIR_TICK_FAILED_ROLLED_BACK':'EXPANSION_REPAIR_TICK_FAILED_ROLLBACK_FAILED','repair'=>$update,'tick'=>$tickCheck,'rollback'=>$rollback];
+                }
+                unset($update['rollback_content']);
+                return ['ok'=>false,'code'=>'EXPANSION_REPAIR_TICK_FAILED','repair'=>$update,'tick'=>$tickCheck];
+            }
+
+            unset($update['rollback_content']);
+            return ['ok'=>true,'code'=>'EXPANSION_MANAGED_CELL_REPAIR_OK','resource'=>$descriptor,'cell'=>['cell_id'=>$cell['cell_id'],'base_url'=>$cell['base_url'],'generation'=>$cell['generation']??null],'repair'=>$update,'tick'=>$tickCheck];
         } finally {
             if(function_exists('sodium_memzero')) sodium_memzero($secret); else $secret='';
         }
