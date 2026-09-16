@@ -12,21 +12,27 @@ require_once __DIR__.'/ExpansionOrchestrator.php';
  * Parent-side command facade for KiCom expansion.
  *
  * Supported deploy modes:
- * - local: exact authorized webroot on the same hosting account; no FTP needed.
+ * - resource: resolve an existing KiCom deployment resource alias internally;
+ * - local: exact authorized webroot on the same hosting account;
  * - ftp/ftps: bootstrap transport for external webspaces.
  *
- * Transfer credentials are accepted only in execute() and are never persisted.
+ * Transfer credentials and resolved local paths are never persisted or returned.
  */
 final class KiComExpansionService
 {
     private string $varDir;
     private string $sourceDir;
     private KiComExpansionParentIdentity $identity;
+    /** @var callable(string):(?string)|null */
+    private $deploymentResourceResolver;
 
-    public function __construct(string $varDir,string $sourceDir,string $parentBaseUrl)
+    /** @param callable(string):(?string)|null $deploymentResourceResolver */
+    public function __construct(string $varDir,string $sourceDir,string $parentBaseUrl,$deploymentResourceResolver=null)
     {
         $this->varDir=rtrim($varDir,'/');
         $this->sourceDir=rtrim($sourceDir,'/');
+        if($deploymentResourceResolver!==null&&!is_callable($deploymentResourceResolver)) throw new InvalidArgumentException('EXPANSION_RESOURCE_RESOLVER_INVALID');
+        $this->deploymentResourceResolver=$deploymentResourceResolver;
         if(!is_dir($this->varDir)&&!@mkdir($this->varDir,0700,true)&&!is_dir($this->varDir)) throw new RuntimeException('EXPANSION_STORAGE_UNAVAILABLE');
         @chmod($this->varDir,0700);
         $this->identity=new KiComExpansionParentIdentity($this->varDir.'/identity',$parentBaseUrl);
@@ -36,7 +42,7 @@ final class KiComExpansionService
     public function execute(array $request): array
     {
         $target=trim((string)($request['target_base_url']??''));
-        $mode=strtolower(trim((string)($request['deploy_mode']??(isset($request['local_web_root'])?'local':'ftps'))));
+        $mode=strtolower(trim((string)($request['deploy_mode']??(isset($request['deployment_resource'])?'resource':(isset($request['local_web_root'])?'local':'ftps')))));
         if($target==='') return ['ok'=>false,'code'=>'EXPANSION_COMMAND_INVALID'];
 
         $ready=$this->identity->ensure();if(empty($ready['ok']))return $ready;
@@ -47,6 +53,15 @@ final class KiComExpansionService
         $orchestrator=new KiComExpansionOrchestrator($registry,$builder,$deployer,$parent,$secret,$this->varDir.'/work');
 
         try {
+            if($mode==='resource'){
+                $name=trim((string)($request['deployment_resource']??''));
+                if($name===''||!preg_match('/^[a-z0-9_.-]{1,64}$/i',$name)) return ['ok'=>false,'code'=>'EXPANSION_DEPLOYMENT_RESOURCE_INVALID'];
+                if($this->deploymentResourceResolver===null) return ['ok'=>false,'code'=>'EXPANSION_DEPLOYMENT_RESOURCE_RESOLVER_UNAVAILABLE'];
+                $resolved=($this->deploymentResourceResolver)($name);
+                if(!is_string($resolved)||trim($resolved)==='') return ['ok'=>false,'code'=>'EXPANSION_DEPLOYMENT_RESOURCE_UNAVAILABLE'];
+                return $orchestrator->expandLocal($target,$resolved,(int)($request['ttl']??3600));
+            }
+
             if($mode==='local'){
                 $localRoot=trim((string)($request['local_web_root']??''));
                 if($localRoot==='') return ['ok'=>false,'code'=>'EXPANSION_LOCAL_WEBROOT_REQUIRED'];
