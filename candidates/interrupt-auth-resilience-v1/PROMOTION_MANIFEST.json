@@ -1,5 +1,5 @@
 {
-  "schema": 4,
+  "schema": 5,
   "candidate": "interrupt-auth-resilience-v5",
   "authority": "candidate-only; live KiCom remains authoritative",
   "runtime_include": [
@@ -11,6 +11,7 @@
     "session_consume_resilient_v3.php",
     "session_open_resilient_v2.php",
     "guarded_action_v5.php",
+    "router_deferred_guard_v1.php",
     "approval_status_v1.php",
     "update_pending_inspect_v1.php",
     "source_manifest_status_v1.php",
@@ -30,21 +31,35 @@
     "guarded_action_v4.php"
   ],
   "validated_properties": [
-    "same request replays exact prior response and next token without re-execution",
+    "same resilient request replays exact prior response and next token without re-execution",
     "expired in-progress request becomes UNCERTAIN and is never automatically re-executed",
-    "previous rolling token is request-bound for resilient requests",
+    "previous rolling token is client_request_id-bound for resilient requests",
     "nested parameter order canonicalizes recursively and nested secret fields are excluded from fingerprints",
     "replay receipts contain no plaintext session id, old token or next token",
     "session-open replay cannot roll a later token backward",
+    "deferred router guard preserves exact response status and lines",
     "critical approval status is read-only and exact-binding-sha protected",
     "pending update inspector is read-only and hides internal package path",
     "public source manifest status exposes hashes only, never source content"
   ],
+  "live_0_9_14_review": {
+    "status": "completed",
+    "map": "LIVE_INTEGRATION_0.9.14.json",
+    "central_get_consumer_count": 21,
+    "special_get_rotators": ["AUTONOMY_TX_COMMIT", "AUTONOMY_CB_EXEC"],
+    "post_rotators": ["AUTONOMY_UPDATE_UPLOAD", "AUTONOMY_BATCH"]
+  },
+  "canonical_memory": {
+    "decision": "D024",
+    "status": "confirmed_written",
+    "decisions_sha256": "48bbda6275a0441870e0ce5f1362adcb021e4b4336a55e930acbfccc6e3aa532"
+  },
   "rules": [
     "Do not promote files merely because they exist on the candidate branch.",
-    "Exact live 0.9.14+ callsites must be re-read before integration.",
+    "Apply only against a live source state whose hashes match LIVE_INTEGRATION_0.9.14.json, or re-read/rebase the integration map first.",
     "RED/production/kernel FreeOTP execution semantics must remain unchanged.",
     "Do not finalize a new self-update while unknown RED pending 0.9.15 would be overwritten.",
-    "Canonical interruption/auth-resilience decision must be written to KiCom memory before release promotion."
+    "Authenticated mutation transport denial is not evidence that KiCom executed a request; never blind-retry an ambiguous mutation.",
+    "All release promotion must pass isolated build validation, genome/verifier checks and deliberate lost-response tests."
   ]
 }
