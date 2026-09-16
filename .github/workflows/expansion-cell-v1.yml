@@ -31,6 +31,7 @@ jobs:
           php -l experimental/expansion-cell/ExpansionProtocol.php
           php -l experimental/expansion-cell/ExpansionRegistry.php
           php -l experimental/expansion-cell/ExpansionFtpDeployer.php
+          php -l experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php
           php -l experimental/expansion-cell/CellNode.php
           php -l experimental/expansion-cell/ExpansionCellRuntime.php
           php -l experimental/expansion-cell/ExpansionCronRelay.php
@@ -47,6 +48,7 @@ jobs:
           php -l experimental/expansion-cell/expansion-cron-selftest.php
           php -l experimental/expansion-cell/orchestrator-selftest.php
           php -l experimental/expansion-cell/service-selftest.php
+          php -l experimental/expansion-cell/local-deploy-selftest.php
 
       - name: Expansion/federation selftest
         run: php experimental/expansion-cell/expansion-selftest.php
@@ -59,6 +61,9 @@ jobs:
 
       - name: Parent service selftest
         run: php experimental/expansion-cell/service-selftest.php
+
+      - name: Local filesystem deploy selftest
+        run: php experimental/expansion-cell/local-deploy-selftest.php
 
       - name: Secret persistence guard
         shell: bash
@@ -86,6 +91,15 @@ jobs:
           fi
           grep -Fq 'Require all denied' experimental/expansion-cell/ExpansionCellPackageBuilder.php
           grep -Fq 'bootstrap\.config\.php' experimental/expansion-cell/cell-runtime/.htaccess
+
+      - name: Local-deploy boundary guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'realpath' experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php
+          grep -q 'EXPANSION_TARGET_EXISTS' experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php
+          grep -q 'expandLocal' experimental/expansion-cell/ExpansionOrchestrator.php
+          grep -q "deploy_mode" experimental/expansion-cell/ExpansionService.php
 
       - name: Boundary guard
         shell: bash
