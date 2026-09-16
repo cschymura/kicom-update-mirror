@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "project": "KiCom",
+  "checkpoint_date": "2026-09-16",
+  "purpose": "durable backup and continuity checkpoint; excludes all live credentials",
+  "live": {
+    "runtime_version": "0.9.15",
+    "genome": "kicom-0.9.15-g16",
+    "authority": "live KiCom server",
+    "dev_zone_installed": true,
+    "passkey_enrolled": true,
+    "first_party_dev_status_verified": true,
+    "agent_bridge_installed": true,
+    "agent_bridge_transport_status": "browser side works; current ChatGPT web-fetch transport cannot reliably consume credentialed dynamic endpoint"
+  },
+  "development_mode": {
+    "primary_channel": "GitHub + CI",
+    "kicom_role": "build/target/control system",
+    "ordinary_dev_otp_relays": false,
+    "rolling_dev_token": false,
+    "dev_session_absolute_ttl_seconds": 604800,
+    "dev_session_idle_ttl_seconds": 86400,
+    "production_authority_separate": true,
+    "preserve_history": true,
+    "archive_superseded_states": true
+  },
+  "pull_requests": [
+    {"number":17,"branch":"candidate/dev-zone-v1","head_before_checkpoint":"4b3240fb5139307b7b9026608dfed9b669a65aad","state":"open-draft","role":"practical DEV zone"},
+    {"number":16,"branch":"candidate/passkey-auth-resilience-v1","head":"bcc032f4f14d138b7fef3fc99d5f8c65dd279dab","state":"open-draft","role":"passkey auth bridge after resilience"},
+    {"number":15,"branch":"feature/passkey-auth-bridge-v1","head":"7bb83db0d3cdf7a8083558128a61ca620640a607","state":"open-draft","role":"historical passkey prototype"},
+    {"number":14,"branch":"candidate/delegated-build-jobs-v1","head":"f4c973693d2f2bd223846f68bc779bc4438c0e4f","state":"open-draft","role":"delegated isolated build jobs"},
+    {"number":13,"branch":"candidate/interrupt-auth-resilience-v1","head":"2cf9cb0e075dec45ab3c98446565a0a0f8444af3","state":"open-draft","role":"interrupt/auth resilience v5 and prepared canonical-memory repair"},
+    {"number":12,"branch":"candidate/proposal-freeotp-batch-v1","head":"2dfcd303662fa89ed5ab358fa2374a9d8d8dcdae","state":"open-draft","role":"transaction-bound workspace proposal batch"}
+  ],
+  "ci": {
+    "known_green_runs": [35070368850,35077346848,35095493725],
+    "dev_zone_known_candidate_zip_sha256_after_path_fix": "62b51f5d849302cf8bdfe24a4acbcfa2e2f0204a9c2e39e080adec01bde7189b"
+  },
+  "dev_capabilities": [
+    "source.snapshot.read",
+    "workspace.read",
+    "workspace.write",
+    "workspace.delete",
+    "workspace.history",
+    "build.begin",
+    "build.patch",
+    "build.status",
+    "build.test",
+    "build.finalize_candidate",
+    "candidate.read",
+    "candidate.discard",
+    "logs.read"
+  ],
+  "forbidden_in_dev": [
+    "production deploy",
+    "self-update install",
+    "kernel mutation",
+    "recovery mutation",
+    "auth administration",
+    "secret-store access",
+    "arbitrary log paths"
+  ],
+  "secrets_policy": {
+    "persist_totp_codes": false,
+    "persist_totp_seed": false,
+    "persist_session_ids_or_tokens": false,
+    "persist_passkey_private_material": false,
+    "persist_private_encryption_keys": false
+  },
+  "continuity": {
+    "canonical_first": true,
+    "canonical_resources": ["BOOTSTRAP","PROJECT_STATE","ARCHITECTURE","PROTOCOL","DECISIONS","CHANGELOG","NEXT"],
+    "fallback": "this checkpoint plus GitHub branch history",
+    "destructive_deletion_default": false
+  }
+}

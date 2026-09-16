@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "name": "kicom-dev-zone-v1",
+  "type": "development-zone-module",
+  "target": "KiCom",
+  "target_runtime": "0.9.15+",
+  "status": "candidate",
+  "install_root": "dev/",
+  "auth_entry": "passkey",
+  "session": {
+    "scope": "dev",
+    "absolute_ttl_seconds": 604800,
+    "idle_ttl_seconds": 86400,
+    "rolling_token": false,
+    "reusable_token": true,
+    "storage": "server-side hash only",
+    "browser_transport": "X-KiCom-Dev-Session + X-KiCom-Dev-Token headers",
+    "agent_transport": "DEV-only GET bridge through extensionless directory endpoint; credential may appear in URL and is intentionally incapable of production authority"
+  },
+  "files": [
+    "PasskeyBridge.php",
+    "browser.js",
+    "DevSession.php",
+    "DevAuthAdapter.php",
+    "DevAuthFlow.php",
+    "DevRouter.php",
+    "DevHttpAdapter.php",
+    "DevKiComBindings.php",
+    "DevDiagnostics.php",
+    "dev-client.js",
+    "dev-auth.php",
+    "dev-api.php",
+    "dev-bridge.php",
+    "agent/index.php",
+    "index.html"
+  ],
+  "runtime": {
+    "ui": "dev/index.html",
+    "auth_endpoint": "dev/dev-auth.php",
+    "api_endpoint": "dev/dev-api.php",
+    "agent_bridge": "dev/agent/",
+    "agent_bridge_delegate": "dev/dev-bridge.php",
+    "one_time_enrollment": "existing FreeOTP verifier",
+    "normal_entry": "WebAuthn passkey",
+    "bridge_link": "one-click copy from first-party DEV UI",
+    "diagnostics": ["dev_audit", "living_experience"]
+  },
+  "candidate_export": {
+    "uses_existing_verifier": true,
+    "creates_production_pending": false,
+    "promotion_is_separate": true
+  },
+  "forbidden_authority": [
+    "production deploy",
+    "self-update install",
+    "kernel mutation",
+    "recovery mutation",
+    "auth administration",
+    "secret-store access",
+    "arbitrary log paths"
+  ],
+  "promotion": "separate production approval"
+}
