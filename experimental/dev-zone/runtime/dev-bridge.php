@@ -3,16 +3,14 @@ declare(strict_types=1);
 
 /**
  * GET-only bridge for development tooling that cannot send custom headers.
- *
- * Deliberate trade-off: the reusable DEV credential is transported in the URL.
- * This endpoint MUST remain DEV-scoped. The same credential has no production,
- * self-update-install, kernel, recovery, auth-admin or secret-store authority.
+ * The URL credential is deliberately DEV-only and has no production authority.
  */
 $root=dirname(__DIR__);
 require_once $root.'/lib.php';
 require_once __DIR__.'/DevSession.php';
 require_once __DIR__.'/DevRouter.php';
 require_once __DIR__.'/DevKiComBindings.php';
+require_once __DIR__.'/DevDiagnostics.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, max-age=0');
@@ -57,7 +55,8 @@ if (!is_array($payload)) devBridgeOut(['ok'=>false,'code'=>'DEV_BRIDGE_PAYLOAD_J
 
 $store=kicomVarDir().'/dev_zone';
 $sessions=new KiComDevSessionManager($store.'/sessions');
-$router=new KiComDevRouter($sessions,KiComDevRuntimeBindings::handlers());
+$handlers=array_merge(KiComDevRuntimeBindings::handlers(),KiComDevDiagnostics::handlers());
+$router=new KiComDevRouter($sessions,$handlers);
 $result=$router->handle($operation,$sid,$key,$payload);
 $ok=!empty($result['ok']);
 $code=(string)($result['code']??'DEV_UNKNOWN');
