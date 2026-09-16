@@ -6,6 +6,7 @@ on:
       - 'experimental/expansion-cell/**'
       - 'docs/goals/KICOM_EXPANSION_FEDERATION.*'
       - 'docs/checkpoints/KICOM_2026-09-16_EXPANSION_*.md'
+      - 'docs/checkpoints/KICOM_2026-09-16_MEMORY_FIRST_ACTIVE_CELL.md'
       - '.github/workflows/expansion-cell-v1.yml'
   workflow_dispatch:
 
@@ -32,6 +33,7 @@ jobs:
           php -l experimental/expansion-cell/ExpansionRegistry.php
           php -l experimental/expansion-cell/ExpansionFtpDeployer.php
           php -l experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php
+          php -l experimental/expansion-cell/ExpansionManagedCellUpdater.php
           php -l experimental/expansion-cell/ExpansionKiComDeployTargetResolver.php
           php -l experimental/expansion-cell/CellNode.php
           php -l experimental/expansion-cell/ExpansionCellRuntime.php
@@ -50,6 +52,7 @@ jobs:
           php -l experimental/expansion-cell/orchestrator-selftest.php
           php -l experimental/expansion-cell/service-selftest.php
           php -l experimental/expansion-cell/local-deploy-selftest.php
+          php -l experimental/expansion-cell/managed-updater-selftest.php
           php -l experimental/expansion-cell/resource-resolver-selftest.php
 
       - name: Expansion/federation selftest
@@ -66,6 +69,9 @@ jobs:
 
       - name: Local filesystem deploy selftest
         run: php experimental/expansion-cell/local-deploy-selftest.php
+
+      - name: Managed child runtime updater selftest
+        run: php experimental/expansion-cell/managed-updater-selftest.php
 
       - name: KiCom deployment resource resolver selftest
         run: php experimental/expansion-cell/resource-resolver-selftest.php
@@ -97,7 +103,7 @@ jobs:
           grep -Fq 'Require all denied' experimental/expansion-cell/ExpansionCellPackageBuilder.php
           grep -Fq 'bootstrap\.config\.php' experimental/expansion-cell/cell-runtime/.htaccess
 
-      - name: Local/resource deploy boundary guard
+      - name: Local/resource deploy and repair boundary guard
         shell: bash
         run: |
           set -euo pipefail
@@ -107,6 +113,13 @@ jobs:
           grep -q 'KiComExpansionKiComDeployTargetResolver' experimental/expansion-cell/ExpansionService.php
           grep -q "\['test','staging'\]" experimental/expansion-cell/ExpansionKiComDeployTargetResolver.php
           grep -q "!array_key_exists('root'" experimental/expansion-cell/resource-resolver-selftest.php
+          grep -q 'EXPANSION_REPAIR_HASH_CONFLICT' experimental/expansion-cell/ExpansionManagedCellUpdater.php
+          grep -q "cell-manifest.json" experimental/expansion-cell/ExpansionManagedCellUpdater.php
+          grep -q "kicom/federation.php" experimental/expansion-cell/ExpansionManagedCellUpdater.php
+          if grep -Fq '@include $cfg' experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php; then
+            echo 'Sibling bootstrap config must never be executed during repair' >&2
+            exit 1
+          fi
           if grep -q "'local_directory'=>\|'stage_directory'=>" experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php; then
             echo 'Local deploy result must not expose absolute server paths' >&2
             exit 1
