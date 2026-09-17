@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "candidate": "kicom-interaction-character-v1",
+  "status": "candidate_not_live",
+  "proposed_decisions": [
+    {
+      "id": "D028",
+      "status": "accepted_candidate",
+      "title": "Preserve and evolve interaction character across sessions",
+      "rationale": "KiCom should preserve successful collaboration patterns, command semantics, workflow preferences and learned interaction failure modes across chats as an explicit Conversation Continuity layer. This layer is guidance for cooperation, not an authority source or sensitive user profile."
+    }
+  ],
+  "architecture_additions": [
+    {
+      "component": "interaction_character",
+      "role": "persist and evolve non-sensitive collaboration semantics across sessions"
+    },
+    {
+      "layers": ["core", "adaptive", "session"],
+      "semantics": "core is stable and human-confirmed; adaptive may mature through repeated evidence; session captures transient chat-local patterns"
+    },
+    {
+      "flow": "interaction observation -> session pattern -> repeated evidence -> adaptive pattern -> optional explicit human confirmation -> core; superseded versions remain archived"
+    },
+    {
+      "rule": "Conversation continuity may change style, pacing, command interpretation and workflow defaults, but never verifier/trust/auth/TLS/safety/authorization boundaries."
+    },
+    {
+      "rule": "Sensitive personal attributes, credentials, secrets, private keys, OTPs and exact-address-style data are outside the Interaction Character model."
+    },
+    {
+      "rule": "A new chat may bootstrap from active core and adaptive patterns; session-only traits are excluded by default."
+    }
+  ],
+  "goal_hypotheses": [
+    {
+      "title": "Portable collaboration continuity",
+      "priority": "high",
+      "description": "Allow a new KiCom/ChatGPT session to resume not only factual project state but also proven collaboration semantics and working rhythm.",
+      "success_criteria": "A fresh session can load an evidence-backed non-sensitive continuity profile and correctly interpret established project commands and working conventions without importing stale session quirks as permanent truth."
+    },
+    {
+      "title": "Interaction character evolves without becoming profiling",
+      "priority": "high",
+      "description": "Repeated interaction evidence may improve adaptive collaboration patterns, while core changes require explicit human confirmation and sensitive profiling remains forbidden.",
+      "success_criteria": "Adaptive patterns can mature/supersede with append-only evidence; core cannot auto-promote; sensitive categories are rejected."
+    }
+  ],
+  "integration": {
+    "engine": "experimental/interaction-character/InteractionCharacter.php",
+    "selftest": "experimental/interaction-character/interaction-character-selftest.php",
+    "seed": "candidates/interaction-character-v1/PROFILE_SEED.json",
+    "target": "post-0.9.16 trusted genome-bound module path; coordinate activation with Skill Cultivation rather than bypassing the 0.9.15 verifier",
+    "live_mutation_performed": false
+  },
+  "non_negotiable_boundaries": {
+    "authority_source": "FORBIDDEN",
+    "safety_override": "FORBIDDEN",
+    "credential_storage": "FORBIDDEN",
+    "sensitive_user_profiling": "FORBIDDEN",
+    "external_permission_grant": "FORBIDDEN",
+    "history_hard_delete": "FORBIDDEN"
+  }
+}
