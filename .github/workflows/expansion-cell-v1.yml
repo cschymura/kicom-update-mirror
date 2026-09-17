@@ -36,6 +36,7 @@ jobs:
           php -l experimental/expansion-cell/ExpansionManagedCellUpdater.php
           php -l experimental/expansion-cell/ExpansionKiComDeployTargetResolver.php
           php -l experimental/expansion-cell/CellPerceptionAction.php
+          php -l experimental/expansion-cell/CellWorldModel.php
           php -l experimental/expansion-cell/CellLiving.php
           php -l experimental/expansion-cell/CellNode.php
           php -l experimental/expansion-cell/ExpansionCellRuntime.php
@@ -107,14 +108,16 @@ jobs:
           grep -q 'CELL_LIVING_BORN' experimental/expansion-cell/CellLiving.php
           grep -q 'living_ready' experimental/expansion-cell/CellNode.php
           grep -q 'perception_action_ready' experimental/expansion-cell/CellNode.php
+          grep -q 'world_model_ready' experimental/expansion-cell/CellNode.php
           grep -q 'canonical_memory' experimental/expansion-cell/cell-runtime/living-schema.json
           grep -q 'genome_lkg' experimental/expansion-cell/cell-runtime/living-schema.json
           grep -q '"perception"' experimental/expansion-cell/cell-runtime/living-schema.json
           grep -q '"action"' experimental/expansion-cell/cell-runtime/living-schema.json
-          grep -q 'promotion-deferred-until-pa-verified' experimental/expansion-cell/CellLiving.php
+          grep -q 'persistent-situational-awareness' experimental/expansion-cell/cell-runtime/living-schema.json
+          grep -q 'CellWorldModel.php' experimental/expansion-cell/ExpansionCellPackageBuilder.php
+          grep -q 'EXPANSION_PACKAGE_WORLD_MODEL_MISSING' experimental/expansion-cell/ExpansionCellPackageBuilder.php
           grep -q 'EXPANSION_PACKAGE_INTRINSIC_SUBSYSTEM_MISSING' experimental/expansion-cell/ExpansionCellPackageBuilder.php
           grep -q 'missing intrinsic subsystem fails build' experimental/expansion-cell/package-completeness-selftest.php
-          grep -q 'CellPerceptionAction.php' experimental/expansion-cell/ExpansionCellPackageBuilder.php
           if grep -RniE 'parent_(private|secret)_key|passkey|totp_secret|dev_bearer' experimental/expansion-cell/cell-runtime/living-schema.json; then
             echo 'Living schema must not inherit parent or platform secrets' >&2
             exit 1
@@ -144,6 +147,29 @@ jobs:
             exit 1
           fi
 
+      - name: Situational world model guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'perception/world-history.jsonl' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'perception/peer-memory.json' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'action/possibility-history.jsonl' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'cell.secrets' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'external.unprobed' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'autonomous_reproduction' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'autonomous_executable_evolution' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'signed-parent-peer-context' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'PERCEPTION_QUERY' experimental/expansion-cell/CellNode.php
+          grep -q 'world_report' experimental/expansion-cell/CellNode.php
+          if grep -nE '\b(curl_init|fsockopen|pfsockopen)\s*\(' experimental/expansion-cell/CellWorldModel.php; then
+            echo 'World model must not gain arbitrary network probing primitives' >&2
+            exit 1
+          fi
+          if grep -nE '\b(shell_exec|exec|system|passthru|proc_open|popen)\s*\(' experimental/expansion-cell/CellWorldModel.php; then
+            echo 'World model must not execute shell commands' >&2
+            exit 1
+          fi
+
       - name: Shared-hosting package guard
         shell: bash
         run: |
@@ -167,6 +193,7 @@ jobs:
           grep -q "!array_key_exists('root'" experimental/expansion-cell/resource-resolver-selftest.php
           grep -q 'EXPANSION_REPAIR_HASH_CONFLICT' experimental/expansion-cell/ExpansionManagedCellUpdater.php
           grep -q 'living_snapshots' experimental/expansion-cell/ExpansionManagedCellUpdater.php
+          grep -q 'world_model_ready' experimental/expansion-cell/ExpansionManagedCellUpdater.php
           grep -q "cell-manifest.json" experimental/expansion-cell/ExpansionManagedCellUpdater.php
           grep -q "kicom/federation.php" experimental/expansion-cell/ExpansionManagedCellUpdater.php
           if grep -Fq '@include $cfg' experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php; then
