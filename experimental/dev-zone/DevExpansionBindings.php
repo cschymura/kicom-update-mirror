@@ -79,8 +79,8 @@ final class KiComDevExpansionBindings
     /**
      * Upgrade the already-active sandbox child to the current intrinsic Living
      * architecture. Identity, signing key and lineage stay unchanged. Existing
-     * Living state is retained through a bounded snapshot before perception /
-     * action memory is added and the local genome/LKG is rebased.
+     * Living state is retained through a bounded snapshot before perception,
+     * action memory and the situational world model are rebased.
      *
      * @return array<string,mixed>
      */
@@ -124,18 +124,23 @@ final class KiComDevExpansionBindings
         $paShape=in_array($perceptionState,['AVAILABLE','DEGRADED','STALE'],true)
             &&(int)($afterCell['perception_action']['boundaries']??0)>0
             &&(int)($afterCell['perception_action']['actions']??0)>0;
-        if(!$identityOk||!$livingReady||!$paReady||!$paShape){
+        $world=is_array($afterCell['world_model']??null)?(array)$afterCell['world_model']:[];
+        $worldState=(string)($world['knowledge_state']??'UNKNOWN');
+        $worldReady=!empty($afterCell['world_model_ready'])&&!empty($world['ready'])
+            &&in_array($worldState,['AVAILABLE','DEGRADED','STALE'],true)
+            &&preg_match('/^[a-f0-9]{64}$/',(string)($world['world_id']??''))===1;
+        if(!$identityOk||!$livingReady||!$paReady||!$paShape||!$worldReady){
             $rollback=!empty($upgrade['changed'])?$updater->rollbackLivingRuntime($resolved,$upgrade):['ok'=>true,'code'=>'NO_CHANGE'];
             return [
                 'ok'=>false,
                 'code'=>!empty($rollback['ok'])?'DEV_EXPANSION_LIVING_VERIFY_FAILED_ROLLED_BACK':'DEV_EXPANSION_LIVING_VERIFY_FAILED_ROLLBACK_FAILED',
                 'identity_ok'=>$identityOk,'living_ready'=>$livingReady,'perception_action_ready'=>$paReady,'perception_state'=>$perceptionState,
-                'rollback'=>$rollback,
+                'world_model_ready'=>$worldReady,'world_model_state'=>$worldState,'rollback'=>$rollback,
             ];
         }
 
-        // Reuse the signed federation smoke path. A successful tick now also
-        // refreshes perception/action memory and proves the parent as a neighbor.
+        // Reuse the signed federation smoke path. A successful tick refreshes
+        // Perception/Action and the World Model and proves the parent as a peer.
         $tick=$service->repairFederationEndpoint(
             self::RESOURCE_ALIAS,
             self::TARGET_BASE_URL,
@@ -149,11 +154,14 @@ final class KiComDevExpansionBindings
         $afterTick=$http->getJson($childBase.'/status.php');
         $tickCell=is_array($afterTick['cell']??null)?(array)$afterTick['cell']:[];
         $tickPa=is_array($tickCell['perception_action']??null)?(array)$tickCell['perception_action']:[];
+        $tickWorld=is_array($tickCell['world_model']??null)?(array)$tickCell['world_model']:[];
         $tickReady=!empty($afterTick['ok'])&&!empty($tickCell['perception_action_ready'])&&!empty($tickPa['ready'])
-            &&(int)($tickPa['neighbors']??0)>=1;
+            &&(int)($tickPa['neighbors']??0)>=1
+            &&!empty($tickCell['world_model_ready'])&&!empty($tickWorld['ready'])
+            &&preg_match('/^[a-f0-9]{64}$/',(string)($tickWorld['world_id']??''))===1;
         if(!$tickReady){
             $rollback=!empty($upgrade['changed'])?$updater->rollbackLivingRuntime($resolved,$upgrade):['ok'=>true,'code'=>'NO_CHANGE'];
-            return ['ok'=>false,'code'=>!empty($rollback['ok'])?'DEV_EXPANSION_PA_TICK_VERIFY_FAILED_ROLLED_BACK':'DEV_EXPANSION_PA_TICK_VERIFY_FAILED_ROLLBACK_FAILED','rollback'=>$rollback];
+            return ['ok'=>false,'code'=>!empty($rollback['ok'])?'DEV_EXPANSION_WORLD_TICK_VERIFY_FAILED_ROLLED_BACK':'DEV_EXPANSION_WORLD_TICK_VERIFY_FAILED_ROLLBACK_FAILED','rollback'=>$rollback];
         }
 
         $public=$this->publicUpgradeResult($upgrade);
@@ -166,8 +174,10 @@ final class KiComDevExpansionBindings
                 'state'=>'active',
                 'living_ready'=>true,
                 'perception_action_ready'=>true,
+                'world_model_ready'=>true,
                 'living'=>$tickCell['living']??($afterCell['living']??null),
                 'perception_action'=>$tickPa,
+                'world_model'=>$tickWorld,
             ],
             'upgrade'=>$public,
             'federation_smoke'=>$tick,
