@@ -32,13 +32,11 @@ final class KiComExpansionCellPackageBuilder
         $p=parse_url((string)$prepared['child_base_url']);
         if (!is_array($p)||strtolower((string)($p['scheme']??''))!=='https'||empty($p['host'])) return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_HTTPS_REQUIRED'];
 
-        // Hidden dotfiles are deliberately generated rather than source-required.
-        // Every intrinsic daughter capability, however, must physically exist in
-        // the package before deployment.
         $required=[
             'ExpansionProtocol.php',
             'CellNode.php',
             'CellLiving.php',
+            'CellPerceptionAction.php',
             'cell-runtime/common.php',
             'cell-runtime/bootstrap.php',
             'cell-runtime/federation.php',
@@ -57,6 +55,7 @@ final class KiComExpansionCellPackageBuilder
             'ExpansionProtocol.php'=>'lib/ExpansionProtocol.php',
             'CellNode.php'=>'lib/CellNode.php',
             'CellLiving.php'=>'lib/CellLiving.php',
+            'CellPerceptionAction.php'=>'lib/CellPerceptionAction.php',
             'cell-runtime/common.php'=>'common.php',
             'cell-runtime/bootstrap.php'=>'bootstrap.php',
             'cell-runtime/federation.php'=>'federation.php',
@@ -110,7 +109,7 @@ final class KiComExpansionCellPackageBuilder
     {
         $required=[
             '.htaccess','var/.htaccess','bootstrap.config.php','common.php','bootstrap.php','federation.php','status.php','doctor.php','living-schema.json',
-            'lib/ExpansionProtocol.php','lib/CellNode.php','lib/CellLiving.php',
+            'lib/ExpansionProtocol.php','lib/CellNode.php','lib/CellLiving.php','lib/CellPerceptionAction.php',
         ];
         $listed=[];foreach(($manifest['files']??[]) as $row)if(is_array($row)&&isset($row['path']))$listed[(string)$row['path']]=true;
         foreach($required as $path){
@@ -118,7 +117,7 @@ final class KiComExpansionCellPackageBuilder
         }
         $schemaRaw=@file_get_contents($root.'/living-schema.json');$schema=is_string($schemaRaw)?json_decode($schemaRaw,true):null;
         if(!is_array($schema)||(int)($schema['schema']??0)!==1)return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_LIVING_SCHEMA_INVALID'];
-        foreach(['identity','canonical_memory','workspace','observer','genome_lkg','immune','evolution'] as $sub)if(!in_array($sub,$schema['required_subsystems']??[],true))return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_INTRINSIC_SUBSYSTEM_MISSING','subsystem'=>$sub];
+        foreach(['identity','canonical_memory','workspace','observer','genome_lkg','immune','evolution','perception','action'] as $sub)if(!in_array($sub,$schema['required_subsystems']??[],true))return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_INTRINSIC_SUBSYSTEM_MISSING','subsystem'=>$sub];
         return ['ok'=>true,'required_files'=>$required];
     }
 
