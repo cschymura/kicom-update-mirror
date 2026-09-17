@@ -7,7 +7,7 @@ function writeNode(string $var,string $baseUrl='https://child.example/kicom'): a
     $node=[
         'schema'=>1,'state'=>'active','cell_id'=>'cell-'.str_repeat('a',24),
         'root_id'=>'cell-'.str_repeat('b',24),'parent_id'=>'cell-'.str_repeat('b',24),'generation'=>1,
-        'public_key'=>'test-public-key','base_url'=>$baseUrl,'capabilities'=>['federation.tick','status.report'],
+        'public_key'=>'test-public-key','base_url'=>$baseUrl,'parent_base_url'=>'https://parent.example/kicom','capabilities'=>['federation.tick','status.report'],
         'created_at'=>gmdate('c'),'activated_at'=>gmdate('c'),
     ];
     file_put_contents($var.'/node.json',json_encode($node,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES)."\n");
@@ -17,6 +17,11 @@ function writeNode(string $var,string $baseUrl='https://child.example/kicom'): a
 function thinManifest(string $cell,array $files): void {
     $rows=[];foreach($files as $rel){$rows[]=['path'=>$rel,'bytes'=>filesize($cell.'/'.$rel),'sha256'=>hash_file('sha256',$cell.'/'.$rel)];}
     file_put_contents($cell.'/cell-manifest.json',json_encode(['schema'=>1,'files'=>$rows],JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES)."\n");
+}
+function copySourceTree(string $dst):void{
+    @mkdir($dst.'/cell-runtime',0700,true);
+    foreach(['ExpansionProtocol.php','CellNode.php','CellLiving.php','CellPerceptionAction.php'] as $f)chk(copy(__DIR__.'/'.$f,$dst.'/'.$f),'copy source '.$f);
+    foreach(['common.php','bootstrap.php','federation.php','status.php','doctor.php','living-schema.json'] as $f)chk(copy(__DIR__.'/cell-runtime/'.$f,$dst.'/cell-runtime/'.$f),'copy runtime '.$f);
 }
 
 $base=sys_get_temp_dir().'/kicom-managed-updater-'.bin2hex(random_bytes(5));
@@ -39,7 +44,7 @@ try{
     $rb=$u->rollbackFederationEndpoint($web,$r);
     chk(!empty($rb['ok'])&&hash_file('sha256',$cell.'/federation.php')===$before,'rollback');
 
-    // Thin active child -> complete Living child, preserving identity/state.
+    // Thin active child -> complete Living v2 child, preserving identity/state.
     $web2=$base.'/upgrade-web';$cell2=$web2.'/kicom';$var2=$cell2.'/var';@mkdir($var2,0700,true);
     $thinStatus="<?php echo 'thin-status';\n";$thinFederation="<?php echo 'thin-federation';\n";
     file_put_contents($cell2.'/status.php',$thinStatus);file_put_contents($cell2.'/federation.php',$thinFederation);
@@ -48,18 +53,43 @@ try{
 
     $up=$u->upgradeLivingRuntime($web2,__DIR__,'https://child.example/kicom');
     chk(!empty($up['ok'])&&($up['code']??'')==='EXPANSION_LIVING_UPGRADE_APPLIED','living upgrade applied');
-    chk(!empty($up['living']['living_ready']),'living ready');
-    chk(is_file($cell2.'/lib/CellLiving.php')&&is_file($cell2.'/doctor.php')&&is_file($cell2.'/living-schema.json'),'living runtime copied');
+    chk(!empty($up['living']['living_ready'])&&!empty($up['living']['perception_action']['ready']),'living + PA ready');
+    chk(is_file($cell2.'/lib/CellLiving.php')&&is_file($cell2.'/lib/CellPerceptionAction.php')&&is_file($cell2.'/doctor.php')&&is_file($cell2.'/living-schema.json'),'living runtime copied');
     chk(is_dir($var2.'/living/memory')&&is_dir($var2.'/living/workspace')&&is_dir($var2.'/living/genome/lkg')&&is_dir($var2.'/living/evolution/candidates'),'intrinsic tree exists');
+    chk(is_file($var2.'/living/perception/current.json')&&is_file($var2.'/living/perception/history.jsonl')&&is_file($var2.'/living/action/model.json')&&is_file($var2.'/living/action/history.jsonl'),'perception/action memory exists');
     chk(file_get_contents($var2.'/signing.secret')===$secretBefore,'signing identity preserved');
     chk(file_get_contents($var2.'/node.json')===$nodeBefore,'node lineage preserved');
     $newManifest=json_decode((string)file_get_contents($cell2.'/cell-manifest.json'),true);
-    chk(is_array($newManifest)&&($newManifest['schema']??0)===2&&($newManifest['mutable_state']??'')==='var-preserved','upgrade manifest');
+    chk(is_array($newManifest)&&($newManifest['schema']??0)===3&&($newManifest['mutable_state']??'')==='var-preserved-and-snapshotted'&&($newManifest['perception_action_memory']??false)===true,'upgrade manifest v3');
 
+    // A second managed runtime upgrade snapshots and rebases the existing Living tree.
+    $source2=$base.'/source2';copySourceTree($source2);
+    file_put_contents($source2.'/cell-runtime/status.php',(string)file_get_contents($source2.'/cell-runtime/status.php')."\n// managed PA upgrade fixture\n");
+    $genomeBefore=json_decode((string)file_get_contents($var2.'/living/genome/genome.json'),true);chk(is_array($genomeBefore),'genome before rebaseline');
+    $perceptionHistoryBefore=count(file($var2.'/living/perception/history.jsonl',FILE_IGNORE_NEW_LINES)?:[]);
+    $actionHistoryBefore=count(file($var2.'/living/action/history.jsonl',FILE_IGNORE_NEW_LINES)?:[]);
+    $second=$u->upgradeLivingRuntime($web2,$source2,'https://child.example/kicom');
+    chk(!empty($second['ok'])&&($second['code']??'')==='EXPANSION_LIVING_PA_UPGRADE_APPLIED','existing living PA upgrade applied');
+    chk(is_string($second['snapshot_id']??null)&&is_dir($var2.'/living_snapshots/'.$second['snapshot_id']),'prior living snapshot retained');
+    $genomeAfter=json_decode((string)file_get_contents($var2.'/living/genome/genome.json'),true);chk(is_array($genomeAfter),'genome after rebaseline');
+    chk(($genomeAfter['previous_id']??'')===($genomeBefore['id']??''),'new genome records predecessor');
+    chk(($genomeAfter['id']??'')!==($genomeBefore['id']??''),'genome id advances');
+    chk((count(file($var2.'/living/perception/history.jsonl',FILE_IGNORE_NEW_LINES)?:[]))>$perceptionHistoryBefore,'perception history preserved and extended');
+    chk((count(file($var2.'/living/action/history.jsonl',FILE_IGNORE_NEW_LINES)?:[]))>$actionHistoryBefore,'action history preserved and extended');
+    chk(file_get_contents($var2.'/signing.secret')===$secretBefore&&file_get_contents($var2.'/node.json')===$nodeBefore,'identity survives PA rebaseline');
+
+    $rbSecond=$u->rollbackLivingRuntime($web2,$second);
+    chk(!empty($rbSecond['ok']),'existing living rollback succeeds');
+    chk(is_dir($var2.'/living_snapshots/'.$second['snapshot_id']),'rollback retains source snapshot');
+    chk(is_string($rbSecond['failed_living_archive']??null)&&is_dir((string)$rbSecond['failed_living_archive']),'rolled-back new living archived, not deleted');
+    $restoredGenome=json_decode((string)file_get_contents($var2.'/living/genome/genome.json'),true);chk(is_array($restoredGenome)&&($restoredGenome['id']??'')===($genomeBefore['id']??''),'prior living restored from snapshot');
+
+    // Roll thin->living transition back too; failed new living is retained separately.
     $rb2=$u->rollbackLivingRuntime($web2,$up);
     chk(!empty($rb2['ok']),'living rollback');
     chk(file_get_contents($cell2.'/status.php')===$thinStatus&&file_get_contents($cell2.'/federation.php')===$thinFederation,'old runtime restored');
-    chk(!is_file($cell2.'/lib/CellLiving.php')&&!is_file($cell2.'/doctor.php')&&!is_dir($var2.'/living'),'new living files/state removed on rollback');
+    chk(!is_file($cell2.'/lib/CellLiving.php')&&!is_file($cell2.'/lib/CellPerceptionAction.php')&&!is_dir($var2.'/living'),'new living runtime/state removed from active path on rollback');
+    chk(is_string($rb2['failed_living_archive']??null)&&is_dir((string)$rb2['failed_living_archive']),'rolled-back living retained in failed archive');
     chk(file_get_contents($cell2.'/cell-manifest.json')===$manifestBefore,'old manifest restored');
     chk(file_get_contents($var2.'/signing.secret')===$secretBefore&&file_get_contents($var2.'/node.json')===$nodeBefore,'identity survives rollback');
 
@@ -67,7 +97,7 @@ try{
     file_put_contents($cell2.'/status.php',"<?php echo 'drift';\n");
     $drift=$u->upgradeLivingRuntime($web2,__DIR__,'https://child.example/kicom');
     chk(empty($drift['ok'])&&($drift['code']??'')==='EXPANSION_UPGRADE_MANAGED_DRIFT','managed drift rejected');
-    chk(!is_file($cell2.'/lib/CellLiving.php')&&!is_dir($var2.'/living'),'drift rejection writes nothing');
+    chk(!is_file($cell2.'/lib/CellLiving.php')&&!is_dir($var2.'/living'),'drift rejection writes nothing active');
 
     // Base-url mismatch and foreign targets remain rejected.
     file_put_contents($var.'/node.json',json_encode(['state'=>'active','cell_id'=>'cell-'.str_repeat('a',24),'parent_id'=>'cell-'.str_repeat('b',24),'base_url'=>'https://evil.example/kicom']));
