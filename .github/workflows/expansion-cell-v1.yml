@@ -35,6 +35,7 @@ jobs:
           php -l experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php
           php -l experimental/expansion-cell/ExpansionManagedCellUpdater.php
           php -l experimental/expansion-cell/ExpansionKiComDeployTargetResolver.php
+          php -l experimental/expansion-cell/CellPerceptionAction.php
           php -l experimental/expansion-cell/CellLiving.php
           php -l experimental/expansion-cell/CellNode.php
           php -l experimental/expansion-cell/ExpansionCellRuntime.php
@@ -105,13 +106,41 @@ jobs:
           set -euo pipefail
           grep -q 'CELL_LIVING_BORN' experimental/expansion-cell/CellLiving.php
           grep -q 'living_ready' experimental/expansion-cell/CellNode.php
+          grep -q 'perception_action_ready' experimental/expansion-cell/CellNode.php
           grep -q 'canonical_memory' experimental/expansion-cell/cell-runtime/living-schema.json
           grep -q 'genome_lkg' experimental/expansion-cell/cell-runtime/living-schema.json
-          grep -q 'autonomous-internal-after-static-fitness-with-local-lkg-rollback' experimental/expansion-cell/CellLiving.php
+          grep -q '"perception"' experimental/expansion-cell/cell-runtime/living-schema.json
+          grep -q '"action"' experimental/expansion-cell/cell-runtime/living-schema.json
+          grep -q 'promotion-deferred-until-pa-verified' experimental/expansion-cell/CellLiving.php
           grep -q 'EXPANSION_PACKAGE_INTRINSIC_SUBSYSTEM_MISSING' experimental/expansion-cell/ExpansionCellPackageBuilder.php
           grep -q 'missing intrinsic subsystem fails build' experimental/expansion-cell/package-completeness-selftest.php
+          grep -q 'CellPerceptionAction.php' experimental/expansion-cell/ExpansionCellPackageBuilder.php
           if grep -RniE 'parent_(private|secret)_key|passkey|totp_secret|dev_bearer' experimental/expansion-cell/cell-runtime/living-schema.json; then
             echo 'Living schema must not inherit parent or platform secrets' >&2
+            exit 1
+          fi
+
+      - name: Perception action boundary guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'UNKNOWN' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'AVAILABLE' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'UNAVAILABLE' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'FORBIDDEN' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'DEGRADED' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'STALE' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'perception/history.jsonl' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'action/history.jsonl' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'protected.external.write' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'internal.capability.extend' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q "promotion'=>'DEFERRED" experimental/expansion-cell/CellPerceptionAction.php
+          if grep -nE 'curl_init|fsockopen|pfsockopen|https?://' experimental/expansion-cell/CellPerceptionAction.php; then
+            echo 'Perception layer must not gain arbitrary network probing primitives' >&2
+            exit 1
+          fi
+          if grep -nE '\b(shell_exec|exec|system|passthru|proc_open|popen)\s*\(' experimental/expansion-cell/CellPerceptionAction.php; then
+            echo 'Perception/action memory must not execute shell commands' >&2
             exit 1
           fi
 
@@ -137,6 +166,7 @@ jobs:
           grep -q "\['test','staging'\]" experimental/expansion-cell/ExpansionKiComDeployTargetResolver.php
           grep -q "!array_key_exists('root'" experimental/expansion-cell/resource-resolver-selftest.php
           grep -q 'EXPANSION_REPAIR_HASH_CONFLICT' experimental/expansion-cell/ExpansionManagedCellUpdater.php
+          grep -q 'living_snapshots' experimental/expansion-cell/ExpansionManagedCellUpdater.php
           grep -q "cell-manifest.json" experimental/expansion-cell/ExpansionManagedCellUpdater.php
           grep -q "kicom/federation.php" experimental/expansion-cell/ExpansionManagedCellUpdater.php
           if grep -Fq '@include $cfg' experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php; then
