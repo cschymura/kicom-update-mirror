@@ -17,7 +17,7 @@ function rmTree(string $dir): void {
 }
 function seedChildRuntime(string $root): void {
     @mkdir($root.'/lib',0700,true);@mkdir($root.'/var',0700,true);
-    foreach(['ExpansionProtocol.php','CellNode.php','CellLiving.php','CellPerceptionAction.php'] as $f) must(copy(__DIR__.'/'.$f,$root.'/lib/'.$f),'seed lib '.$f);
+    foreach(['ExpansionProtocol.php','CellNode.php','CellLiving.php','CellPerceptionAction.php','CellWorldModel.php'] as $f) must(copy(__DIR__.'/'.$f,$root.'/lib/'.$f),'seed lib '.$f);
     foreach(['common.php','bootstrap.php','federation.php','status.php','doctor.php'] as $f) must(copy(__DIR__.'/cell-runtime/'.$f,$root.'/'.$f),'seed endpoint '.$f);
     must(copy(__DIR__.'/cell-runtime/living-schema.json',$root.'/living-schema.json'),'seed living schema');
 }
@@ -52,18 +52,20 @@ try {
         'parent_id'=>$parent['cell_id'],
         'parent_public_key'=>$parent['public_key'],
         'parent_base_url'=>$parent['base_url'],
-        'capabilities'=>['federation.tick','status.report'],
+        'capabilities'=>['federation.tick','status.report','perception.query'],
     ]);
     must(!empty($init['ok']),'child initialize');
     must(!empty($init['living_ready']),'complete living substrate at birth');
     must(!empty($init['perception_action_ready']),'perception/action ready at birth');
+    must(!empty($init['world_model_ready']),'world model ready at birth');
     $born=$child->status();
     must(is_array($born)&&!empty($born['living_ready']),'status proves living ready before enrollment');
     must(!empty($born['perception_action_ready']),'status proves perception/action ready before enrollment');
+    must(!empty($born['world_model_ready'])&&!empty($born['world_model']['ready']),'status proves world model ready before enrollment');
     foreach(['identity','canonical_memory','workspace','observer','genome_lkg','immune','evolution','perception','action'] as $sub) must(!empty($born['living']['subsystems'][$sub]),'born subsystem '.$sub);
     foreach(['PROJECT_STATE.kcl','ARCHITECTURE.kcl','PROTOCOL.kcl','DECISIONS.kcl','CHANGELOG.kcl','NEXT.kcl'] as $f) must(is_file($childRoot.'/var/living/memory/'.$f),'local canonical memory '.$f);
-    foreach(['current.json','history.jsonl','changes.jsonl','neighbors.json'] as $f) must(is_file($childRoot.'/var/living/perception/'.$f),'perception memory '.$f);
-    foreach(['model.json','history.jsonl','boundaries.json','expansion-opportunities.json'] as $f) must(is_file($childRoot.'/var/living/action/'.$f),'action memory '.$f);
+    foreach(['current.json','history.jsonl','changes.jsonl','neighbors.json','world.json','world-history.jsonl','world-changes.jsonl','peer-memory.json'] as $f) must(is_file($childRoot.'/var/living/perception/'.$f),'perception/world memory '.$f);
+    foreach(['model.json','history.jsonl','boundaries.json','expansion-opportunities.json','possibilities.json','possibility-history.jsonl'] as $f) must(is_file($childRoot.'/var/living/action/'.$f),'action/world memory '.$f);
 
     $perception=jsonFile($childRoot.'/var/living/perception/current.json');
     must(($perception['unknowns'][0]['state']??'')==='UNKNOWN','unprobed external remains UNKNOWN');
@@ -72,6 +74,12 @@ try {
     $actionIndex=[];foreach($actionModel['actions']??[] as $a)if(is_array($a))$actionIndex[(string)($a['id']??'')]=$a;
     must(($actionIndex['protected.external.write']['state']??'')==='FORBIDDEN','protected external write forbidden without boundary authorization');
     must(($actionIndex['internal.capability.extend']['promotion']??'')==='DEFERRED','internal executable promotion deferred');
+    $world=jsonFile($childRoot.'/var/living/perception/world.json');
+    must(($world['access']['cell.workspace']['write']??'')==='AVAILABLE','world knows local workspace is writable');
+    must(($world['access']['cell.secrets']['read']??'')==='FORBIDDEN','world knows direct secret visibility is forbidden');
+    must(($world['access']['external.unprobed']['read']??'')==='UNKNOWN','world keeps unprobed external read UNKNOWN');
+    must(($world['paused']['autonomous_reproduction']??'')==='DEFERRED','reproduction explicitly paused in world model');
+    must(($world['paused']['autonomous_executable_evolution']??'')==='DEFERRED','executable evolution explicitly paused in world model');
 
     $living=new KiComExpansionCellLiving($childRoot.'/var');
     $doctor=$living->doctor(false);must(!empty($doctor['ok']),'doctor healthy after birth');
@@ -93,6 +101,7 @@ try {
     must(isset($hello['proof'],$hello['descriptor']),'hello proof+descriptor');
     must(($hello['descriptor']['living_ready']??false)===true,'enrollment proves cell was complete before trust');
     must(($hello['descriptor']['perception_action_ready']??false)===true,'enrollment proves perception/action existed before trust');
+    must(($hello['descriptor']['world_model_ready']??false)===true,'enrollment proves world model existed before trust');
 
     $bad=$registry->enroll((string)$prep['expansion_id'],(array)$hello['descriptor'],str_repeat('0',64));
     must(empty($bad['ok'])&&($bad['code']??'')==='EXPANSION_ENROLLMENT_PROOF_INVALID','bad proof rejected');
@@ -122,19 +131,31 @@ try {
     must(!empty($active['ok'])&&($active['code']??'')==='CELL_ACTIVE','child activation');
     must(!is_file($childRoot.'/var/bootstrap.private.json'),'bootstrap token erased after activation');
     $activeStatus=$child->status();
-    must(!empty($activeStatus['living_ready'])&&!empty($activeStatus['perception_action_ready']),'activation preserves intrinsic living+PA readiness');
+    must(!empty($activeStatus['living_ready'])&&!empty($activeStatus['perception_action_ready'])&&!empty($activeStatus['world_model_ready']),'activation preserves intrinsic readiness');
 
     $neighbors=jsonFile($childRoot.'/var/living/perception/neighbors.json');
     $parentSeen=false;foreach($neighbors['neighbors']??[] as $n)if(is_array($n)&&($n['cell_id']??'')===$parent['cell_id']){$parentSeen=(($n['state']??'')==='AVAILABLE');}
     must($parentSeen,'signed activation marks parent AVAILABLE');
 
     $historyBefore=count(file($childRoot.'/var/living/perception/history.jsonl',FILE_IGNORE_NEW_LINES)?:[]);
+    $worldHistoryBefore=count(file($childRoot.'/var/living/perception/world-history.jsonl',FILE_IGNORE_NEW_LINES)?:[]);
     $actionsBefore=count(file($childRoot.'/var/living/action/history.jsonl',FILE_IGNORE_NEW_LINES)?:[]);
+    $siblingId='cell-'.str_repeat('c',24);
+    $peerContext=[
+        'parent'=>[
+            'cell_id'=>$parent['cell_id'],'base_url'=>$parent['base_url'],'generation'=>0,
+            'capabilities'=>['federation.tick','perception.query'],
+        ],
+        'peers'=>[[
+            'cell_id'=>$siblingId,'base_url'=>'https://peer.example/kicom','generation'=>1,
+            'capabilities'=>['status.report'],
+        ]],
+    ];
     $tick=KiComExpansionProtocol::signEnvelope(
         $parent['cell_id'],
         (string)$accepted['cell']['cell_id'],
         'FEDERATION_TICK',
-        ['tick_id'=>'tick-1','budget_ms'=>1000],
+        ['tick_id'=>'tick-1','budget_ms'=>1000,'peer_context'=>$peerContext],
         $parentIdentity['secret_key']
     );
     $reply=$child->handleParentMessage($tick);
@@ -148,12 +169,44 @@ try {
     must(!empty($replyCheck['ok']),'parent verifies child reply');
     must(($reply['payload']['living_ready']??false)===true,'tick reports intrinsic living readiness');
     must(($reply['payload']['perception_action_ready']??false)===true,'tick reports perception/action readiness');
-    must(($reply['payload']['known_neighbors']??0)>=1,'tick reports known neighbor');
+    must(($reply['payload']['world_model_ready']??false)===true,'tick reports world-model readiness');
+    must(($reply['payload']['known_neighbors']??0)>=1,'tick reports known parent neighbor');
     must(($reply['payload']['known_boundaries']??0)>=1,'tick reports known boundaries');
     $historyAfter=count(file($childRoot.'/var/living/perception/history.jsonl',FILE_IGNORE_NEW_LINES)?:[]);
+    $worldHistoryAfter=count(file($childRoot.'/var/living/perception/world-history.jsonl',FILE_IGNORE_NEW_LINES)?:[]);
     $actionsAfter=count(file($childRoot.'/var/living/action/history.jsonl',FILE_IGNORE_NEW_LINES)?:[]);
     must($historyAfter>$historyBefore,'tick appends perception history');
+    must($worldHistoryAfter>$worldHistoryBefore,'tick appends world-model history');
     must($actionsAfter>$actionsBefore,'tick appends action history');
+    $worldAfterTick=jsonFile($childRoot.'/var/living/perception/world.json');
+    $worldPeers=[];foreach($worldAfterTick['neighbors']??[] as $n)if(is_array($n))$worldPeers[(string)($n['cell_id']??'')]=$n;
+    must(isset($worldPeers[$parent['cell_id']])&&($worldPeers[$parent['cell_id']]['state']??'')==='AVAILABLE','world remembers verified parent');
+    must(isset($worldPeers[$siblingId])&&($worldPeers[$siblingId]['evidence']??'')==='signed-parent-peer-context','world accepts sibling only from signed parent context');
+    must(($worldPeers[$siblingId]['capabilities'][0]??'')==='status.report','world remembers signed peer capability evidence');
+
+    $query=KiComExpansionProtocol::signEnvelope(
+        $parent['cell_id'],
+        (string)$accepted['cell']['cell_id'],
+        'PERCEPTION_QUERY',
+        ['query_id'=>'perception-1','peer_context'=>$peerContext],
+        $parentIdentity['secret_key']
+    );
+    $queryReply=$child->handleParentMessage($query);
+    $queryCheck=KiComExpansionProtocol::verifyEnvelope(
+        $queryReply,
+        (string)$accepted['cell']['cell_id'],
+        $parent['cell_id'],
+        (string)$accepted['cell']['public_key']
+    );
+    must(!empty($queryCheck['ok']),'signed perception query reply verifies');
+    must(($queryReply['operation']??'')==='PERCEPTION_QUERY_RESULT','perception query operation result');
+    $report=is_array($queryReply['payload']['world_report']??null)?(array)$queryReply['payload']['world_report']:[];
+    must(!empty($report['ok'])&&($report['code']??'')==='CELL_WORLD_REPORT','perception query returns bounded world report');
+    must(($report['access']['cell.secrets']['read']??'')==='FORBIDDEN','report preserves secret boundary');
+    must(($report['paused']['autonomous_reproduction']??'')==='DEFERRED','report preserves reproduction pause');
+    must(count($report['neighbors']??[])>=2,'report contains signed neighbor knowledge');
+    $reportJson=json_encode($report,JSON_UNESCAPED_SLASHES)?:'';
+    must(!str_contains($reportJson,'signing.secret')&&!str_contains($reportJson,'bootstrap.private'),'report leaks no private filenames');
 
     $stale=KiComExpansionProtocol::signEnvelope(
         $parent['cell_id'],
