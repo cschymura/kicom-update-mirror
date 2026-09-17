@@ -70,7 +70,12 @@ final class KiComExpansionHttpsTransport implements KiComExpansionTransport
         if ($status<200||$status>=300) return ['ok'=>false,'code'=>'EXPANSION_HTTP_STATUS','http_status'=>$status];
         $decoded=json_decode($raw,true);
         if (!is_array($decoded)) return ['ok'=>false,'code'=>'EXPANSION_HTTP_JSON_INVALID','http_status'=>$status];
-        return $decoded+['http_status'=>$status];
+
+        // Success payloads are protocol data. In particular, federation replies
+        // are signed over the exact JSON field set. Never inject transport
+        // metadata such as HTTP status into a successful decoded payload before
+        // signature verification; doing so invalidates every detached signature.
+        return $decoded;
     }
 
     private function assertPinned(string $url): void
