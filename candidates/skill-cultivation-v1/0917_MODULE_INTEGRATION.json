@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "candidate": "kicom-skill-cultivation-0.9.17-g18",
+  "status": "implemented_candidate_not_live",
+  "requires": {
+    "runtime_min": "0.9.16",
+    "genome_min": "kicom-0.9.16-g17",
+    "trusted_module_loader": true,
+    "modules_update_allowlist": true
+  },
+  "target": {
+    "runtime": "0.9.17",
+    "genome": "kicom-0.9.17-g18"
+  },
+  "source": {
+    "branch": "candidate/expansion-cell-v1",
+    "commit": "baba17d0dee8b3551900beed6dc0aefdb3b25404",
+    "engine_v1": "experimental/skill-cultivation/SkillCultivation.php",
+    "public_facade_v2": "experimental/skill-cultivation/SkillCultivationV2.php",
+    "experience_bridge": "experimental/skill-cultivation/SkillCultivationBridge.php"
+  },
+  "module_layout": [
+    {
+      "path": "modules/SkillCultivation.php",
+      "role": "retained evidence/maturity engine",
+      "load_order": 10
+    },
+    {
+      "path": "modules/SkillCultivationV2.php",
+      "role": "hardened public integration surface with immutable trust boundaries",
+      "load_order": 20
+    },
+    {
+      "path": "modules/SkillCultivationBridge.php",
+      "role": "Experience Memory to skill-gap bridge",
+      "load_order": 30
+    }
+  ],
+  "module_manifest": "genome/modules.json",
+  "persistence": {
+    "derived_state": "var/living/skills/skills.json",
+    "append_only_evidence": "var/living/skills/history.jsonl",
+    "hard_delete": "FORBIDDEN"
+  },
+  "integration_hooks": {
+    "experience_memory": [
+      "human_technical_mediation",
+      "recurring_action_failure",
+      "capability_opportunity"
+    ],
+    "world_action_model": "publish evidence-backed skill capabilities without granting authority",
+    "evolution": "may create/test implementation candidates for proposed skills in bounded test territory",
+    "immune": "may degrade skill availability when observed behavior diverges from retained evidence"
+  },
+  "locked_boundaries": {
+    "arbitrary_code_execution": "FORBIDDEN",
+    "direct_secret_visibility": "FORBIDDEN",
+    "external_permission_grant": "FORBIDDEN",
+    "protected_external_action": "EXTERNAL_AUTH_REQUIRED",
+    "history_hard_delete": "FORBIDDEN"
+  },
+  "activation_preconditions": [
+    "0.9.16/g17 trusted module support is live and healthy",
+    "all module files are genome components with exact sha256",
+    "genome/modules.json references only trusted module paths",
+    "module selftests pass",
+    "existing update verifier accepts the complete 0.9.17 package",
+    "snapshot/LKG exists before activation",
+    "post-install healthcheck passes or automatic rollback restores LKG"
+  ],
+  "authority": {
+    "skill_maturity_grants_permission": false,
+    "internal_skill_practice_requires_human_approval": false,
+    "protected_external_boundary_may_require_human_authorization": true
+  }
+}
