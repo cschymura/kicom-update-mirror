@@ -19,29 +19,30 @@ jobs:
         run: |
           set -euo pipefail
           probe() {
-            local label="$1" url="$2"
+            local label="$1" url="$2" ua="${3:-curl/8}"
             echo "===== ${label} ====="
             body="$(mktemp)" headers="$(mktemp)"
-            code="$(curl -sS -L --max-time 15 --connect-timeout 7 -D "$headers" -o "$body" -w '%{http_code}' "$url" || true)"
+            code="$(curl -sS -L --max-time 15 --connect-timeout 7 -A "$ua" -D "$headers" -o "$body" -w '%{http_code}' "$url" || true)"
             echo "HTTP ${code}"
             sed -n '1,12p' "$headers" | sed -E 's/(set-cookie:).*/\1 [redacted]/I'
-            echo '-- body (first 2000 bytes) --'
-            head -c 2000 "$body" || true
+            echo '-- body (first 4000 bytes) --'
+            head -c 4000 "$body" || true
             echo
             rm -f "$body" "$headers"
           }
 
           probe bootstrap 'https://kicom.rurtalbahn.info/?q=BOOTSTRAP'
           probe update_status 'https://kicom.rurtalbahn.info/?q=UPDATE_STATUS'
+          probe living_experience 'https://kicom.rurtalbahn.info/?q=LIVING_EXPERIENCE'
           probe dev_root 'https://kicom.rurtalbahn.info/dev/'
           probe dev_artifact 'https://kicom.rurtalbahn.info/dev/dev-artifact.php'
           probe dev_api 'https://kicom.rurtalbahn.info/dev/dev-api.php'
           probe dev_bridge 'https://kicom.rurtalbahn.info/dev/dev-bridge.php?op=DEV_SESSION_STATUS&p=e30'
           probe runtime_probe 'https://kicom.rurtalbahn.info/dev/dev-runtime-probe.php'
           probe runtime_load_probe 'https://kicom.rurtalbahn.info/dev/dev-runtime-load-probe.php'
-          probe source_manifest_status 'https://kicom.rurtalbahn.info/?q=SOURCE_MANIFEST_STATUS'
-          probe direct_source_status 'https://kicom.rurtalbahn.info/?q=DIRECT_SOURCE_STATUS'
-          probe direct_source_read 'https://kicom.rurtalbahn.info/?q=DIRECT_SOURCE_READ&path=lib.php'
-          probe source_read 'https://kicom.rurtalbahn.info/?q=SOURCE_READ&path=lib.php'
-          probe source_fast_read 'https://kicom.rurtalbahn.info/?q=SOURCE_FAST_READ&path=lib.php'
-          probe autonomy_source_list 'https://kicom.rurtalbahn.info/?q=AUTONOMY_SOURCE_LIST'
+          probe primary_root_default 'https://feed.rurtalbahn.info/channel.json'
+          probe primary_root_kicom_ua 'https://feed.rurtalbahn.info/channel.json' 'KiCom/0.9.15 update-channel'
+          probe primary_kicom_default 'https://feed.rurtalbahn.info/kicom/channel.json'
+          probe primary_kicom_kicom_ua 'https://feed.rurtalbahn.info/kicom/channel.json' 'KiCom/0.9.15 update-channel'
+          probe archive_host 'https://archive.rurtalbahn.info/'
+          probe kicomarchive_host 'https://kicomarchive.rurtalbahn.info/'
