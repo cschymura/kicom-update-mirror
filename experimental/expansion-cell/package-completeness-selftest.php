@@ -6,7 +6,7 @@ function pc(bool $ok,string $m):void{if(!$ok){fwrite(STDERR,"FAIL $m\n");exit(1)
 function pcRm(string $d):void{if(!is_dir($d))return;$it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($d,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST);foreach($it as $f){$p=$f->getPathname();$f->isDir()?@rmdir($p):@unlink($p);}@rmdir($d);}
 function pcSeed(string $src):void{
     @mkdir($src.'/cell-runtime',0700,true);
-    foreach(['ExpansionProtocol.php','CellNode.php','CellLiving.php'] as $f)pc(copy(__DIR__.'/'.$f,$src.'/'.$f),'copy '.$f);
+    foreach(['ExpansionProtocol.php','CellNode.php','CellLiving.php','CellPerceptionAction.php'] as $f)pc(copy(__DIR__.'/'.$f,$src.'/'.$f),'copy '.$f);
     foreach(['common.php','bootstrap.php','federation.php','status.php','doctor.php','living-schema.json'] as $f)pc(copy(__DIR__.'/cell-runtime/'.$f,$src.'/cell-runtime/'.$f),'copy runtime '.$f);
 }
 $base=sys_get_temp_dir().'/kicom-package-complete-'.bin2hex(random_bytes(5));@mkdir($base,0700,true);
@@ -22,8 +22,13 @@ try{
     $manifest=json_decode((string)file_get_contents($base.'/pkg-ok/cell-manifest.json'),true);
     pc(is_array($manifest)&&($manifest['intrinsic_complete']??false)===true,'manifest proves intrinsic completeness');
     $paths=[];foreach($manifest['files']??[] as $r)if(is_array($r))$paths[]=(string)($r['path']??'');
-    foreach(['lib/CellLiving.php','living-schema.json','doctor.php'] as $p)pc(in_array($p,$paths,true),'manifest contains '.$p);
+    foreach(['lib/CellLiving.php','lib/CellPerceptionAction.php','living-schema.json','doctor.php'] as $p)pc(in_array($p,$paths,true),'manifest contains '.$p);
     $builder->destroy($base.'/pkg-ok');
+
+    @unlink($src.'/CellPerceptionAction.php');
+    $missingPa=$builder->build($base.'/pkg-missing-pa',$prepared,$parent);
+    pc(empty($missingPa['ok'])&&($missingPa['code']??'')==='EXPANSION_PACKAGE_SOURCE_MISSING'&&($missingPa['path']??'')==='CellPerceptionAction.php','missing perception/action runtime fails build');
+    pc(copy(__DIR__.'/CellPerceptionAction.php',$src.'/CellPerceptionAction.php'),'restore CellPerceptionAction fixture');
 
     @unlink($src.'/CellLiving.php');
     $missingFile=$builder->build($base.'/pkg-missing-file',$prepared,$parent);
@@ -31,10 +36,10 @@ try{
     pc(copy(__DIR__.'/CellLiving.php',$src.'/CellLiving.php'),'restore CellLiving fixture');
 
     $schema=json_decode((string)file_get_contents($src.'/cell-runtime/living-schema.json'),true);pc(is_array($schema),'schema fixture');
-    $schema['required_subsystems']=array_values(array_filter($schema['required_subsystems']??[],static fn($v):bool=>$v!=='immune'));
+    $schema['required_subsystems']=array_values(array_filter($schema['required_subsystems']??[],static fn($v):bool=>$v!=='perception'));
     file_put_contents($src.'/cell-runtime/living-schema.json',json_encode($schema,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES)."\n");
     $missingSubsystem=$builder->build($base.'/pkg-missing-subsystem',$prepared,$parent);
-    pc(empty($missingSubsystem['ok'])&&($missingSubsystem['code']??'')==='EXPANSION_PACKAGE_INTRINSIC_SUBSYSTEM_MISSING'&&($missingSubsystem['subsystem']??'')==='immune','missing intrinsic subsystem fails build');
+    pc(empty($missingSubsystem['ok'])&&($missingSubsystem['code']??'')==='EXPANSION_PACKAGE_INTRINSIC_SUBSYSTEM_MISSING'&&($missingSubsystem['subsystem']??'')==='perception','missing intrinsic subsystem fails build');
     pc(!is_dir($base.'/pkg-missing-subsystem'),'failed package is removed');
 
     echo "KiCom Expansion package completeness selftest: PASS\n";
