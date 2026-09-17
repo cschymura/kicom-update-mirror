@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__.'/ExpansionProtocol.php';
 require_once __DIR__.'/CellLiving.php';
+require_once __DIR__.'/CellPerceptionAction.php';
 
 /**
  * Child-side federation state machine for an Expansion Cell.
@@ -28,8 +29,9 @@ final class KiComExpansionCellNode
      * Called once after the complete package lands on the target host.
      *
      * Birth is fail-closed: the node is committed only after the daughter has
-     * local memory, workspace, observer, genome/LKG, immune and evolution
-     * substrate. Enrollment later establishes lineage/trust only.
+     * local memory, workspace, observer, genome/LKG, immune, evolution,
+     * perception memory and action memory substrate. Enrollment later establishes
+     * lineage/trust only.
      *
      * @param array<string,mixed> $bootstrap
      * @return array<string,mixed>
@@ -103,6 +105,24 @@ final class KiComExpansionCellNode
             return ['ok'=>false,'code'=>'CELL_BOOTSTRAP_WRITE_FAILED'];
         }
 
+        $paNode=$public+[
+            'parent_id'=>(string)$bootstrap['parent_id'],
+            'parent_base_url'=>rtrim((string)$bootstrap['parent_base_url'],'/'),
+            'root_id'=>'',
+            'generation'=>1,
+        ];
+        $pa=new KiComExpansionCellPerceptionAction($this->dir);
+        $paReady=$pa->ensure($paNode);
+        if(empty($paReady['ok'])){
+            $this->rollbackBirth($living);
+            return ['ok'=>false,'code'=>'CELL_PA_BIRTH_FAILED','perception_action'=>$paReady];
+        }
+        $paCycle=$pa->cycle($paNode,'birth');
+        if(empty($paCycle['ok'])){
+            $this->rollbackBirth($living);
+            return ['ok'=>false,'code'=>'CELL_PA_BIRTH_CYCLE_FAILED','perception_action'=>$paCycle];
+        }
+
         $livingStatus=$living->status();
         if (empty($livingStatus['living_ready'])) {
             $this->rollbackBirth($living);
@@ -115,6 +135,7 @@ final class KiComExpansionCellNode
             'cell_id'=>$public['cell_id'],
             'base_url'=>$public['base_url'],
             'living_ready'=>true,
+            'perception_action_ready'=>true,
             'intrinsic_subsystems'=>$livingStatus['subsystems']??[],
         ];
     }
@@ -126,13 +147,15 @@ final class KiComExpansionCellNode
         $boot=$this->readJson($this->dir.'/bootstrap.private.json');
         if ($node===null||$boot===null||($node['state']??'')!=='enrolling') return ['ok'=>false,'code'=>'CELL_NOT_ENROLLING'];
         $living=(new KiComExpansionCellLiving($this->dir))->status();
-        if (empty($living['living_ready'])) return ['ok'=>false,'code'=>'CELL_LIVING_NOT_READY','living'=>$living];
+        $pa=(new KiComExpansionCellPerceptionAction($this->dir))->status();
+        if (empty($living['living_ready'])||empty($pa['ready'])) return ['ok'=>false,'code'=>'CELL_LIVING_NOT_READY','living'=>$living,'perception_action'=>$pa];
         $descriptor=[
             'cell_id'=>(string)$node['cell_id'],
             'public_key'=>(string)$node['public_key'],
             'base_url'=>(string)$node['base_url'],
             'capabilities'=>self::normalizeCapabilities($node['capabilities']??[]),
             'living_ready'=>true,
+            'perception_action_ready'=>true,
         ];
         $proof=KiComExpansionProtocol::enrollmentProof($descriptor,(string)$boot['enrollment_token']);
         return [
@@ -177,6 +200,11 @@ final class KiComExpansionCellNode
         $node['parent_public_key']=(string)$boot['parent_public_key'];
         $node['parent_base_url']=(string)$boot['parent_base_url'];
         $node['activated_at']=gmdate('c');
+
+        $pa=new KiComExpansionCellPerceptionAction($this->dir);
+        $paCycle=$pa->cycle($node,'activation',['parent_verified'=>true,'message_id'=>(string)($envelope['message_id']??'')]);
+        if(empty($paCycle['ok'])) return ['ok'=>false,'code'=>'CELL_PA_ACTIVATION_FAILED','perception_action'=>$paCycle];
+
         if (!$this->writeJson($this->dir.'/node.json',$node)) return ['ok'=>false,'code'=>'CELL_ACTIVATION_WRITE_FAILED'];
 
         $living=new KiComExpansionCellLiving($this->dir);
@@ -187,13 +215,13 @@ final class KiComExpansionCellNode
 
         // Enrollment token is no longer needed after signed activation.
         @unlink($this->dir.'/bootstrap.private.json');
-        return ['ok'=>true,'code'=>'CELL_ACTIVE','cell_id'=>(string)$node['cell_id'],'root_id'=>$node['root_id'],'parent_id'=>$node['parent_id'],'generation'=>$node['generation'],'living_ready'=>true];
+        return ['ok'=>true,'code'=>'CELL_ACTIVE','cell_id'=>(string)$node['cell_id'],'root_id'=>$node['root_id'],'parent_id'=>$node['parent_id'],'generation'=>$node['generation'],'living_ready'=>true,'perception_action_ready'=>true];
     }
 
     /**
      * Verify one parent cron/federation message and return a signed child reply.
-     * FEDERATION_TICK also runs the local immune doctor; no parent capability is
-     * installed by the tick.
+     * FEDERATION_TICK runs the local immune doctor and the perception/action loop;
+     * no parent capability is installed by the tick.
      *
      * @param array<string,mixed> $envelope
      * @return array<string,mixed>
@@ -213,6 +241,13 @@ final class KiComExpansionCellNode
         if (!in_array($op,['FEDERATION_TICK','FEDERATION_STATUS_REQUEST'],true)) return ['ok'=>false,'code'=>'CELL_OPERATION_FORBIDDEN'];
 
         $doctor=(new KiComExpansionCellLiving($this->dir))->doctor($op==='FEDERATION_TICK');
+        $pa=new KiComExpansionCellPerceptionAction($this->dir);
+        $paCycle=$pa->cycle(
+            $node,
+            $op==='FEDERATION_TICK'?'federation_tick':'federation_status_request',
+            ['parent_verified'=>true,'message_id'=>(string)($envelope['message_id']??'')]
+        );
+        $paStatus=$pa->status();
         $result=[
             'ok'=>true,
             'cell_id'=>(string)$node['cell_id'],
@@ -224,6 +259,11 @@ final class KiComExpansionCellNode
             'living_ready'=>!empty($doctor['status']['living_ready']),
             'living_drift_count'=>(int)($doctor['status']['drift_count']??0),
             'living_lkg_ok'=>!empty($doctor['status']['lkg_ok']),
+            'perception_action_ready'=>!empty($paStatus['ready']),
+            'perception_state'=>(string)($paStatus['perception_state']??'UNKNOWN'),
+            'known_neighbors'=>(int)($paStatus['neighbors']??0),
+            'known_boundaries'=>(int)($paStatus['boundaries']??0),
+            'perception_cycle_ok'=>!empty($paCycle['ok']),
         ];
         $secret=@file_get_contents($this->dir.'/signing.secret');
         if (!is_string($secret)||strlen($secret)!==SODIUM_CRYPTO_SIGN_SECRETKEYBYTES) return ['ok'=>false,'code'=>'CELL_SECRET_UNAVAILABLE'];
@@ -248,8 +288,11 @@ final class KiComExpansionCellNode
         $node=$this->readJson($this->dir.'/node.json');
         if ($node===null) return null;
         $living=(new KiComExpansionCellLiving($this->dir))->status();
+        $pa=(new KiComExpansionCellPerceptionAction($this->dir))->status();
         $node['living_ready']=!empty($living['living_ready']);
         $node['living']=$living;
+        $node['perception_action_ready']=!empty($pa['ready']);
+        $node['perception_action']=$pa;
         return $node;
     }
 
