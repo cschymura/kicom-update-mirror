@@ -59,6 +59,7 @@ jobs:
           php -l experimental/dev-zone/dev-diagnostics-selftest.php
           php -l experimental/dev-zone/dev-observer-selftest.php
           php -l experimental/dev-zone/dev-expansion-selftest.php
+          php -l experimental/expansion-cell/CellPerceptionAction.php
 
       - name: Validate candidate manifest
         run: |
@@ -97,6 +98,7 @@ jobs:
           grep -q "RESOURCE_ALIAS='sandbox'" experimental/dev-zone/DevExpansionBindings.php
           grep -q "TARGET_BASE_URL='https://sandbox.rurtalbahn.info'" experimental/dev-zone/DevExpansionBindings.php
           grep -q "EXPECTED_BUGGY_FEDERATION_SHA='d648b1b20c41f39049aa4cabd23ced3d9794cf2c1e92e602886b2e2674730653'" experimental/dev-zone/DevExpansionBindings.php
+          grep -q 'perception_action_ready' experimental/dev-zone/DevExpansionBindings.php
           if grep -q 'dev-expansion.php' experimental/dev-zone/runtime/dev-bridge.php; then
             echo 'GET bridge must not delegate sandbox expansion execution' >&2
             exit 1
@@ -162,7 +164,7 @@ jobs:
           cp experimental/dev-zone/runtime/agent/index.php dist/kicom-dev-zone-v1/dev/agent/
           cp experimental/dev-zone/runtime/index.html dist/kicom-dev-zone-v1/dev/
 
-          for f in ExpansionProtocol.php ExpansionRegistry.php ExpansionFtpDeployer.php ExpansionLocalFilesystemDeployer.php ExpansionManagedCellUpdater.php ExpansionKiComDeployTargetResolver.php ExpansionCronRelay.php ExpansionCellPackageBuilder.php ExpansionHttpTransport.php ExpansionOrchestrator.php ExpansionParentIdentity.php ExpansionService.php CellNode.php CellLiving.php; do
+          for f in ExpansionProtocol.php ExpansionRegistry.php ExpansionFtpDeployer.php ExpansionLocalFilesystemDeployer.php ExpansionManagedCellUpdater.php ExpansionKiComDeployTargetResolver.php ExpansionCronRelay.php ExpansionCellPackageBuilder.php ExpansionHttpTransport.php ExpansionOrchestrator.php ExpansionParentIdentity.php ExpansionService.php CellNode.php CellLiving.php CellPerceptionAction.php; do
             cp "experimental/expansion-cell/$f" "dist/kicom-dev-zone-v1/dev/expansion/$f"
           done
           cp experimental/expansion-cell/cell-runtime/common.php dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/
@@ -190,10 +192,13 @@ jobs:
           php -l dist/kicom-dev-zone-v1/dev/expansion/ExpansionManagedCellUpdater.php
           php -l dist/kicom-dev-zone-v1/dev/expansion/ExpansionKiComDeployTargetResolver.php
           php -l dist/kicom-dev-zone-v1/dev/expansion/CellLiving.php
+          php -l dist/kicom-dev-zone-v1/dev/expansion/CellPerceptionAction.php
           php -l dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/doctor.php
           test -f dist/kicom-dev-zone-v1/dev/expansion/CellLiving.php
+          test -f dist/kicom-dev-zone-v1/dev/expansion/CellPerceptionAction.php
           test -f dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/living-schema.json
           test -f dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/.htaccess
+          grep -q 'perception_action_memory' dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/living-schema.json
           (cd dist && zip -qr kicom-dev-zone-v1.zip kicom-dev-zone-v1)
           sha256sum dist/kicom-dev-zone-v1.zip | tee dist/kicom-dev-zone-v1.zip.sha256
 
