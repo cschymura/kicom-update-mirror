@@ -162,13 +162,15 @@ jobs:
           cp experimental/dev-zone/runtime/agent/index.php dist/kicom-dev-zone-v1/dev/agent/
           cp experimental/dev-zone/runtime/index.html dist/kicom-dev-zone-v1/dev/
 
-          for f in ExpansionProtocol.php ExpansionRegistry.php ExpansionFtpDeployer.php ExpansionLocalFilesystemDeployer.php ExpansionManagedCellUpdater.php ExpansionKiComDeployTargetResolver.php ExpansionCronRelay.php ExpansionCellPackageBuilder.php ExpansionHttpTransport.php ExpansionOrchestrator.php ExpansionParentIdentity.php ExpansionService.php CellNode.php; do
+          for f in ExpansionProtocol.php ExpansionRegistry.php ExpansionFtpDeployer.php ExpansionLocalFilesystemDeployer.php ExpansionManagedCellUpdater.php ExpansionKiComDeployTargetResolver.php ExpansionCronRelay.php ExpansionCellPackageBuilder.php ExpansionHttpTransport.php ExpansionOrchestrator.php ExpansionParentIdentity.php ExpansionService.php CellNode.php CellLiving.php; do
             cp "experimental/expansion-cell/$f" "dist/kicom-dev-zone-v1/dev/expansion/$f"
           done
           cp experimental/expansion-cell/cell-runtime/common.php dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/
           cp experimental/expansion-cell/cell-runtime/bootstrap.php dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/
           cp experimental/expansion-cell/cell-runtime/federation.php dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/
           cp experimental/expansion-cell/cell-runtime/status.php dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/
+          cp experimental/expansion-cell/cell-runtime/doctor.php dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/
+          cp experimental/expansion-cell/cell-runtime/living-schema.json dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/
           cp experimental/expansion-cell/cell-runtime/.htaccess dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/
 
           cp experimental/dev-zone/manifest.json dist/kicom-dev-zone-v1/
@@ -187,6 +189,10 @@ jobs:
           php -l dist/kicom-dev-zone-v1/dev/expansion/ExpansionService.php
           php -l dist/kicom-dev-zone-v1/dev/expansion/ExpansionManagedCellUpdater.php
           php -l dist/kicom-dev-zone-v1/dev/expansion/ExpansionKiComDeployTargetResolver.php
+          php -l dist/kicom-dev-zone-v1/dev/expansion/CellLiving.php
+          php -l dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/doctor.php
+          test -f dist/kicom-dev-zone-v1/dev/expansion/CellLiving.php
+          test -f dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/living-schema.json
           test -f dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/.htaccess
           (cd dist && zip -qr kicom-dev-zone-v1.zip kicom-dev-zone-v1)
           sha256sum dist/kicom-dev-zone-v1.zip | tee dist/kicom-dev-zone-v1.zip.sha256
