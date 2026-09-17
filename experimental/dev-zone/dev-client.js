@@ -69,10 +69,11 @@ window.KiComDev = (() => {
   const status = () => request('DEV_SESSION_STATUS');
   const expansionStatus = () => expansionRequest('STATUS');
   const expandSandbox = () => expansionRequest('EXECUTE_SANDBOX');
+  const upgradeSandboxLiving = () => expansionRequest('UPGRADE_SANDBOX_LIVING');
   const revoke = async (reason = 'browser logout') => {
     try { return await request('DEV_SESSION_REVOKE', { reason }); }
     finally { clear(); }
   };
 
-  return { load, save, clear, request, status, expansionStatus, expandSandbox, revoke };
+  return { load, save, clear, request, status, expansionStatus, expandSandbox, upgradeSandboxLiving, revoke };
 })();
