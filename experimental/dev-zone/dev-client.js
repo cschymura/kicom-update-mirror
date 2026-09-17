@@ -89,6 +89,27 @@ window.KiComDev = (() => {
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
   };
+  const changeText = summary => {
+    const s = summary && typeof summary === 'object' ? summary : {};
+    const parts = [];
+    if ('overall_before' in s || 'overall_after' in s) parts.push(`Zustand ${s.overall_before || 'UNKNOWN'} → ${s.overall_after || 'UNKNOWN'}`);
+    if ('neighbors_before' in s || 'neighbors_after' in s) parts.push(`Nachbarn ${s.neighbors_before ?? 0} → ${s.neighbors_after ?? 0}`);
+    Object.entries(s).forEach(([k, v]) => {
+      if (['overall_before','overall_after','neighbors_before','neighbors_after'].includes(k)) return;
+      if (['string','number','boolean'].includes(typeof v) || v === null) parts.push(`${k}=${v}`);
+    });
+    return parts.join(' · ') || 'Änderung erkannt';
+  };
+  const compactActions = actions => {
+    const out = [];
+    arr(actions).forEach(a => {
+      const prev = out[out.length - 1];
+      const same = prev && prev.ts === a.ts && prev.action === a.action && prev.target === a.target && prev.result === a.result;
+      if (same) prev.count += 1;
+      else out.push({ ...a, count: 1 });
+    });
+    return out;
+  };
 
   const ensureExperiencePanel = () => {
     if (document.getElementById('cell-experience-card')) return;
@@ -112,6 +133,7 @@ window.KiComDev = (() => {
     const worldChanges = arr(mem.recent_world_changes);
     const perceptionChanges = arr(mem.recent_perception_changes);
     const actions = arr(mem.recent_actions);
+    const compactedActions = compactActions(actions);
     const possibilityChanges = arr(mem.recent_possibility_changes);
     const constraints = arr(report?.constraints).filter(c => String(c?.state || '').toUpperCase() === 'FORBIDDEN');
     const lines = [];
@@ -126,13 +148,13 @@ window.KiComDev = (() => {
     if (perceptionChanges.length) {
       lines.push('');
       lines.push(`ROHWAHRNEHMUNGSÄNDERUNGEN (${perceptionChanges.length})`);
-      perceptionChanges.forEach(c => lines.push(`  ${when(c.ts)} · ${c.trigger || '–'} · ${Object.keys(c.summary || {}).join(', ') || 'Änderung erkannt'}`));
+      perceptionChanges.forEach(c => lines.push(`  ${when(c.ts)} · ${c.trigger || '–'} · ${changeText(c.summary)}`));
     }
 
     lines.push('');
     lines.push(`HANDLUNGSGEDÄCHTNIS (${actions.length} letzte Handlungen)`);
     if (!actions.length) lines.push('  Noch keine Handlung im sichtbaren Erinnerungsfenster.');
-    actions.forEach(a => lines.push(`  ${when(a.ts)} · ${a.action || '–'} → ${a.target || '–'} · ${String(a.result || 'unknown').toUpperCase()}`));
+    compactedActions.forEach(a => lines.push(`  ${when(a.ts)} · ${a.action || '–'} → ${a.target || '–'} · ${String(a.result || 'unknown').toUpperCase()}${a.count > 1 ? ' · ×' + a.count : ''}`));
 
     lines.push('');
     lines.push(`MÖGLICHKEITSERINNERUNG (${possibilityChanges.length} Änderungen)`);
