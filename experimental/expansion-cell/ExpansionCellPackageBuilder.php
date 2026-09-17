@@ -2,9 +2,9 @@
 declare(strict_types=1);
 
 /**
- * Materializes a deployable child-cell directory for one prepared expansion.
- * The enrollment token exists only in bootstrap.config.php inside this transient
- * package and is deleted on first successful child initialization.
+ * Materializes a deployable, intrinsically complete child-cell directory for one
+ * prepared expansion. Enrollment establishes lineage/trust later; it does not
+ * deliver basic daughter-cell capabilities.
  */
 final class KiComExpansionCellPackageBuilder
 {
@@ -32,16 +32,19 @@ final class KiComExpansionCellPackageBuilder
         $p=parse_url((string)$prepared['child_base_url']);
         if (!is_array($p)||strtolower((string)($p['scheme']??''))!=='https'||empty($p['host'])) return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_HTTPS_REQUIRED'];
 
-        // Hidden dotfiles are deliberately not required as source inputs here.
-        // Some shared-hosting ZIP extractors omit dotfiles. The child .htaccess
-        // is generated below, making package creation robust after such installs.
+        // Hidden dotfiles are deliberately generated rather than source-required.
+        // Every intrinsic daughter capability, however, must physically exist in
+        // the package before deployment.
         $required=[
             'ExpansionProtocol.php',
             'CellNode.php',
+            'CellLiving.php',
             'cell-runtime/common.php',
             'cell-runtime/bootstrap.php',
             'cell-runtime/federation.php',
             'cell-runtime/status.php',
+            'cell-runtime/doctor.php',
+            'cell-runtime/living-schema.json',
         ];
         foreach ($required as $rel) if (!is_file($this->sourceDir.'/'.$rel)) return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_SOURCE_MISSING','path'=>$rel];
 
@@ -53,17 +56,20 @@ final class KiComExpansionCellPackageBuilder
         $copy=[
             'ExpansionProtocol.php'=>'lib/ExpansionProtocol.php',
             'CellNode.php'=>'lib/CellNode.php',
+            'CellLiving.php'=>'lib/CellLiving.php',
             'cell-runtime/common.php'=>'common.php',
             'cell-runtime/bootstrap.php'=>'bootstrap.php',
             'cell-runtime/federation.php'=>'federation.php',
             'cell-runtime/status.php'=>'status.php',
+            'cell-runtime/doctor.php'=>'doctor.php',
+            'cell-runtime/living-schema.json'=>'living-schema.json',
         ];
         foreach ($copy as $src=>$dst) {
             if (!@copy($this->sourceDir.'/'.$src,$outputDir.'/'.$dst)) return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_COPY_FAILED','path'=>$src];
             @chmod($outputDir.'/'.$dst,0600);
         }
 
-        $publicDeny="Options -Indexes\n<FilesMatch \"^(bootstrap\\.config\\.php|common\\.php)$\">\n  Require all denied\n</FilesMatch>\n";
+        $publicDeny="Options -Indexes\n<FilesMatch \"^(bootstrap\\.config\\.php|common\\.php|living-schema\\.json)$\">\n  Require all denied\n</FilesMatch>\n";
         if (@file_put_contents($outputDir.'/.htaccess',$publicDeny,LOCK_EX)===false) return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_HTACCESS_FAILED'];
         @chmod($outputDir.'/.htaccess',0600);
         if (@file_put_contents($outputDir.'/var/.htaccess',"Require all denied\n",LOCK_EX)===false) return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_VAR_HTACCESS_FAILED'];
@@ -89,10 +95,31 @@ final class KiComExpansionCellPackageBuilder
         @chmod($outputDir.'/bootstrap.config.php',0600);
 
         $manifest=$this->manifest($outputDir);
+        $complete=$this->assertCompletePackage($outputDir,$manifest);
+        if (empty($complete['ok'])) { $this->rmTree($outputDir); return $complete; }
+        $manifest['intrinsic_complete']=true;
+        $manifest['required_intrinsic_files']=$complete['required_files'];
         $json=json_encode($manifest,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
         if (!is_string($json)||@file_put_contents($outputDir.'/cell-manifest.json',$json."\n",LOCK_EX)===false) return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_MANIFEST_FAILED'];
         @chmod($outputDir.'/cell-manifest.json',0600);
-        return ['ok'=>true,'code'=>'EXPANSION_PACKAGE_READY','directory'=>$outputDir,'files'=>count($manifest['files']),'tree_sha256'=>$manifest['tree_sha256']];
+        return ['ok'=>true,'code'=>'EXPANSION_PACKAGE_READY','directory'=>$outputDir,'files'=>count($manifest['files']),'tree_sha256'=>$manifest['tree_sha256'],'intrinsic_complete'=>true];
+    }
+
+    /** @return array<string,mixed> */
+    private function assertCompletePackage(string $root,array $manifest): array
+    {
+        $required=[
+            '.htaccess','var/.htaccess','bootstrap.config.php','common.php','bootstrap.php','federation.php','status.php','doctor.php','living-schema.json',
+            'lib/ExpansionProtocol.php','lib/CellNode.php','lib/CellLiving.php',
+        ];
+        $listed=[];foreach(($manifest['files']??[]) as $row)if(is_array($row)&&isset($row['path']))$listed[(string)$row['path']]=true;
+        foreach($required as $path){
+            if(!is_file($root.'/'.$path)||!isset($listed[$path]))return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_INTRINSIC_FILE_MISSING','path'=>$path];
+        }
+        $schemaRaw=@file_get_contents($root.'/living-schema.json');$schema=is_string($schemaRaw)?json_decode($schemaRaw,true):null;
+        if(!is_array($schema)||(int)($schema['schema']??0)!==1)return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_LIVING_SCHEMA_INVALID'];
+        foreach(['identity','canonical_memory','workspace','observer','genome_lkg','immune','evolution'] as $sub)if(!in_array($sub,$schema['required_subsystems']??[],true))return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_INTRINSIC_SUBSYSTEM_MISSING','subsystem'=>$sub];
+        return ['ok'=>true,'required_files'=>$required];
     }
 
     /** @return array<string,mixed> */
