@@ -77,9 +77,10 @@ final class KiComDevExpansionBindings
     }
 
     /**
-     * Upgrade the already-active first sandbox child from the thin federation
-     * runtime to the complete intrinsic Living daughter architecture. Identity,
-     * signing key, lineage and all existing var/ state are preserved.
+     * Upgrade the already-active sandbox child to the current intrinsic Living
+     * architecture. Identity, signing key and lineage stay unchanged. Existing
+     * Living state is retained through a bounded snapshot before perception /
+     * action memory is added and the local genome/LKG is rebased.
      *
      * @return array<string,mixed>
      */
@@ -101,6 +102,9 @@ final class KiComDevExpansionBindings
         if(!preg_match('/^cell-[a-f0-9]{24}$/',(string)($beforeCell['cell_id']??''))) return ['ok'=>false,'code'=>'DEV_EXPANSION_SANDBOX_CELL_ID_INVALID'];
         $beforeCellId=(string)$beforeCell['cell_id'];
         $beforePublic=(string)($beforeCell['public_key']??'');
+        $beforeParent=(string)($beforeCell['parent_id']??'');
+        $beforeRoot=(string)($beforeCell['root_id']??'');
+        $beforeGeneration=(int)($beforeCell['generation']??0);
 
         $updater=new KiComExpansionManagedCellUpdater();
         $upgrade=$updater->upgradeLivingRuntime($resolved,$this->sourceDir,$childBase);
@@ -110,15 +114,28 @@ final class KiComDevExpansionBindings
         $afterCell=is_array($after['cell']??null)?(array)$after['cell']:[];
         $identityOk=!empty($after['ok'])&&($after['code']??'')==='CELL_STATUS'&&($afterCell['state']??'')==='active'
             &&hash_equals($beforeCellId,(string)($afterCell['cell_id']??''))
-            &&hash_equals($beforePublic,(string)($afterCell['public_key']??''));
+            &&hash_equals($beforePublic,(string)($afterCell['public_key']??''))
+            &&hash_equals($beforeParent,(string)($afterCell['parent_id']??''))
+            &&hash_equals($beforeRoot,(string)($afterCell['root_id']??''))
+            &&$beforeGeneration===(int)($afterCell['generation']??-1);
         $livingReady=!empty($afterCell['living_ready'])&&!empty($afterCell['living']['living_ready']);
-        if(!$identityOk||!$livingReady){
+        $paReady=!empty($afterCell['perception_action_ready'])&&!empty($afterCell['perception_action']['ready']);
+        $perceptionState=(string)($afterCell['perception_action']['perception_state']??'UNKNOWN');
+        $paShape=in_array($perceptionState,['AVAILABLE','DEGRADED','STALE'],true)
+            &&(int)($afterCell['perception_action']['boundaries']??0)>0
+            &&(int)($afterCell['perception_action']['actions']??0)>0;
+        if(!$identityOk||!$livingReady||!$paReady||!$paShape){
             $rollback=!empty($upgrade['changed'])?$updater->rollbackLivingRuntime($resolved,$upgrade):['ok'=>true,'code'=>'NO_CHANGE'];
-            return ['ok'=>false,'code'=>!empty($rollback['ok'])?'DEV_EXPANSION_LIVING_VERIFY_FAILED_ROLLED_BACK':'DEV_EXPANSION_LIVING_VERIFY_FAILED_ROLLBACK_FAILED','rollback'=>$rollback];
+            return [
+                'ok'=>false,
+                'code'=>!empty($rollback['ok'])?'DEV_EXPANSION_LIVING_VERIFY_FAILED_ROLLED_BACK':'DEV_EXPANSION_LIVING_VERIFY_FAILED_ROLLBACK_FAILED',
+                'identity_ok'=>$identityOk,'living_ready'=>$livingReady,'perception_action_ready'=>$paReady,'perception_state'=>$perceptionState,
+                'rollback'=>$rollback,
+            ];
         }
 
-        // Reuse the existing managed federation repair path as a signed tick
-        // smoke test. If federation.php is already current it performs no write.
+        // Reuse the signed federation smoke path. A successful tick now also
+        // refreshes perception/action memory and proves the parent as a neighbor.
         $tick=$service->repairFederationEndpoint(
             self::RESOURCE_ALIAS,
             self::TARGET_BASE_URL,
@@ -127,6 +144,16 @@ final class KiComDevExpansionBindings
         if(empty($tick['ok'])){
             $rollback=!empty($upgrade['changed'])?$updater->rollbackLivingRuntime($resolved,$upgrade):['ok'=>true,'code'=>'NO_CHANGE'];
             return ['ok'=>false,'code'=>!empty($rollback['ok'])?'DEV_EXPANSION_LIVING_TICK_FAILED_ROLLED_BACK':'DEV_EXPANSION_LIVING_TICK_FAILED_ROLLBACK_FAILED','tick'=>$tick,'rollback'=>$rollback];
+        }
+
+        $afterTick=$http->getJson($childBase.'/status.php');
+        $tickCell=is_array($afterTick['cell']??null)?(array)$afterTick['cell']:[];
+        $tickPa=is_array($tickCell['perception_action']??null)?(array)$tickCell['perception_action']:[];
+        $tickReady=!empty($afterTick['ok'])&&!empty($tickCell['perception_action_ready'])&&!empty($tickPa['ready'])
+            &&(int)($tickPa['neighbors']??0)>=1;
+        if(!$tickReady){
+            $rollback=!empty($upgrade['changed'])?$updater->rollbackLivingRuntime($resolved,$upgrade):['ok'=>true,'code'=>'NO_CHANGE'];
+            return ['ok'=>false,'code'=>!empty($rollback['ok'])?'DEV_EXPANSION_PA_TICK_VERIFY_FAILED_ROLLED_BACK':'DEV_EXPANSION_PA_TICK_VERIFY_FAILED_ROLLBACK_FAILED','rollback'=>$rollback];
         }
 
         $public=$this->publicUpgradeResult($upgrade);
@@ -138,7 +165,9 @@ final class KiComDevExpansionBindings
                 'base_url'=>$childBase,
                 'state'=>'active',
                 'living_ready'=>true,
-                'living'=>$afterCell['living']??null,
+                'perception_action_ready'=>true,
+                'living'=>$tickCell['living']??($afterCell['living']??null),
+                'perception_action'=>$tickPa,
             ],
             'upgrade'=>$public,
             'federation_smoke'=>$tick,
