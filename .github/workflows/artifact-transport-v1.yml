@@ -22,10 +22,14 @@ jobs:
       - name: PHP syntax
         run: |
           php -l experimental/artifact-transport/ArtifactTransportBus.php
+          php -l experimental/artifact-transport/ArtifactChannelResolver.php
           php -l experimental/artifact-transport/ArtifactFtpAdapter.php
           php -l experimental/artifact-transport/ArtifactKiComBridge.php
+          php -l experimental/artifact-transport/ArtifactRuntimeModule.php
           php -l experimental/artifact-transport/artifact-transport-selftest.php
+          php -l experimental/artifact-transport/artifact-channel-resolver-selftest.php
           php -l experimental/artifact-transport/artifact-bridge-selftest.php
+          php -l experimental/artifact-transport/artifact-runtime-selftest.php
 
       - name: Static authority boundary
         shell: bash
@@ -35,20 +39,24 @@ jobs:
             echo 'Artifact transport must not execute shell commands' >&2
             exit 1
           fi
-          if grep -RniE 'kicomApplySelfUpdate|kicomSelfUpdateInstall|production\.write|kernel\.write|recovery\.write|secrets\.read' experimental/artifact-transport/ArtifactTransportBus.php; then
-            echo 'Transport bus must not own production install authority' >&2
+          if grep -RniE 'kicomApplySelfUpdate|kicomSelfUpdateInstall|production\.write|kernel\.write|recovery\.write|secrets\.read' experimental/artifact-transport/ArtifactTransportBus.php experimental/artifact-transport/ArtifactChannelResolver.php experimental/artifact-transport/ArtifactRuntimeModule.php; then
+            echo 'Artifact transport must not own production install authority' >&2
             exit 1
           fi
-          if grep -n 'kicomReceiveSelfUpdatePackage' experimental/artifact-transport/ArtifactTransportBus.php; then
-            echo 'Transport bus must hand off through bridge/callback, not bind runtime directly' >&2
+          if grep -n 'kicomReceiveSelfUpdatePackage' experimental/artifact-transport/ArtifactTransportBus.php experimental/artifact-transport/ArtifactChannelResolver.php; then
+            echo 'Transport/discovery must hand off through bridge, not bind runtime directly' >&2
             exit 1
           fi
           grep -q 'kicomReceiveSelfUpdatePackage' experimental/artifact-transport/ArtifactKiComBridge.php
           grep -q "duplicates_installer.*false" experimental/artifact-transport/ArtifactKiComBridge.php
+          grep -q "duplicates_installer.*false" experimental/artifact-transport/ArtifactRuntimeModule.php
           grep -q "authority.*transport-only" experimental/artifact-transport/ArtifactTransportBus.php
+          grep -q "authority.*transport-only" experimental/artifact-transport/ArtifactRuntimeModule.php
           grep -q "production_tree_write.*false" experimental/artifact-transport/ArtifactTransportBus.php
           grep -q "sha256_required.*true" experimental/artifact-transport/ArtifactTransportBus.php
           grep -q "history.*append-only" experimental/artifact-transport/ArtifactTransportBus.php
+          grep -q 'ARTIFACT_CHANNEL_HASH_CONFLICT' experimental/artifact-transport/ArtifactChannelResolver.php
+          grep -q 'artifact.json' experimental/artifact-transport/ArtifactRuntimeModule.php
           grep -q "PLAINTEXT_FTP_FORBIDDEN" experimental/artifact-transport/ArtifactFtpAdapter.php
           grep -q '"type": "manual-upload"' experimental/artifact-transport/sources.example.json
           grep -q '"type": "recovery"' experimental/artifact-transport/sources.example.json
@@ -60,8 +68,14 @@ jobs:
       - name: Multi-transport selftest
         run: php experimental/artifact-transport/artifact-transport-selftest.php
 
+      - name: Channel discovery selftest
+        run: php experimental/artifact-transport/artifact-channel-resolver-selftest.php
+
       - name: Existing updater bridge selftest
         run: php experimental/artifact-transport/artifact-bridge-selftest.php
+
+      - name: Runtime offline fallback selftest
+        run: php experimental/artifact-transport/artifact-runtime-selftest.php
 
       - name: Build candidate bundle
         shell: bash
@@ -70,8 +84,10 @@ jobs:
           rm -rf dist/artifact-transport-v1
           mkdir -p dist/artifact-transport-v1
           cp experimental/artifact-transport/ArtifactTransportBus.php dist/artifact-transport-v1/
+          cp experimental/artifact-transport/ArtifactChannelResolver.php dist/artifact-transport-v1/
           cp experimental/artifact-transport/ArtifactFtpAdapter.php dist/artifact-transport-v1/
           cp experimental/artifact-transport/ArtifactKiComBridge.php dist/artifact-transport-v1/
+          cp experimental/artifact-transport/ArtifactRuntimeModule.php dist/artifact-transport-v1/
           cp experimental/artifact-transport/sources.example.json dist/artifact-transport-v1/
           cp experimental/artifact-transport/README.md dist/artifact-transport-v1/
           (cd dist && zip -qr kicom-artifact-transport-v1.zip artifact-transport-v1)
