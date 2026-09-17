@@ -32,6 +32,7 @@
     {"path": "lib/CellPerceptionAction.php", "role": "persistent-perception-action-memory"},
     {"path": "living-schema.json", "role": "intrinsic-schema"}
   ],
+  "perception_action_memory": true,
   "perception_states": ["UNKNOWN", "AVAILABLE", "UNAVAILABLE", "FORBIDDEN", "DEGRADED", "STALE"],
   "perception_action_loop": "observe -> remember -> derive capabilities/boundaries -> act -> observe result -> update perception/action memory",
   "birth_policy": "all intrinsic subsystems materialized and verified before node initialization commits",
