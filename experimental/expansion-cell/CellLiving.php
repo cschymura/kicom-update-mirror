@@ -1,13 +1,15 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__.'/CellPerceptionAction.php';
+
 /**
  * Intrinsic living substrate for a daughter KiCom cell.
  *
  * The whole intrinsic tree is built below a private staging directory and is
  * committed by one directory rename. A child therefore never becomes a valid
- * node with only part of its memory/workspace/observer/genome/immune/evolution
- * substrate present.
+ * node with only part of its memory/workspace/observer/genome/immune/evolution/
+ * perception/action substrate present.
  */
 final class KiComExpansionCellLiving
 {
@@ -46,7 +48,7 @@ final class KiComExpansionCellLiving
         @chmod($stage,0700);
 
         try {
-            foreach (['memory','workspace','observer','genome/lkg','immune','evolution/candidates','evolution/history','quarantine'] as $rel) {
+            foreach (['memory','workspace','observer','genome/lkg','genome/history','immune','evolution/candidates','evolution/history','perception','action','quarantine'] as $rel) {
                 if (!@mkdir($stage.'/'.$rel,0700,true) && !is_dir($stage.'/'.$rel)) return ['ok'=>false,'code'=>'CELL_LIVING_SUBSYSTEM_CREATE_FAILED','subsystem'=>$rel];
                 @chmod($stage.'/'.$rel,0700);
             }
@@ -79,7 +81,11 @@ final class KiComExpansionCellLiving
                 'created_at'=>gmdate('c'),
                 'schema_sha256'=>(string)$schema['sha256'],
                 'components'=>$genomeComponents,
-                'invariants'=>['local-identity','local-memory','local-workspace','local-lkg','detect-and-heal-drift','no-secret-inheritance','internal-evolution-static-fitness','protected-external-boundaries-separate'],
+                'invariants'=>[
+                    'local-identity','local-memory','local-workspace','local-lkg','detect-and-heal-drift','no-secret-inheritance',
+                    'persistent-perception-memory','persistent-action-memory','evidence-not-assumption','explicit-unknown-and-forbidden-states',
+                    'internal-evolution-candidate-fitness','promotion-deferred-until-pa-verified','protected-external-boundaries-separate'
+                ],
             ];
             if (!$this->writeJson($stage.'/genome/genome.json',$genome)) return ['ok'=>false,'code'=>'CELL_LIVING_GENOME_WRITE_FAILED'];
 
@@ -97,12 +103,12 @@ final class KiComExpansionCellLiving
                 'schema'=>1,
                 'candidate_area'=>'living/evolution/candidates',
                 'fitness'=>'static-deterministic',
-                'promotion_policy'=>'autonomous-internal-after-static-fitness-with-local-lkg-rollback',
+                'promotion_policy'=>'deferred-until-perception-action-memory-is-implemented-and-verified',
                 'external_boundary_policy'=>'human-authorization-only-when-protected-external-system-or-credential-requires-it',
                 'created_at'=>gmdate('c'),
             ];
             if (!$this->writeJson($stage.'/evolution/policy.json',$evolution)) return ['ok'=>false,'code'=>'CELL_LIVING_EVOLUTION_WRITE_FAILED'];
-            if (!$this->atomicWrite($stage.'/evolution/candidates/README.txt',"Candidate packages are inert until deterministic fitness passes.\nNo inherited parent secrets or mutable parent memory are permitted.\n",0600)) return ['ok'=>false,'code'=>'CELL_LIVING_EVOLUTION_CANDIDATE_AREA_FAILED'];
+            if (!$this->atomicWrite($stage.'/evolution/candidates/README.txt',"Candidate packages are inert until deterministic fitness passes.\nPromotion is intentionally deferred while perception/action memory is established.\nNo inherited parent secrets or mutable parent memory are permitted.\n",0600)) return ['ok'=>false,'code'=>'CELL_LIVING_EVOLUTION_CANDIDATE_AREA_FAILED'];
 
             $description=[
                 'schema'=>1,
@@ -131,6 +137,7 @@ final class KiComExpansionCellLiving
     /** @return array<string,mixed> */
     public function status(): array
     {
+        $pa=(new KiComExpansionCellPerceptionAction($this->storageDir))->status();
         $sub=[
             'identity'=>$this->identityReady(),
             'canonical_memory'=>$this->memoryReady(),
@@ -139,10 +146,12 @@ final class KiComExpansionCellLiving
             'genome_lkg'=>false,
             'immune'=>is_file($this->livingDir().'/immune/policy.json'),
             'evolution'=>is_file($this->livingDir().'/evolution/policy.json')&&is_dir($this->livingDir().'/evolution/candidates'),
+            'perception'=>is_file($this->livingDir().'/perception/current.json')&&is_file($this->livingDir().'/perception/history.jsonl')&&is_file($this->livingDir().'/perception/changes.jsonl'),
+            'action'=>is_file($this->livingDir().'/action/model.json')&&is_file($this->livingDir().'/action/history.jsonl')&&is_file($this->livingDir().'/action/boundaries.json')&&is_file($this->livingDir().'/action/expansion-opportunities.json'),
         ];
         $scan=$this->scan();
         $sub['genome_lkg']=!empty($scan['ok'])&&!empty($scan['lkg_ok']);
-        $ready=!in_array(false,$sub,true)&&empty($scan['drift']);
+        $ready=!in_array(false,$sub,true)&&empty($scan['drift'])&&!empty($pa['ready']);
         return [
             'ok'=>is_dir($this->livingDir()),
             'code'=>$ready?'CELL_LIVING_READY':'CELL_LIVING_INCOMPLETE',
@@ -151,6 +160,7 @@ final class KiComExpansionCellLiving
             'drift_count'=>count($scan['drift']??[]),
             'lkg_ok'=>(bool)($scan['lkg_ok']??false),
             'genome_id'=>(string)($scan['genome_id']??''),
+            'perception_action'=>$pa,
         ];
     }
 
@@ -202,6 +212,82 @@ final class KiComExpansionCellLiving
         return ['ok'=>!empty($after['ok'])&&empty($after['drift']),'code'=>empty($after['drift'])?'CELL_LIVING_HEALED':'CELL_LIVING_HEAL_INCOMPLETE','repaired'=>$repaired,'scan'=>$after];
     }
 
+    /**
+     * Rebaseline an already-active managed cell after a verified runtime upgrade.
+     * Previous genome/LKG is archived, never hard-deleted.
+     *
+     * @param array<string,mixed> $node
+     * @return array<string,mixed>
+     */
+    public function rebaselineRuntime(array $node): array
+    {
+        if(!is_dir($this->livingDir())) return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_MISSING'];
+        $schema=$this->loadSchema();if(empty($schema['ok']))return $schema;
+        $components=$this->runtimeComponents((array)$schema['schema']);if(empty($components['ok']))return $components;
+
+        $old=$this->readJson($this->livingDir().'/genome/genome.json');
+        if($old===null)return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_OLD_GENOME_MISSING'];
+        $stamp=gmdate('YmdHis').'-'.substr(hash('sha256',json_encode($old,JSON_UNESCAPED_SLASHES)?:''),0,10);
+        $history=$this->livingDir().'/genome/history/'.$stamp;
+        if(!is_dir($history)&&!@mkdir($history,0700,true)&&!is_dir($history))return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_HISTORY_CREATE_FAILED'];
+        @chmod($history,0700);
+        $oldRaw=@file_get_contents($this->livingDir().'/genome/genome.json');
+        if(!is_string($oldRaw)||!$this->atomicWrite($history.'/genome.json',$oldRaw,0600))return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_HISTORY_GENOME_FAILED'];
+        if(!$this->copyTree($this->livingDir().'/genome/lkg',$history.'/lkg'))return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_HISTORY_LKG_FAILED'];
+
+        $next=$this->livingDir().'/genome/.lkg-next-'.bin2hex(random_bytes(4));
+        if(!@mkdir($next,0700,true)&&!is_dir($next))return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_NEXT_LKG_FAILED'];
+        $rows=[];
+        foreach((array)$components['components'] as $component){
+            $rel=(string)$component['path'];$src=$this->rootDir.'/'.$rel;$raw=@file_get_contents($src);
+            if(!is_string($raw)){ $this->rmTree($next); return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_RUNTIME_READ_FAILED','path'=>$rel]; }
+            if(!$this->atomicWrite($next.'/'.$rel,$raw,0600)){ $this->rmTree($next); return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_LKG_WRITE_FAILED','path'=>$rel]; }
+            $rows[]=['path'=>$rel,'sha256'=>hash('sha256',$raw),'auto_heal'=>true,'role'=>(string)($component['role']??'runtime')];
+        }
+        $newId='living-'.substr(hash('sha256',(string)($node['cell_id']??'').'|'.(string)$schema['sha256'].'|'.json_encode($rows)),0,24);
+        $newGenome=[
+            'schema'=>1,'id'=>$newId,'cell_id'=>(string)($node['cell_id']??''),
+            'generation'=>(int)($old['generation']??1)+1,'created_at'=>(string)($old['created_at']??gmdate('c')),
+            'rebased_at'=>gmdate('c'),'previous_id'=>(string)($old['id']??''),'schema_sha256'=>(string)$schema['sha256'],
+            'components'=>$rows,
+            'invariants'=>[
+                'local-identity','local-memory','local-workspace','local-lkg','detect-and-heal-drift','no-secret-inheritance',
+                'persistent-perception-memory','persistent-action-memory','evidence-not-assumption','explicit-unknown-and-forbidden-states',
+                'internal-evolution-candidate-fitness','promotion-deferred-until-pa-verified','protected-external-boundaries-separate'
+            ],
+        ];
+
+        $currentLkg=$this->livingDir().'/genome/lkg';
+        $retired=$history.'/lkg-retired-live';
+        if(is_dir($currentLkg)&&!@rename($currentLkg,$retired)){ $this->rmTree($next); return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_RETIRE_LKG_FAILED']; }
+        if(!@rename($next,$currentLkg)){
+            if(is_dir($retired))@rename($retired,$currentLkg);
+            return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_COMMIT_LKG_FAILED'];
+        }
+        @chmod($currentLkg,0700);
+        if(!$this->writeJson($this->livingDir().'/genome/genome.json',$newGenome)){
+            $this->rmTree($currentLkg);if(is_dir($retired))@rename($retired,$currentLkg);
+            $this->atomicWrite($this->livingDir().'/genome/genome.json',$oldRaw,0600);
+            return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_GENOME_WRITE_FAILED'];
+        }
+
+        $desc=$this->readJson($this->livingDir().'/self-description.json')??[];
+        $desc['intrinsic_schema_sha256']=(string)$schema['sha256'];
+        $desc['subsystems']=(array)$schema['schema']['required_subsystems'];
+        $desc['runtime_components']=array_column($rows,'path');
+        $desc['perception_action_memory']='enabled';
+        $desc['upgraded_at']=gmdate('c');
+        if(!$this->writeJson($this->livingDir().'/self-description.json',$desc))return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_DESCRIPTION_FAILED'];
+
+        $pa=new KiComExpansionCellPerceptionAction($this->storageDir);
+        $paReady=$pa->ensure($node);if(empty($paReady['ok']))return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_PA_ENSURE_FAILED','perception_action'=>$paReady];
+        $paCycle=$pa->cycle($node,'runtime_upgrade');if(empty($paCycle['ok']))return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_PA_CYCLE_FAILED','perception_action'=>$paCycle];
+        if(!$this->updateLocalMemoryForPerceptionAction())return ['ok'=>false,'code'=>'CELL_LIVING_REBASE_MEMORY_UPDATE_FAILED'];
+        $this->recordEvent('perception_action_runtime_rebased','info',['previous_genome'=>(string)($old['id']??''),'genome_id'=>$newId,'history'=>$stamp]);
+        $status=$this->status();
+        return ['ok'=>!empty($status['living_ready']),'code'=>!empty($status['living_ready'])?'CELL_LIVING_REBASE_OK':'CELL_LIVING_REBASE_DEGRADED','history_id'=>$stamp,'genome_id'=>$newId,'status'=>$status];
+    }
+
     /** @param array<string,mixed> $candidate @return array<string,mixed> */
     public function evaluateCandidate(array $candidate): array
     {
@@ -219,7 +305,7 @@ final class KiComExpansionCellLiving
             if (str_ends_with(strtolower($path),'.php')) { try { token_get_all($raw,TOKEN_PARSE); } catch (ParseError $e) { return ['ok'=>false,'code'=>'CELL_CANDIDATE_PHP_SYNTAX_INVALID','entry'=>$i+1]; } }
             $checked[]=['path'=>$path,'sha256'=>$sha,'bytes'=>strlen($raw)];
         }
-        return ['ok'=>true,'code'=>'CELL_CANDIDATE_FITNESS_PASS','fitness'=>'pass','changes'=>$checked,'eligible_for_internal_promotion'=>true,'requires_external_authorization'=>false];
+        return ['ok'=>true,'code'=>'CELL_CANDIDATE_FITNESS_PASS','fitness'=>'pass','changes'=>$checked,'eligible_for_internal_promotion'=>false,'promotion_state'=>'DEFERRED','requires_external_authorization'=>false];
     }
 
     /** @param array<string,mixed> $candidate @return array<string,mixed> */
@@ -227,10 +313,10 @@ final class KiComExpansionCellLiving
     {
         $fit=$this->evaluateCandidate($candidate); if (empty($fit['ok'])) return $fit;
         $id=substr(hash('sha256',json_encode($candidate,JSON_UNESCAPED_SLASHES)?:''),0,24);
-        $row=['schema'=>1,'id'=>$id,'created_at'=>gmdate('c'),'status'=>'fitness_passed','fitness'=>$fit,'candidate'=>$candidate];
+        $row=['schema'=>1,'id'=>$id,'created_at'=>gmdate('c'),'status'=>'fitness_passed_promotion_deferred','fitness'=>$fit,'candidate'=>$candidate];
         if (!$this->writeJson($this->livingDir().'/evolution/candidates/'.$id.'.json',$row)) return ['ok'=>false,'code'=>'CELL_CANDIDATE_STAGE_FAILED'];
-        $this->recordEvent('evolution_candidate_staged','info',['candidate_id'=>$id,'changes'=>count($fit['changes'])]);
-        return ['ok'=>true,'code'=>'CELL_CANDIDATE_STAGED','candidate_id'=>$id,'fitness'=>$fit];
+        $this->recordEvent('evolution_candidate_staged','info',['candidate_id'=>$id,'changes'=>count($fit['changes']),'promotion'=>'DEFERRED']);
+        return ['ok'=>true,'code'=>'CELL_CANDIDATE_STAGED','candidate_id'=>$id,'fitness'=>$fit,'promotion_state'=>'DEFERRED'];
     }
 
     /** @param array<string,mixed> $node */
@@ -255,7 +341,7 @@ final class KiComExpansionCellLiving
         $path=$this->rootDir.'/living-schema.json';$raw=@file_get_contents($path);
         if (!is_string($raw)) return ['ok'=>false,'code'=>'CELL_LIVING_SCHEMA_MISSING'];
         $j=json_decode($raw,true); if(!is_array($j)||(int)($j['schema']??0)!==1) return ['ok'=>false,'code'=>'CELL_LIVING_SCHEMA_INVALID'];
-        $required=['identity','canonical_memory','workspace','observer','genome_lkg','immune','evolution'];$got=array_values(array_filter($j['required_subsystems']??[],'is_string'));
+        $required=['identity','canonical_memory','workspace','observer','genome_lkg','immune','evolution','perception','action'];$got=array_values(array_filter($j['required_subsystems']??[],'is_string'));
         foreach($required as $r)if(!in_array($r,$got,true))return ['ok'=>false,'code'=>'CELL_LIVING_SCHEMA_SUBSYSTEM_MISSING','subsystem'=>$r];
         return ['ok'=>true,'schema'=>$j,'sha256'=>hash('sha256',$raw)];
     }
@@ -274,17 +360,17 @@ final class KiComExpansionCellLiving
         $state=$this->projectStateKcl($cellId,$baseUrl,$parentId,'enrolling','',1);
         return [
             'PROJECT_STATE.kcl'=>$state,
-            'ARCHITECTURE.kcl'=>"ARCHITECTURE cell\nCOMPONENT identity role=\"local\"\nCOMPONENT memory role=\"canonical-local\"\nCOMPONENT workspace role=\"isolated-local\"\nCOMPONENT observer role=\"append-only-trace\"\nCOMPONENT genome_lkg role=\"desired-state-and-local-recovery\"\nCOMPONENT immune role=\"drift-detect-and-heal\"\nCOMPONENT evolution role=\"candidate-static-fitness-autonomous-internal-promotion\"\nRULE \"No parent secret, credential or mutable project memory is inherited.\"\nEND_ARCHITECTURE cell\n",
-            'PROTOCOL.kcl'=>"PROTOCOL KCL-CELL/1\nRULE \"Federation messages are signed and peer trust is local.\"\nRULE \"Enrollment establishes lineage/trust only; it does not add intrinsic capabilities.\"\nEND_PROTOCOL KCL-CELL/1\n",
-            'DECISIONS.kcl'=>"DECISIONS cell\nDECISION C001 status=accepted title=\"Complete at birth\"\nRATIONALE C001 \"Identity, memory, workspace, observer, genome/LKG, immune and evolution substrate are intrinsic.\"\nDECISION C002 status=accepted title=\"Local authority\"\nRATIONALE C002 \"Internal evolution is autonomous after deterministic fitness; protected external boundaries remain separate.\"\nEND_DECISIONS cell\n",
-            'CHANGELOG.kcl'=>"CHANGELOG cell\nEVENT \"".gmdate('c')."\" change=\"Intrinsic living substrate born locally\"\nEND_CHANGELOG cell\n",
-            'NEXT.kcl'=>"NEXT cell\nPRIORITY 1 goal=\"Establish signed lineage, then operate from local memory/genome without receiving basic capabilities from the parent\"\nCONSTRAINT \"No hard delete of retained project experience\"\nEND_NEXT cell\n",
+            'ARCHITECTURE.kcl'=>"ARCHITECTURE cell\nCOMPONENT identity role=\"local\"\nCOMPONENT memory role=\"canonical-local\"\nCOMPONENT workspace role=\"isolated-local\"\nCOMPONENT observer role=\"append-only-trace\"\nCOMPONENT genome_lkg role=\"desired-state-and-local-recovery\"\nCOMPONENT immune role=\"drift-detect-and-heal\"\nCOMPONENT evolution role=\"candidate-static-fitness-promotion-deferred\"\nCOMPONENT perception role=\"evidence-based-self-and-environment-model-with-append-only-history\"\nCOMPONENT action role=\"capabilities-boundaries-expansion-opportunities-and-action-history\"\nRULE \"Perception distinguishes UNKNOWN, AVAILABLE, UNAVAILABLE, FORBIDDEN, DEGRADED and STALE.\"\nRULE \"Memory and goals describe authority; they never grant runtime permission.\"\nRULE \"No parent secret, credential or mutable project memory is inherited.\"\nEND_ARCHITECTURE cell\n",
+            'PROTOCOL.kcl'=>"PROTOCOL KCL-CELL/1\nRULE \"Federation messages are signed and peer trust is local.\"\nRULE \"Enrollment establishes lineage/trust only; it does not add intrinsic capabilities.\"\nRULE \"Perception-Action-Memory loop: observe -> remember -> derive capabilities/boundaries -> act -> observe result -> update memory.\"\nRULE \"Unobserved capability is UNKNOWN, not false; forbidden authority is FORBIDDEN, not unavailable.\"\nEND_PROTOCOL KCL-CELL/1\n",
+            'DECISIONS.kcl'=>"DECISIONS cell\nDECISION C001 status=accepted title=\"Complete at birth\"\nRATIONALE C001 \"Identity, memory, workspace, observer, genome/LKG, immune, evolution, perception and action substrate are intrinsic.\"\nDECISION C002 status=accepted title=\"Local authority\"\nRATIONALE C002 \"Protected external boundaries remain separate from internal descriptive memory.\"\nDECISION C003 status=accepted title=\"Perception and action memory\"\nRATIONALE C003 \"The cell persistently remembers evidence about itself, resources, neighbors, capabilities, boundaries, attempted actions and changed observations.\"\nDECISION C004 status=accepted title=\"Promotion paused\"\nRATIONALE C004 \"Executable autonomous evolution promotion is deferred until perception/action memory is implemented and verified.\"\nEND_DECISIONS cell\n",
+            'CHANGELOG.kcl'=>"CHANGELOG cell\nEVENT \"".gmdate('c')."\" change=\"Intrinsic living substrate born locally with perception/action memory\"\nEND_CHANGELOG cell\n",
+            'NEXT.kcl'=>"NEXT cell\nPRIORITY 1 goal=\"Maintain an evidence-based perception/action memory loop: where am I, what can I do/access, who are my neighbors, what are my boundaries, and which boundaries may be safely extended\"\nDEFERRED goal=\"Executable autonomous evolution promotion until perception/action memory is verified\"\nCONSTRAINT \"No hard delete of retained project experience\"\nEND_NEXT cell\n",
         ];
     }
 
     private function projectStateKcl(string $cellId,string $baseUrl,string $parentId,string $state,string $rootId,int $generation): string
     {
-        return "PROJECT cell\nSTATE \"".$state."\"\nFACT cell_id=\"".$cellId."\"\nFACT base_url=\"".rtrim($baseUrl,'/')."\"\nFACT parent_id=\"".$parentId."\"\nFACT root_id=\"".$rootId."\"\nFACT generation=".max(1,$generation)."\nFACT intrinsic_complete=true\nRULE \"Local identity, mutable memory and secrets are not cloned from the parent.\"\nEND_PROJECT cell\n";
+        return "PROJECT cell\nSTATE \"".$state."\"\nFACT cell_id=\"".$cellId."\"\nFACT base_url=\"".rtrim($baseUrl,'/')."\"\nFACT parent_id=\"".$parentId."\"\nFACT root_id=\"".$rootId."\"\nFACT generation=".max(1,$generation)."\nFACT intrinsic_complete=true\nFACT perception_action_memory=true\nRULE \"Local identity, mutable memory and secrets are not cloned from the parent.\"\nEND_PROJECT cell\n";
     }
 
     /** @param array<string,mixed> $definition @return array<string,mixed> */
@@ -297,9 +383,31 @@ final class KiComExpansionCellLiving
             'genome_lkg'=>$this->genomeReadyAt($root),
             'immune'=>is_file($root.'/immune/policy.json'),
             'evolution'=>is_file($root.'/evolution/policy.json')&&is_dir($root.'/evolution/candidates'),
+            'perception'=>is_dir($root.'/perception'),
+            'action'=>is_dir($root.'/action'),
         ];
         if(in_array(false,$sub,true))return ['ok'=>false,'code'=>'CELL_LIVING_TREE_INCOMPLETE','subsystems'=>$sub];
         return ['ok'=>true,'code'=>'CELL_LIVING_TREE_COMPLETE','subsystems'=>$sub];
+    }
+
+    private function updateLocalMemoryForPerceptionAction(): bool
+    {
+        $memory=$this->livingDir().'/memory';
+        $updates=[
+            'ARCHITECTURE.kcl'=>['marker'=>'END_ARCHITECTURE cell','block'=>"COMPONENT perception role=\"evidence-based-self-and-environment-model-with-append-only-history\"\nCOMPONENT action role=\"capabilities-boundaries-expansion-opportunities-and-action-history\"\nRULE \"Perception distinguishes UNKNOWN, AVAILABLE, UNAVAILABLE, FORBIDDEN, DEGRADED and STALE.\"\n"],
+            'PROTOCOL.kcl'=>['marker'=>'END_PROTOCOL KCL-CELL/1','block'=>"RULE \"Perception-Action-Memory loop: observe -> remember -> derive capabilities/boundaries -> act -> observe result -> update memory.\"\nRULE \"Unobserved capability is UNKNOWN, not false; forbidden authority is FORBIDDEN, not unavailable.\"\n"],
+            'DECISIONS.kcl'=>['marker'=>'END_DECISIONS cell','block'=>"DECISION C003 status=accepted title=\"Perception and action memory\"\nRATIONALE C003 \"The cell persistently remembers evidence about itself, resources, neighbors, capabilities, boundaries, attempted actions and changed observations.\"\nDECISION C004 status=accepted title=\"Promotion paused\"\nRATIONALE C004 \"Executable autonomous evolution promotion is deferred until perception/action memory is implemented and verified.\"\n"],
+            'CHANGELOG.kcl'=>['marker'=>'END_CHANGELOG cell','block'=>"EVENT \"".gmdate('c')."\" change=\"Perception/action memory integrated; prior genome/LKG retained in history\"\n"],
+            'NEXT.kcl'=>['marker'=>'END_NEXT cell','block'=>"PRIORITY 1 goal=\"Maintain evidence-based perception/action memory and update it after meaningful actions\"\nDEFERRED goal=\"Executable autonomous evolution promotion until perception/action memory is verified\"\n"],
+        ];
+        foreach($updates as $file=>$u){
+            $path=$memory.'/'.$file;$raw=@file_get_contents($path);if(!is_string($raw))return false;
+            if(str_contains($raw,$u['block']))continue;
+            $pos=strpos($raw,$u['marker']);if($pos===false)return false;
+            $next=substr($raw,0,$pos).$u['block'].substr($raw,$pos);
+            if(!$this->atomicWrite($path,$next,0600))return false;
+        }
+        return true;
     }
 
     private function identityReady(): bool
@@ -328,5 +436,6 @@ final class KiComExpansionCellLiving
     /** @param array<string,mixed> $data */
     private function recordEvent(string $type,string $severity,array $data): bool { return $this->appendJsonLine($this->livingDir().'/observer/events.jsonl',['ts'=>gmdate('c'),'type'=>$type,'severity'=>$severity,'data'=>$data]); }
     private function atomicWrite(string $path,string $content,int $mode): bool { $dir=dirname($path);if(!is_dir($dir)&&!@mkdir($dir,0700,true)&&!is_dir($dir))return false;$tmp=$path.'.tmp.'.bin2hex(random_bytes(4));if(@file_put_contents($tmp,$content,LOCK_EX)===false)return false;@chmod($tmp,$mode);if(!@rename($tmp,$path)){@unlink($tmp);return false;}@chmod($path,$mode);return true; }
+    private function copyTree(string $src,string $dst): bool { if(!is_dir($src))return false;if(!is_dir($dst)&&!@mkdir($dst,0700,true)&&!is_dir($dst))return false;$it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($src,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::SELF_FIRST);foreach($it as $f){$rel=ltrim(str_replace('\\','/',substr($f->getPathname(),strlen($src))),'/');$to=$dst.'/'.$rel;if($f->isDir()){if(!is_dir($to)&&!@mkdir($to,0700,true)&&!is_dir($to))return false;@chmod($to,0700);}else{if(!@copy($f->getPathname(),$to))return false;@chmod($to,0600);}}return true; }
     private function rmTree(string $dir): void { if(!is_dir($dir))return;$it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST);foreach($it as $f){$p=$f->getPathname();$f->isDir()?@rmdir($p):@unlink($p);}@rmdir($dir); }
 }
