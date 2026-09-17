@@ -1,0 +1,59 @@
+name: KiCom Skill Cultivation v1
+
+on:
+  push:
+    branches: [candidate/expansion-cell-v1]
+    paths:
+      - 'experimental/skill-cultivation/**'
+      - 'candidates/skill-cultivation-v1/**'
+      - '.github/workflows/skill-cultivation-v1.yml'
+  pull_request:
+    paths:
+      - 'experimental/skill-cultivation/**'
+      - 'candidates/skill-cultivation-v1/**'
+      - '.github/workflows/skill-cultivation-v1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PHP syntax
+        run: |
+          php -l experimental/skill-cultivation/SkillCultivation.php
+          php -l experimental/skill-cultivation/skill-cultivation-selftest.php
+
+      - name: Canonical candidate JSON
+        run: |
+          python -m json.tool candidates/skill-cultivation-v1/CANONICAL_MEMORY_PATCH.json >/dev/null
+
+      - name: Boundary static checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=experimental/skill-cultivation/SkillCultivation.php
+          ! grep -nE '\b(shell_exec|exec|system|passthru|proc_open|popen)\s*\(' "$f"
+          ! grep -nE '\b(curl_init|fsockopen|stream_socket_client)\s*\(' "$f"
+          grep -q "external_permission_grant.*FORBIDDEN" "$f"
+          grep -q "protected_external_action.*EXTERNAL_AUTH_REQUIRED" "$f"
+          grep -q "history_hard_delete.*FORBIDDEN" "$f"
+          grep -q "archive-never-hard-delete" "$f"
+
+      - name: Functional selftest
+        run: php experimental/skill-cultivation/skill-cultivation-selftest.php
+
+      - name: Policy candidate checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=candidates/skill-cultivation-v1/CANONICAL_MEMORY_PATCH.json
+          grep -q '"id": "D025"' "$f"
+          grep -q '"id": "D026"' "$f"
+          grep -q '"id": "D027"' "$f"
+          grep -q '"live_mutation_performed": false' "$f"
+          grep -q 'Human-at-the-boundary' "$f"
