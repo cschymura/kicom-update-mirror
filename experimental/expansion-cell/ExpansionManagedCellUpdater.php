@@ -85,8 +85,8 @@ final class KiComExpansionManagedCellUpdater
 
     /**
      * Upgrade an active managed child to the current intrinsic Living runtime.
-     * Existing Living v1 cells are upgraded in place with a retained state
-     * snapshot; thin cells still receive a first intrinsic Living birth.
+     * Existing Living cells are upgraded in place with a retained state snapshot;
+     * thin cells still receive a first intrinsic Living birth.
      *
      * @return array<string,mixed>
      */
@@ -107,6 +107,7 @@ final class KiComExpansionManagedCellUpdater
             'CellNode.php'=>'lib/CellNode.php',
             'CellLiving.php'=>'lib/CellLiving.php',
             'CellPerceptionAction.php'=>'lib/CellPerceptionAction.php',
+            'CellWorldModel.php'=>'lib/CellWorldModel.php',
             'cell-runtime/common.php'=>'common.php',
             'cell-runtime/bootstrap.php'=>'bootstrap.php',
             'cell-runtime/federation.php'=>'federation.php',
@@ -125,6 +126,7 @@ final class KiComExpansionManagedCellUpdater
             } elseif($srcRel==='cell-runtime/living-schema.json') {
                 $j=json_decode($raw,true);if(!is_array($j)||($j['schema']??0)!==1) return ['ok'=>false,'code'=>'EXPANSION_UPGRADE_SCHEMA_INVALID'];
                 foreach(['perception','action'] as $sub)if(!in_array($sub,$j['required_subsystems']??[],true))return ['ok'=>false,'code'=>'EXPANSION_UPGRADE_SCHEMA_SUBSYSTEM_MISSING','subsystem'=>$sub];
+                if(($j['world_model']??'')!=='persistent-situational-awareness')return ['ok'=>false,'code'=>'EXPANSION_UPGRADE_WORLD_MODEL_SCHEMA_MISSING'];
             }
             $sources[$dstRel]=['content'=>$raw,'sha256'=>hash('sha256',$raw)];
         }
@@ -147,8 +149,10 @@ final class KiComExpansionManagedCellUpdater
         foreach($sources as $rel=>$src){$target=$cell.'/'.$rel;if(!is_file($target)||!hash_equals((string)$src['sha256'],hash_file('sha256',$target)?:'')){$allRuntimeCurrent=false;break;}}
         if($livingExisted&&$allRuntimeCurrent){
             require_once $sourceDir.'/CellLiving.php';
+            require_once $sourceDir.'/CellWorldModel.php';
             $ls=(new KiComExpansionCellLiving($cell.'/var'))->status();
-            if(!empty($ls['living_ready'])&&!empty($ls['perception_action']['ready'])) return ['ok'=>true,'code'=>'EXPANSION_LIVING_ALREADY_CURRENT','changed'=>false,'living'=>$ls,'cell_id'=>$node['cell_id']];
+            $ws=(new KiComExpansionCellWorldModel($cell.'/var'))->status();
+            if(!empty($ls['living_ready'])&&!empty($ls['perception_action']['ready'])&&!empty($ws['ready'])) return ['ok'=>true,'code'=>'EXPANSION_LIVING_ALREADY_CURRENT','changed'=>false,'living'=>$ls,'world_model'=>$ws,'cell_id'=>$node['cell_id']];
         }
 
         $snapshotId=null;$snapshotDir=null;
@@ -180,6 +184,8 @@ final class KiComExpansionManagedCellUpdater
         }
 
         require_once $sourceDir.'/CellLiving.php';
+        require_once $sourceDir.'/CellPerceptionAction.php';
+        require_once $sourceDir.'/CellWorldModel.php';
         $living=new KiComExpansionCellLiving($cell.'/var');
         if($livingExisted){
             $transition=$living->rebaselineRuntime((array)$node);
@@ -191,12 +197,20 @@ final class KiComExpansionManagedCellUpdater
                 'capabilities'=>$node['capabilities']??[],
             ]);
             if(!empty($transition['ok'])&&!$living->recordActivation((array)$node))$transition=['ok'=>false,'code'=>'CELL_LIVING_ACTIVATION_WRITE_FAILED'];
-            if(!empty($transition['ok'])){
-                $pa=new KiComExpansionCellPerceptionAction($cell.'/var');
-                $paReady=$pa->ensure((array)$node);
-                $paCycle=!empty($paReady['ok'])?$pa->cycle((array)$node,'managed_living_upgrade'):['ok'=>false,'code'=>'CELL_PA_ENSURE_FAILED'];
-                if(empty($paReady['ok'])||empty($paCycle['ok']))$transition=['ok'=>false,'code'=>'CELL_PA_MANAGED_UPGRADE_FAILED','ensure'=>$paReady,'cycle'=>$paCycle];
-            }
+        }
+        if(!empty($transition['ok'])){
+            $pa=new KiComExpansionCellPerceptionAction($cell.'/var');
+            $paReady=$pa->ensure((array)$node);
+            $paCycle=!empty($paReady['ok'])?$pa->cycle((array)$node,'managed_living_upgrade'):['ok'=>false,'code'=>'CELL_PA_ENSURE_FAILED'];
+            if(empty($paReady['ok'])||empty($paCycle['ok']))$transition=['ok'=>false,'code'=>'CELL_PA_MANAGED_UPGRADE_FAILED','ensure'=>$paReady,'cycle'=>$paCycle];
+        }
+        $worldStatus=['ok'=>false,'code'=>'CELL_WORLD_NOT_ATTEMPTED'];
+        if(!empty($transition['ok'])){
+            $world=new KiComExpansionCellWorldModel($cell.'/var');
+            $worldReady=$world->ensure((array)$node);
+            $worldCycle=!empty($worldReady['ok'])?$world->refresh((array)$node,'managed_world_upgrade'):['ok'=>false,'code'=>'CELL_WORLD_ENSURE_FAILED'];
+            $worldStatus=$world->status();
+            if(empty($worldReady['ok'])||empty($worldCycle['ok'])||empty($worldStatus['ready']))$transition=['ok'=>false,'code'=>'CELL_WORLD_MANAGED_UPGRADE_FAILED','ensure'=>$worldReady,'cycle'=>$worldCycle,'status'=>$worldStatus];
         }
         if(empty($transition['ok'])){
             $rb=$this->restoreUpgradeState($cell,$backups,$written,$livingExisted,$snapshotDir,$snapshotId);
@@ -204,9 +218,9 @@ final class KiComExpansionManagedCellUpdater
         }
 
         $ls=$living->status();
-        if(empty($ls['living_ready'])||empty($ls['perception_action']['ready'])){
+        if(empty($ls['living_ready'])||empty($ls['perception_action']['ready'])||empty($worldStatus['ready'])){
             $rb=$this->restoreUpgradeState($cell,$backups,$written,$livingExisted,$snapshotDir,$snapshotId);
-            return ['ok'=>false,'code'=>!empty($rb['ok'])?'EXPANSION_UPGRADE_VERIFY_FAILED_ROLLED_BACK':'EXPANSION_UPGRADE_VERIFY_FAILED_ROLLBACK_FAILED','living'=>$ls,'rollback'=>$rb];
+            return ['ok'=>false,'code'=>!empty($rb['ok'])?'EXPANSION_UPGRADE_VERIFY_FAILED_ROLLED_BACK':'EXPANSION_UPGRADE_VERIFY_FAILED_ROLLBACK_FAILED','living'=>$ls,'world_model'=>$worldStatus,'rollback'=>$rb];
         }
 
         $rows=[];
@@ -214,8 +228,8 @@ final class KiComExpansionManagedCellUpdater
         usort($rows,static fn(array $a,array $b):int=>strcmp((string)$a['path'],(string)$b['path']));
         $tree='';foreach($rows as $r)$tree.=$r['sha256'].'  '.$r['path']."\n";
         $newManifest=[
-            'schema'=>3,
-            'managed_upgrade'=>'living-v2-perception-action',
+            'schema'=>4,
+            'managed_upgrade'=>'living-v3-situational-world-model',
             'cell_id'=>(string)$node['cell_id'],
             'base_url'=>rtrim((string)$node['base_url'],'/'),
             'mutable_state'=>'var-preserved-and-snapshotted',
@@ -223,6 +237,7 @@ final class KiComExpansionManagedCellUpdater
             'tree_sha256'=>hash('sha256',$tree),
             'upgraded_at'=>gmdate('c'),
             'perception_action_memory'=>true,
+            'world_model'=>true,
             'prior_living_snapshot_id'=>$snapshotId,
         ];
         $manifestJson=json_encode($newManifest,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
@@ -234,13 +249,15 @@ final class KiComExpansionManagedCellUpdater
 
         return [
             'ok'=>true,
-            'code'=>$livingExisted?'EXPANSION_LIVING_PA_UPGRADE_APPLIED':'EXPANSION_LIVING_UPGRADE_APPLIED',
+            'code'=>$livingExisted?'EXPANSION_LIVING_WORLD_UPGRADE_APPLIED':'EXPANSION_LIVING_UPGRADE_APPLIED',
             'changed'=>true,
             'cell_id'=>(string)$node['cell_id'],
             'files'=>count($rows),
             'tree_sha256'=>$newManifest['tree_sha256'],
             'living'=>$ls,
             'perception_action_ready'=>true,
+            'world_model_ready'=>true,
+            'world_model'=>$worldStatus,
             'snapshot_id'=>$snapshotId,
             '_rollback'=>[
                 'backups'=>$backups,'written'=>$written,'living_created'=>!$livingExisted,
@@ -333,8 +350,7 @@ final class KiComExpansionManagedCellUpdater
         @chmod($tmp,0600);
         $sha=hash_file('sha256',$tmp)?:'';
         if(!hash_equals(hash('sha256',$content),$sha)){@unlink($tmp);return ['ok'=>false,'code'=>'EXPANSION_REPAIR_TEMP_HASH_MISMATCH'];}
-        if(!@rename($tmp,$target)){@unlink($tmp);return ['ok'=>false,'code'=>'EXPANSION_REPAIR_RENAME_FAILED'];
-        }
+        if(!@rename($tmp,$target)){@unlink($tmp);return ['ok'=>false,'code'=>'EXPANSION_REPAIR_RENAME_FAILED'];}
         @chmod($target,$mode);
         clearstatcache(true,$target);
         if(function_exists('opcache_invalidate')) @opcache_invalidate($target,true);
