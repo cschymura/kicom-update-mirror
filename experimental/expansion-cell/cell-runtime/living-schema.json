@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "name": "kicom-expansion-living-cell/1",
+  "required_subsystems": [
+    "identity",
+    "canonical_memory",
+    "workspace",
+    "observer",
+    "genome_lkg",
+    "immune",
+    "evolution"
+  ],
+  "memory_resources": [
+    "PROJECT_STATE.kcl",
+    "ARCHITECTURE.kcl",
+    "PROTOCOL.kcl",
+    "DECISIONS.kcl",
+    "CHANGELOG.kcl",
+    "NEXT.kcl"
+  ],
+  "runtime_components": [
+    {"path": "common.php", "role": "http-common"},
+    {"path": "bootstrap.php", "role": "enrollment-bootstrap"},
+    {"path": "federation.php", "role": "signed-federation-endpoint"},
+    {"path": "status.php", "role": "public-status"},
+    {"path": "doctor.php", "role": "local-living-doctor"},
+    {"path": "lib/ExpansionProtocol.php", "role": "federation-protocol"},
+    {"path": "lib/CellNode.php", "role": "cell-state-machine"},
+    {"path": "lib/CellLiving.php", "role": "intrinsic-living-substrate"},
+    {"path": "living-schema.json", "role": "intrinsic-schema"}
+  ],
+  "birth_policy": "all intrinsic subsystems materialized and verified before node initialization commits",
+  "evolution_policy": "autonomous internal promotion only after deterministic static fitness with local LKG rollback",
+  "external_boundary_policy": "human authorization only when a protected external system, credential or permission requires it",
+  "inheritance_policy": "architecture may be inherited; identity, secrets, mutable state and project memory are local"
+}
