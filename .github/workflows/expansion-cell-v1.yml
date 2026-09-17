@@ -35,6 +35,7 @@ jobs:
           php -l experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php
           php -l experimental/expansion-cell/ExpansionManagedCellUpdater.php
           php -l experimental/expansion-cell/ExpansionKiComDeployTargetResolver.php
+          php -l experimental/expansion-cell/CellLiving.php
           php -l experimental/expansion-cell/CellNode.php
           php -l experimental/expansion-cell/ExpansionCellRuntime.php
           php -l experimental/expansion-cell/ExpansionCronRelay.php
@@ -47,6 +48,7 @@ jobs:
           php -l experimental/expansion-cell/cell-runtime/bootstrap.php
           php -l experimental/expansion-cell/cell-runtime/federation.php
           php -l experimental/expansion-cell/cell-runtime/status.php
+          php -l experimental/expansion-cell/cell-runtime/doctor.php
           php -l experimental/expansion-cell/expansion-selftest.php
           php -l experimental/expansion-cell/expansion-cron-selftest.php
           php -l experimental/expansion-cell/orchestrator-selftest.php
@@ -54,9 +56,13 @@ jobs:
           php -l experimental/expansion-cell/local-deploy-selftest.php
           php -l experimental/expansion-cell/managed-updater-selftest.php
           php -l experimental/expansion-cell/resource-resolver-selftest.php
+          php -l experimental/expansion-cell/package-completeness-selftest.php
 
       - name: Expansion/federation selftest
         run: php experimental/expansion-cell/expansion-selftest.php
+
+      - name: Complete daughter package selftest
+        run: php experimental/expansion-cell/package-completeness-selftest.php
 
       - name: Cron federation selftest
         run: php experimental/expansion-cell/expansion-cron-selftest.php
@@ -89,8 +95,25 @@ jobs:
           grep -q 'Credentials are method arguments only' experimental/expansion-cell/ExpansionFtpDeployer.php
           grep -q 'bootstrap.private.json' experimental/expansion-cell/CellNode.php
           grep -q "unlink(\$this->dir.'/bootstrap.private.json')" experimental/expansion-cell/CellNode.php
+          grep -q 'sodium_memzero' experimental/expansion-cell/CellNode.php
           grep -q 'builder->destroy($packageDir)' experimental/expansion-cell/ExpansionOrchestrator.php
           grep -q 'sodium_memzero' experimental/expansion-cell/ExpansionService.php
+
+      - name: Complete daughter birth guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'CELL_LIVING_BORN' experimental/expansion-cell/CellLiving.php
+          grep -q 'living_ready' experimental/expansion-cell/CellNode.php
+          grep -q 'canonical_memory' experimental/expansion-cell/cell-runtime/living-schema.json
+          grep -q 'genome_lkg' experimental/expansion-cell/cell-runtime/living-schema.json
+          grep -q 'autonomous-internal-after-static-fitness-with-local-lkg-rollback' experimental/expansion-cell/CellLiving.php
+          grep -q 'EXPANSION_PACKAGE_INTRINSIC_SUBSYSTEM_MISSING' experimental/expansion-cell/ExpansionCellPackageBuilder.php
+          grep -q 'missing intrinsic subsystem fails build' experimental/expansion-cell/package-completeness-selftest.php
+          if grep -RniE 'parent_(private|secret)_key|passkey|totp_secret|dev_bearer' experimental/expansion-cell/cell-runtime/living-schema.json; then
+            echo 'Living schema must not inherit parent or platform secrets' >&2
+            exit 1
+          fi
 
       - name: Shared-hosting package guard
         shell: bash
