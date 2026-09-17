@@ -2,8 +2,8 @@
   "schema": 1,
   "candidate": "kicom-skill-cultivation-v1",
   "created_at": "2026-09-17T18:35:00Z",
-  "target_runtime": "0.9.16",
-  "target_genome": "kicom-0.9.16-g17",
+  "activation_runtime": "0.9.17",
+  "activation_genome": "kicom-0.9.17-g18",
   "status": "candidate_not_live",
   "live_base": {
     "runtime": "0.9.15",
@@ -17,6 +17,10 @@
     "architecture_sha256": "2a9c7cecbd41d3380dee5332fb4f13329b9d8f6bbb7f69f89d71b55bb961abfb",
     "decisions_sha256": "94938c7402b18f779b5bc48393c819db966ee0445461d35246ea6c35ce619a07",
     "latest_decision": "D024"
+  },
+  "release_sequence": {
+    "0.9.16_g17": "bootstrap trusted genome-bound module loading and controlled modules/ update allowlist; do not install the new module before the 0.9.15 verifier can trust that path",
+    "0.9.17_g18": "install and activate Skill Cultivation as a genome-bound module and connect it to Experience Memory, Evolution and the World/Action Model"
   },
   "proposed_decisions": [
     {
@@ -103,7 +107,8 @@
   "implementation": {
     "engine": "experimental/skill-cultivation/SkillCultivation.php",
     "selftest": "experimental/skill-cultivation/skill-cultivation-selftest.php",
-    "integration_target": "trusted genome-bound module in 0.9.16/g17",
+    "bootstrap_prerequisite": "0.9.16/g17 trusted module support",
+    "integration_target": "trusted genome-bound module in 0.9.17/g18",
     "live_mutation_performed": false
   }
 }
