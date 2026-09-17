@@ -26,8 +26,10 @@ jobs:
       - name: PHP syntax
         run: |
           php -l experimental/skill-cultivation/SkillCultivation.php
+          php -l experimental/skill-cultivation/SkillCultivationV2.php
           php -l experimental/skill-cultivation/SkillCultivationBridge.php
           php -l experimental/skill-cultivation/skill-cultivation-selftest.php
+          php -l experimental/skill-cultivation/skill-cultivation-v2-selftest.php
 
       - name: Canonical candidate JSON
         run: |
@@ -37,21 +39,23 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for f in experimental/skill-cultivation/SkillCultivation.php experimental/skill-cultivation/SkillCultivationBridge.php; do
+          for f in experimental/skill-cultivation/SkillCultivation.php experimental/skill-cultivation/SkillCultivationV2.php experimental/skill-cultivation/SkillCultivationBridge.php; do
             ! grep -nE '\b(shell_exec|exec|system|passthru|proc_open|popen)\s*\(' "$f"
             ! grep -nE '\b(curl_init|fsockopen|stream_socket_client)\s*\(' "$f"
           done
-          f=experimental/skill-cultivation/SkillCultivation.php
+          f=experimental/skill-cultivation/SkillCultivationV2.php
           grep -q "external_permission_grant.*FORBIDDEN" "$f"
           grep -q "protected_external_action.*EXTERNAL_AUTH_REQUIRED" "$f"
           grep -q "history_hard_delete.*FORBIDDEN" "$f"
-          grep -q "archive-never-hard-delete" "$f"
+          grep -q "immutable-non-negotiable-boundaries" "$f"
           b=experimental/skill-cultivation/SkillCultivationBridge.php
           grep -q "evidence-only; never grants external permission" "$b"
           grep -q "EXPERIENCE_IGNORED" "$b"
 
-      - name: Functional selftest
-        run: php experimental/skill-cultivation/skill-cultivation-selftest.php
+      - name: Functional selftests
+        run: |
+          php experimental/skill-cultivation/skill-cultivation-selftest.php
+          php experimental/skill-cultivation/skill-cultivation-v2-selftest.php
 
       - name: Policy candidate checks
         shell: bash
