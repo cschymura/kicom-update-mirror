@@ -23,6 +23,7 @@ function kicomDeployTarget(string $alias,bool $requireEnabled=true): ?array {
 }
 
 require_once __DIR__.'/DevExpansionBindings.php';
+require_once __DIR__.'/DevSandboxPerception.php';
 
 try {
     $binding=new KiComDevExpansionBindings(dirname(__DIR__).'/expansion-cell','https://kicom.rurtalbahn.info');
@@ -32,5 +33,7 @@ try {
     $resource=(array)($status['resource']??[]);
     devExpansionMust(($resource['alias']??'')==='sandbox'&&($resource['class']??'')==='test','sandbox alias/class fixed');
     devExpansionMust(!array_key_exists('root',$resource),'server root hidden');
+    devExpansionMust(class_exists('KiComDevSandboxPerception'),'signed perception bridge class available');
+    devExpansionMust(method_exists('KiComDevSandboxPerception','query'),'signed perception query method available');
     echo "KiCom DEV Expansion binding selftest: PASS\n";
 } finally { devExpansionRm($base); }
