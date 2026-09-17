@@ -7,7 +7,8 @@ declare(strict_types=1);
  * This is deliberately not a general filesystem writer. It accepts only a
  * KiCom-managed /kicom child beneath an already-resolved allowlisted webroot,
  * preserves var/ identity and mutable state, and writes only the fixed runtime
- * files listed below.
+ * files listed below. Existing living state is snapshotted before an in-place
+ * architecture upgrade; snapshots are retained rather than hard-deleted.
  */
 final class KiComExpansionManagedCellUpdater
 {
@@ -83,9 +84,9 @@ final class KiComExpansionManagedCellUpdater
     }
 
     /**
-     * Upgrade an active thin child to the complete intrinsic Living runtime.
-     * var/ is preserved; cell identity, signing.secret, node.json and lineage are
-     * never replaced. Existing managed runtime drift is rejected before writes.
+     * Upgrade an active managed child to the current intrinsic Living runtime.
+     * Existing Living v1 cells are upgraded in place with a retained state
+     * snapshot; thin cells still receive a first intrinsic Living birth.
      *
      * @return array<string,mixed>
      */
@@ -105,6 +106,7 @@ final class KiComExpansionManagedCellUpdater
             'ExpansionProtocol.php'=>'lib/ExpansionProtocol.php',
             'CellNode.php'=>'lib/CellNode.php',
             'CellLiving.php'=>'lib/CellLiving.php',
+            'CellPerceptionAction.php'=>'lib/CellPerceptionAction.php',
             'cell-runtime/common.php'=>'common.php',
             'cell-runtime/bootstrap.php'=>'bootstrap.php',
             'cell-runtime/federation.php'=>'federation.php',
@@ -122,6 +124,7 @@ final class KiComExpansionManagedCellUpdater
                 try{token_get_all($raw,TOKEN_PARSE);}catch(ParseError $e){return ['ok'=>false,'code'=>'EXPANSION_UPGRADE_SOURCE_SYNTAX_INVALID','path'=>$srcRel];}
             } elseif($srcRel==='cell-runtime/living-schema.json') {
                 $j=json_decode($raw,true);if(!is_array($j)||($j['schema']??0)!==1) return ['ok'=>false,'code'=>'EXPANSION_UPGRADE_SCHEMA_INVALID'];
+                foreach(['perception','action'] as $sub)if(!in_array($sub,$j['required_subsystems']??[],true))return ['ok'=>false,'code'=>'EXPANSION_UPGRADE_SCHEMA_SUBSYSTEM_MISSING','subsystem'=>$sub];
             }
             $sources[$dstRel]=['content'=>$raw,'sha256'=>hash('sha256',$raw)];
         }
@@ -132,7 +135,6 @@ final class KiComExpansionManagedCellUpdater
             if(!is_array($entry)) return ['ok'=>false,'code'=>'EXPANSION_UPGRADE_MANIFEST_INVALID'];
             $rel=(string)($entry['path']??'');$sha=strtolower((string)($entry['sha256']??''));
             if($rel===''||!preg_match('/^[a-f0-9]{64}$/',$sha)) return ['ok'=>false,'code'=>'EXPANSION_UPGRADE_MANIFEST_INVALID'];
-            // bootstrap.config.php is intentionally deleted after first boot.
             if($rel==='bootstrap.config.php') continue;
             $target=$cell.'/'.$rel;
             if(!is_file($target)||is_link($target)) return ['ok'=>false,'code'=>'EXPANSION_UPGRADE_MANAGED_FILE_MISSING','path'=>$rel];
@@ -141,11 +143,19 @@ final class KiComExpansionManagedCellUpdater
         }
 
         $livingExisted=is_dir($cell.'/var/living');
-        if($livingExisted){
+        $allRuntimeCurrent=true;
+        foreach($sources as $rel=>$src){$target=$cell.'/'.$rel;if(!is_file($target)||!hash_equals((string)$src['sha256'],hash_file('sha256',$target)?:'')){$allRuntimeCurrent=false;break;}}
+        if($livingExisted&&$allRuntimeCurrent){
             require_once $sourceDir.'/CellLiving.php';
             $ls=(new KiComExpansionCellLiving($cell.'/var'))->status();
-            if(!empty($ls['living_ready'])) return ['ok'=>true,'code'=>'EXPANSION_LIVING_ALREADY_CURRENT','changed'=>false,'living'=>$ls,'cell_id'=>$node['cell_id']];
-            return ['ok'=>false,'code'=>'EXPANSION_UPGRADE_EXISTING_LIVING_INCOMPLETE','living'=>$ls];
+            if(!empty($ls['living_ready'])&&!empty($ls['perception_action']['ready'])) return ['ok'=>true,'code'=>'EXPANSION_LIVING_ALREADY_CURRENT','changed'=>false,'living'=>$ls,'cell_id'=>$node['cell_id']];
+        }
+
+        $snapshotId=null;$snapshotDir=null;
+        if($livingExisted){
+            $snapshotId=gmdate('YmdHis').'-'.substr(hash('sha256',(string)$node['cell_id'].'|'.microtime(true)),0,10);
+            $snapshotDir=$cell.'/var/living_snapshots/'.$snapshotId;
+            if(!$this->copyTreeBounded($cell.'/var/living',$snapshotDir,5000,33554432)) return ['ok'=>false,'code'=>'EXPANSION_UPGRADE_LIVING_SNAPSHOT_FAILED'];
         }
 
         $backups=[];$written=[];
@@ -163,7 +173,7 @@ final class KiComExpansionManagedCellUpdater
             $target=$cell.'/'.$rel;$mode=str_starts_with($rel,'lib/')?0600:0644;
             $w=$this->atomicWrite($target,(string)$src['content'],$mode);
             if(empty($w['ok'])){
-                $rb=$this->restoreFiles($cell,$backups,$written,false);
+                $rb=$this->restoreUpgradeState($cell,$backups,$written,$livingExisted,$snapshotDir,$snapshotId);
                 return ['ok'=>false,'code'=>!empty($rb['ok'])?'EXPANSION_UPGRADE_WRITE_FAILED_ROLLED_BACK':'EXPANSION_UPGRADE_WRITE_FAILED_ROLLBACK_FAILED','path'=>$rel,'rollback'=>$rb];
             }
             $written[]=$rel;
@@ -171,23 +181,31 @@ final class KiComExpansionManagedCellUpdater
 
         require_once $sourceDir.'/CellLiving.php';
         $living=new KiComExpansionCellLiving($cell.'/var');
-        $born=$living->initialize([
-            'cell_id'=>(string)$node['cell_id'],
-            'base_url'=>(string)$node['base_url'],
-            'parent_id'=>(string)($node['parent_id']??''),
-            'capabilities'=>$node['capabilities']??[],
-        ]);
-        if(empty($born['ok'])){
-            $rb=$this->restoreFiles($cell,$backups,$written,true);
-            return ['ok'=>false,'code'=>!empty($rb['ok'])?'EXPANSION_UPGRADE_LIVING_FAILED_ROLLED_BACK':'EXPANSION_UPGRADE_LIVING_FAILED_ROLLBACK_FAILED','living'=>$born,'rollback'=>$rb];
+        if($livingExisted){
+            $transition=$living->rebaselineRuntime((array)$node);
+        } else {
+            $transition=$living->initialize([
+                'cell_id'=>(string)$node['cell_id'],
+                'base_url'=>(string)$node['base_url'],
+                'parent_id'=>(string)($node['parent_id']??''),
+                'capabilities'=>$node['capabilities']??[],
+            ]);
+            if(!empty($transition['ok'])&&!$living->recordActivation((array)$node))$transition=['ok'=>false,'code'=>'CELL_LIVING_ACTIVATION_WRITE_FAILED'];
+            if(!empty($transition['ok'])){
+                $pa=new KiComExpansionCellPerceptionAction($cell.'/var');
+                $paReady=$pa->ensure((array)$node);
+                $paCycle=!empty($paReady['ok'])?$pa->cycle((array)$node,'managed_living_upgrade'):['ok'=>false,'code'=>'CELL_PA_ENSURE_FAILED'];
+                if(empty($paReady['ok'])||empty($paCycle['ok']))$transition=['ok'=>false,'code'=>'CELL_PA_MANAGED_UPGRADE_FAILED','ensure'=>$paReady,'cycle'=>$paCycle];
+            }
         }
-        if(!$living->recordActivation($node)){
-            $rb=$this->restoreFiles($cell,$backups,$written,true);
-            return ['ok'=>false,'code'=>!empty($rb['ok'])?'EXPANSION_UPGRADE_ACTIVATION_FAILED_ROLLED_BACK':'EXPANSION_UPGRADE_ACTIVATION_FAILED_ROLLBACK_FAILED','rollback'=>$rb];
+        if(empty($transition['ok'])){
+            $rb=$this->restoreUpgradeState($cell,$backups,$written,$livingExisted,$snapshotDir,$snapshotId);
+            return ['ok'=>false,'code'=>!empty($rb['ok'])?'EXPANSION_UPGRADE_LIVING_FAILED_ROLLED_BACK':'EXPANSION_UPGRADE_LIVING_FAILED_ROLLBACK_FAILED','living'=>$transition,'rollback'=>$rb];
         }
+
         $ls=$living->status();
-        if(empty($ls['living_ready'])){
-            $rb=$this->restoreFiles($cell,$backups,$written,true);
+        if(empty($ls['living_ready'])||empty($ls['perception_action']['ready'])){
+            $rb=$this->restoreUpgradeState($cell,$backups,$written,$livingExisted,$snapshotDir,$snapshotId);
             return ['ok'=>false,'code'=>!empty($rb['ok'])?'EXPANSION_UPGRADE_VERIFY_FAILED_ROLLED_BACK':'EXPANSION_UPGRADE_VERIFY_FAILED_ROLLBACK_FAILED','living'=>$ls,'rollback'=>$rb];
         }
 
@@ -196,31 +214,38 @@ final class KiComExpansionManagedCellUpdater
         usort($rows,static fn(array $a,array $b):int=>strcmp((string)$a['path'],(string)$b['path']));
         $tree='';foreach($rows as $r)$tree.=$r['sha256'].'  '.$r['path']."\n";
         $newManifest=[
-            'schema'=>2,
-            'managed_upgrade'=>'living-v1',
+            'schema'=>3,
+            'managed_upgrade'=>'living-v2-perception-action',
             'cell_id'=>(string)$node['cell_id'],
             'base_url'=>rtrim((string)$node['base_url'],'/'),
-            'mutable_state'=>'var-preserved',
+            'mutable_state'=>'var-preserved-and-snapshotted',
             'files'=>$rows,
             'tree_sha256'=>hash('sha256',$tree),
             'upgraded_at'=>gmdate('c'),
+            'perception_action_memory'=>true,
+            'prior_living_snapshot_id'=>$snapshotId,
         ];
         $manifestJson=json_encode($newManifest,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
         if(!is_string($manifestJson)||empty($this->atomicWrite($cell.'/cell-manifest.json',$manifestJson."\n",0644)['ok'])){
-            $rb=$this->restoreFiles($cell,$backups,$written,true);
+            $rb=$this->restoreUpgradeState($cell,$backups,$written,$livingExisted,$snapshotDir,$snapshotId);
             return ['ok'=>false,'code'=>!empty($rb['ok'])?'EXPANSION_UPGRADE_MANIFEST_WRITE_FAILED_ROLLED_BACK':'EXPANSION_UPGRADE_MANIFEST_WRITE_FAILED_ROLLBACK_FAILED','rollback'=>$rb];
         }
         $written[]='cell-manifest.json';
 
         return [
             'ok'=>true,
-            'code'=>'EXPANSION_LIVING_UPGRADE_APPLIED',
+            'code'=>$livingExisted?'EXPANSION_LIVING_PA_UPGRADE_APPLIED':'EXPANSION_LIVING_UPGRADE_APPLIED',
             'changed'=>true,
             'cell_id'=>(string)$node['cell_id'],
             'files'=>count($rows),
             'tree_sha256'=>$newManifest['tree_sha256'],
             'living'=>$ls,
-            '_rollback'=>['backups'=>$backups,'written'=>$written,'living_created'=>!$livingExisted],
+            'perception_action_ready'=>true,
+            'snapshot_id'=>$snapshotId,
+            '_rollback'=>[
+                'backups'=>$backups,'written'=>$written,'living_created'=>!$livingExisted,
+                'living_existed'=>$livingExisted,'snapshot_dir'=>$snapshotDir,'snapshot_id'=>$snapshotId,
+            ],
         ];
     }
 
@@ -232,7 +257,11 @@ final class KiComExpansionManagedCellUpdater
         $cell=$root.'/kicom';
         $r=$upgrade['_rollback']??null;
         if(!is_array($r)||!is_array($r['backups']??null)||!is_array($r['written']??null)) return ['ok'=>false,'code'=>'EXPANSION_UPGRADE_ROLLBACK_INPUT_INVALID'];
-        return $this->restoreFiles($cell,(array)$r['backups'],(array)$r['written'],!empty($r['living_created']));
+        return $this->restoreUpgradeState(
+            $cell,(array)$r['backups'],(array)$r['written'],!empty($r['living_existed']),
+            is_string($r['snapshot_dir']??null)?(string)$r['snapshot_dir']:null,
+            is_string($r['snapshot_id']??null)?(string)$r['snapshot_id']:null
+        );
     }
 
     /** @param array<string,mixed>|null $node @return array<string,mixed> */
@@ -247,7 +276,35 @@ final class KiComExpansionManagedCellUpdater
     }
 
     /** @param array<string,array<string,mixed>> $backups @param list<string> $written */
-    private function restoreFiles(string $cell,array $backups,array $written,bool $removeLiving): array
+    private function restoreUpgradeState(string $cell,array $backups,array $written,bool $livingExisted,?string $snapshotDir,?string $snapshotId): array
+    {
+        $files=$this->restoreFiles($cell,$backups,$written,false);
+        $livingOk=true;$archive=null;
+        if($livingExisted&&is_string($snapshotDir)&&is_dir($snapshotDir)){
+            $failedRoot=$cell.'/var/living_failed';if(!is_dir($failedRoot))@mkdir($failedRoot,0700,true);
+            $archive=$failedRoot.'/'.($snapshotId?:gmdate('YmdHis'));
+            if(is_dir($cell.'/var/living')){
+                if(is_dir($archive))$archive.='-'.substr(hash('sha256',microtime(true).''),0,6);
+                if(!@rename($cell.'/var/living',$archive))$livingOk=false;
+            }
+            if($livingOk&&!$this->copyTreeBounded($snapshotDir,$cell.'/var/living',5000,33554432))$livingOk=false;
+        } elseif(!$livingExisted&&is_dir($cell.'/var/living')) {
+            $failedRoot=$cell.'/var/living_failed';if(!is_dir($failedRoot))@mkdir($failedRoot,0700,true);
+            $archive=$failedRoot.'/'.gmdate('YmdHis').'-new-living';
+            if(!@rename($cell.'/var/living',$archive))$livingOk=false;
+        }
+        return [
+            'ok'=>!empty($files['ok'])&&$livingOk,
+            'code'=>!empty($files['ok'])&&$livingOk?'EXPANSION_UPGRADE_ROLLED_BACK':'EXPANSION_UPGRADE_ROLLBACK_INCOMPLETE',
+            'restored'=>$files['restored']??[],
+            'living_restored'=>$livingOk,
+            'failed_living_archive'=>$archive,
+            'snapshot_retained'=>$snapshotDir,
+        ];
+    }
+
+    /** @param array<string,array<string,mixed>> $backups @param list<string> $written */
+    private function restoreFiles(string $cell,array $backups,array $written,bool $unused): array
     {
         $ok=true;$restored=[];
         foreach(array_reverse($written) as $rel){
@@ -262,8 +319,7 @@ final class KiComExpansionManagedCellUpdater
             $mode=str_starts_with($rel,'lib/')?0600:0644;
             $w=$this->atomicWrite($target,$content,$mode);if(empty($w['ok'])){$ok=false;continue;}$restored[]=$rel;
         }
-        if($removeLiving&&is_dir($cell.'/var/living')) $this->rmTree($cell.'/var/living');
-        return ['ok'=>$ok,'code'=>$ok?'EXPANSION_UPGRADE_ROLLED_BACK':'EXPANSION_UPGRADE_ROLLBACK_INCOMPLETE','restored'=>$restored];
+        return ['ok'=>$ok,'code'=>$ok?'EXPANSION_UPGRADE_FILES_ROLLED_BACK':'EXPANSION_UPGRADE_FILE_ROLLBACK_INCOMPLETE','restored'=>$restored];
     }
 
     /** @return array{ok:bool,code:string,sha256?:string} */
@@ -277,11 +333,34 @@ final class KiComExpansionManagedCellUpdater
         @chmod($tmp,0600);
         $sha=hash_file('sha256',$tmp)?:'';
         if(!hash_equals(hash('sha256',$content),$sha)){@unlink($tmp);return ['ok'=>false,'code'=>'EXPANSION_REPAIR_TEMP_HASH_MISMATCH'];}
-        if(!@rename($tmp,$target)){@unlink($tmp);return ['ok'=>false,'code'=>'EXPANSION_REPAIR_RENAME_FAILED'];}
+        if(!@rename($tmp,$target)){@unlink($tmp);return ['ok'=>false,'code'=>'EXPANSION_REPAIR_RENAME_FAILED'];
+        }
         @chmod($target,$mode);
         clearstatcache(true,$target);
         if(function_exists('opcache_invalidate')) @opcache_invalidate($target,true);
         return ['ok'=>true,'code'=>'EXPANSION_REPAIR_ATOMIC_WRITE_OK','sha256'=>$sha];
+    }
+
+    private function copyTreeBounded(string $src,string $dst,int $maxFiles,int $maxBytes): bool
+    {
+        if(!is_dir($src)||is_link($src))return false;
+        if(is_dir($dst))return false;
+        if(!@mkdir($dst,0700,true)&&!is_dir($dst))return false;@chmod($dst,0700);
+        $files=0;$bytes=0;
+        $it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($src,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::SELF_FIRST);
+        foreach($it as $f){
+            if($f->isLink())return false;
+            $rel=ltrim(str_replace('\\','/',substr($f->getPathname(),strlen($src))),'/');
+            if($rel===''||str_contains($rel,'..'))return false;
+            $to=$dst.'/'.$rel;
+            if($f->isDir()){
+                if(!is_dir($to)&&!@mkdir($to,0700,true)&&!is_dir($to))return false;@chmod($to,0700);continue;
+            }
+            $files++;$bytes+=(int)$f->getSize();if($files>$maxFiles||$bytes>$maxBytes)return false;
+            $dir=dirname($to);if(!is_dir($dir)&&!@mkdir($dir,0700,true)&&!is_dir($dir))return false;
+            if(!@copy($f->getPathname(),$to))return false;@chmod($to,0600);
+        }
+        return true;
     }
 
     private function managedCell(string $cell): bool
@@ -311,12 +390,5 @@ final class KiComExpansionManagedCellUpdater
         $real=realpath($path);
         if($real===false||!is_dir($real)) return null;
         return rtrim(str_replace('\\','/',$real),'/');
-    }
-
-    private function rmTree(string $dir): void
-    {
-        if(!is_dir($dir)) return;
-        $it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST);
-        foreach($it as $f){$p=$f->getPathname();$f->isDir()?@rmdir($p):@unlink($p);} @rmdir($dir);
     }
 }
