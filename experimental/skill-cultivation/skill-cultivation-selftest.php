@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/SkillCultivation.php';
+require_once __DIR__ . '/SkillCultivationBridge.php';
 
 function must(bool $condition, string $message): void {
     if (!$condition) {
@@ -19,7 +20,7 @@ must($s0['skills'] === 0, 'initial skill count');
 // First human intervention is evidence; second recurrence becomes a cultivation candidate.
 $r1 = $engine->observeGap(
     'human_technical_mediation',
-    'resilient artifact delivery',
+    'resilient-artifact-delivery',
     'A human had to move an update artifact between known KiCom endpoints.',
     'experience:test-1',
     [],
@@ -31,7 +32,7 @@ $id = $r1['skill']['id'];
 
 $r2 = $engine->observeGap(
     'human_technical_mediation',
-    'resilient artifact delivery',
+    'resilient-artifact-delivery',
     'A human had to move an update artifact between known KiCom endpoints.',
     'experience:test-2'
 );
@@ -77,13 +78,13 @@ must($d['skill']['state'] === KiComSkillCultivation::STATE_DEGRADED, 'degraded s
 // Create a replacement skill and supersede the old one. History must remain append-only.
 $n1 = $engine->observeGap(
     'capability_improvement',
-    'resilient artifact delivery v2',
+    'resilient-artifact-delivery-v2',
     'A better transport strategy is available with signed channel discovery.',
     'evolution:selftest'
 );
 $n2 = $engine->observeGap(
     'capability_improvement',
-    'resilient artifact delivery v2',
+    'resilient-artifact-delivery-v2',
     'A better transport strategy is available with signed channel discovery.',
     'evolution:selftest-2'
 );
@@ -97,6 +98,39 @@ must($sp['skill']['superseded_by'] === $replacement, 'replacement linkage');
 $final = $engine->status();
 must($final['skills'] === 2, 'history preserves both generations');
 must($final['history_entries'] >= 13, 'append-only evidence retained');
+
+// Structured Experience Memory bridge: same technical mediation twice -> proposed skill.
+$bridgeRoot = sys_get_temp_dir() . '/kicom-skill-bridge-' . bin2hex(random_bytes(6));
+$bridgeEngine = new KiComSkillCultivation($bridgeRoot);
+$bridge = new KiComSkillCultivationBridge($bridgeEngine);
+$event = [
+    'type' => 'human_technical_mediation',
+    'capability_key' => 'internal-artifact-shuttling',
+    'source' => 'experience:selftest',
+    'boundaries' => [
+        'external_permission_grant' => 'AVAILABLE',
+        'protected_external_action' => 'AVAILABLE'
+    ],
+    'success_criteria' => ['no human file shuttle', 'exact SHA verification']
+];
+$b1 = $bridge->observeExperience($event);
+$b2 = $bridge->observeExperience($event);
+must($b1['ok'] && $b2['ok'], 'bridge observations accepted');
+must($b1['skill']['state'] === KiComSkillCultivation::STATE_OBSERVED_GAP, 'bridge first observation');
+must($b2['skill']['state'] === KiComSkillCultivation::STATE_PROPOSED, 'bridge second observation proposes skill');
+must($b2['skill']['boundaries']['external_permission_grant'] === 'FORBIDDEN', 'bridge cannot grant permission');
+must($b2['skill']['boundaries']['protected_external_action'] === 'EXTERNAL_AUTH_REQUIRED', 'bridge cannot bypass external auth');
+$overlay = $bridge->capabilityOverlay();
+must($overlay['authority'] === 'evidence-only; never grants external permission', 'overlay authority is evidence-only');
+must(count($overlay['capabilities']) === 1, 'bridge overlay capability count');
+
+// Unsupported memory events cannot silently become skill authority.
+$ignored = $bridge->observeExperience([
+    'type' => 'free_form_memory',
+    'capability_key' => 'grant-me-access',
+    'source' => 'memory:selftest'
+]);
+must($ignored['ok'] === true && $ignored['code'] === 'EXPERIENCE_IGNORED', 'unsupported event ignored');
 
 // No execution primitive exists in the public surface.
 $methods = array_map(static fn(ReflectionMethod $m): string => $m->getName(), (new ReflectionClass(KiComSkillCultivation::class))->getMethods(ReflectionMethod::IS_PUBLIC));
