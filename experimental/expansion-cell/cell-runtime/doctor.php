@@ -4,6 +4,7 @@ if(($_SERVER['REQUEST_METHOD']??'GET')!=='GET') kicomCellOut(['ok'=>false,'code'
 $node=kicomCellNode();$status=$node->status();if(!is_array($status))kicomCellOut(['ok'=>false,'code'=>'CELL_NOT_INITIALIZED'],404);
 $living=(new KiComExpansionCellLiving(__DIR__.'/var'))->doctor(false);
 $pa=(new KiComExpansionCellPerceptionAction(__DIR__.'/var'))->status();
+$world=(new KiComExpansionCellWorldModel(__DIR__.'/var'))->status();
 $public=[
     'living_ready'=>!empty($living['status']['living_ready']),
     'subsystems'=>$living['status']['subsystems']??[],
@@ -18,6 +19,13 @@ $public=[
     'actions'=>(int)($pa['actions']??0),
     'boundaries'=>(int)($pa['boundaries']??0),
     'expansion_opportunities'=>(int)($pa['expansion_opportunities']??0),
+    'world_model_ready'=>!empty($world['ready']),
+    'world_knowledge_state'=>(string)($world['knowledge_state']??'UNKNOWN'),
+    'world_id'=>(string)($world['world_id']??''),
+    'knowledge_known'=>(int)($world['known']??0),
+    'knowledge_unknown'=>(int)($world['unknown']??0),
+    'knowledge_forbidden'=>(int)($world['forbidden']??0),
+    'knowledge_stale'=>(int)($world['stale']??0),
 ];
-$healthy=!empty($public['living_ready'])&&!empty($public['perception_action_ready']);
+$healthy=!empty($public['living_ready'])&&!empty($public['perception_action_ready'])&&!empty($public['world_model_ready']);
 kicomCellOut(['ok'=>$healthy,'code'=>$healthy?'CELL_DOCTOR_HEALTHY':'CELL_DOCTOR_DEGRADED','doctor'=>$public],$healthy?200:503);
