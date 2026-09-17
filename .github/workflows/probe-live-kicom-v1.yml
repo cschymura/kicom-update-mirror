@@ -1,0 +1,47 @@
+name: Probe live KiCom public runtime paths
+
+on:
+  push:
+    branches: [candidate/expansion-cell-v1]
+    paths:
+      - '.github/workflows/probe-live-kicom-v1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe public KiCom endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe() {
+            local label="$1" url="$2"
+            echo "===== ${label} ====="
+            body="$(mktemp)" headers="$(mktemp)"
+            code="$(curl -sS -L --max-time 15 --connect-timeout 7 -D "$headers" -o "$body" -w '%{http_code}' "$url" || true)"
+            echo "HTTP ${code}"
+            sed -n '1,12p' "$headers" | sed -E 's/(set-cookie:).*/\1 [redacted]/I'
+            echo '-- body (first 2000 bytes) --'
+            head -c 2000 "$body" || true
+            echo
+            rm -f "$body" "$headers"
+          }
+
+          probe bootstrap 'https://kicom.rurtalbahn.info/?q=BOOTSTRAP'
+          probe update_status 'https://kicom.rurtalbahn.info/?q=UPDATE_STATUS'
+          probe dev_root 'https://kicom.rurtalbahn.info/dev/'
+          probe dev_artifact 'https://kicom.rurtalbahn.info/dev/dev-artifact.php'
+          probe dev_api 'https://kicom.rurtalbahn.info/dev/dev-api.php'
+          probe dev_bridge 'https://kicom.rurtalbahn.info/dev/dev-bridge.php?op=DEV_SESSION_STATUS&p=e30'
+          probe runtime_probe 'https://kicom.rurtalbahn.info/dev/dev-runtime-probe.php'
+          probe runtime_load_probe 'https://kicom.rurtalbahn.info/dev/dev-runtime-load-probe.php'
+          probe source_manifest_status 'https://kicom.rurtalbahn.info/?q=SOURCE_MANIFEST_STATUS'
+          probe direct_source_status 'https://kicom.rurtalbahn.info/?q=DIRECT_SOURCE_STATUS'
+          probe direct_source_read 'https://kicom.rurtalbahn.info/?q=DIRECT_SOURCE_READ&path=lib.php'
+          probe source_read 'https://kicom.rurtalbahn.info/?q=SOURCE_READ&path=lib.php'
+          probe source_fast_read 'https://kicom.rurtalbahn.info/?q=SOURCE_FAST_READ&path=lib.php'
+          probe autonomy_source_list 'https://kicom.rurtalbahn.info/?q=AUTONOMY_SOURCE_LIST'
