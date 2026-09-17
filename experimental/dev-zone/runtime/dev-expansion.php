@@ -5,6 +5,7 @@ $root=dirname(__DIR__);
 require_once $root.'/lib.php';
 require_once __DIR__.'/DevSession.php';
 require_once __DIR__.'/DevExpansionBindings.php';
+require_once __DIR__.'/DevSandboxPerception.php';
 require_once __DIR__.'/DevObserver.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -35,7 +36,7 @@ if(!is_array($body)) devExpansionOut(['ok'=>false,'code'=>'DEV_EXPANSION_JSON_IN
 
 $operation=strtoupper(trim((string)($body['operation']??'')));
 $capability=match($operation){
-    'STATUS'=>'expansion.resource.status',
+    'STATUS','QUERY_SANDBOX_PERCEPTION'=>'expansion.resource.status',
     'EXECUTE_SANDBOX','REPAIR_SANDBOX_FEDERATION','UPGRADE_SANDBOX_LIVING'=>'expansion.test.execute',
     default=>'',
 };
@@ -53,9 +54,11 @@ $observer->stage($opId,'AUTH','OK');
 
 try{
     $bindings=new KiComDevExpansionBindings(__DIR__.'/expansion','https://kicom.rurtalbahn.info');
+    $perception=new KiComDevSandboxPerception(__DIR__.'/expansion','https://kicom.rurtalbahn.info');
     $observer->stage($opId,'BINDINGS','OK');
     $result=match($operation){
         'STATUS'=>$bindings->resourceStatus(),
+        'QUERY_SANDBOX_PERCEPTION'=>$perception->query(),
         'EXECUTE_SANDBOX'=>$bindings->executeSandbox(),
         'REPAIR_SANDBOX_FEDERATION'=>$bindings->repairSandboxFederation(),
         'UPGRADE_SANDBOX_LIVING'=>$bindings->upgradeSandboxLiving(),
