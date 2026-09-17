@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex,nofollow,noarchive">
 <title>KiCom DEV</title>
 <style>
-:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:light dark;--bg:#f4f6f8;--card:#fff;--text:#17202a;--muted:#667085;--line:#d9dee5;--accent:#1264a3;--good:#16794b;--bad:#b42318}@media(prefers-color-scheme:dark){:root{--bg:#101418;--card:#171c22;--text:#eef2f6;--muted:#98a2b3;--line:#303843;--accent:#62a8e5;--good:#5dd49a;--bad:#ff7b72}}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text)}main{max-width:720px;margin:0 auto;padding:28px 16px 60px}.head{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}h1{font-size:1.55rem;margin:0}.tag{font-size:.78rem;border:1px solid var(--line);border-radius:999px;padding:5px 9px;color:var(--muted)}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin:12px 0;box-shadow:0 5px 18px rgba(0,0,0,.04)}h2{font-size:1rem;margin:0 0 8px}.status{font-weight:650;margin:6px 0}.muted{color:var(--muted);font-size:.9rem;line-height:1.45}.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}button,input{font:inherit;border-radius:10px;border:1px solid var(--line);padding:11px 13px}button{background:var(--accent);color:white;border-color:transparent;font-weight:650;cursor:pointer}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}button.danger{background:transparent;color:var(--bad);border-color:var(--line)}button:disabled{opacity:.55;cursor:default}input{background:transparent;color:var(--text);min-width:160px;flex:1}pre{white-space:pre-wrap;word-break:break-word;font-size:.78rem;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;max-height:220px;overflow:auto}.ok{color:var(--good)}.err{color:var(--bad)}
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color-scheme:light dark;--bg:#f4f6f8;--card:#fff;--text:#17202a;--muted:#667085;--line:#d9dee5;--accent:#1264a3;--good:#16794b;--bad:#b42318}@media(prefers-color-scheme:dark){:root{--bg:#101418;--card:#171c22;--text:#eef2f6;--muted:#98a2b3;--line:#303843;--accent:#62a8e5;--good:#5dd49a;--bad:#ff7b72}}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text)}main{max-width:720px;margin:0 auto;padding:28px 16px 60px}.head{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:18px}h1{font-size:1.55rem;margin:0}.tag{font-size:.78rem;border:1px solid var(--line);border-radius:999px;padding:5px 9px;color:var(--muted)}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin:12px 0;box-shadow:0 5px 18px rgba(0,0,0,.04)}h2{font-size:1rem;margin:0 0 8px}.status{font-weight:650;margin:6px 0}.muted{color:var(--muted);font-size:.9rem;line-height:1.45}.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}button,input{font:inherit;border-radius:10px;border:1px solid var(--line);padding:11px 13px}button{background:var(--accent);color:white;border-color:transparent;font-weight:650;cursor:pointer}button.secondary{background:transparent;color:var(--text);border-color:var(--line)}button.danger{background:transparent;color:var(--bad);border-color:var(--line)}button:disabled{opacity:.55;cursor:default}input{background:transparent;color:var(--text);min-width:160px;flex:1}pre{white-space:pre-wrap;word-break:break-word;font-size:.78rem;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;max-height:320px;overflow:auto}.ok{color:var(--good)}.err{color:var(--bad)}
 </style>
 </head>
 <body>
@@ -31,9 +31,17 @@
     <div class="muted">Verwaltete Testzelle ausschließlich unter <code>https://sandbox.rurtalbahn.info/kicom/</code>. Bestehende Sandbox-Inhalte außerhalb dieses Verzeichnisses bleiben unverändert. Der Living-Upgrade-Pfad erhält Zell-ID, Schlüssel, Lineage und <code>var/</code>-State.</div>
     <div class="row">
       <button id="expansion-check" class="secondary">Sandbox prüfen</button>
+      <button id="perception-query" class="secondary">Wahrnehmung anzeigen</button>
       <button id="expansion-run">Sandbox-Zelle starten</button>
       <button id="expansion-upgrade" class="secondary">Living-Unterbau aktualisieren</button>
     </div>
+  </section>
+
+  <section class="card">
+    <h2>Zellwahrnehmung</h2>
+    <div id="perception-summary" class="status">Noch nicht abgefragt</div>
+    <div class="muted">Die Vollansicht wird nicht öffentlich gelesen. DEV sendet eine vom Parent signierte <code>PERCEPTION_QUERY</code>, prüft die signierte Antwort der Tochter und zeigt nur deren begrenzten World-Model-Bericht.</div>
+    <pre id="perception-view">Noch keine signierte Wahrnehmungsabfrage.</pre>
   </section>
 
   <section class="card">
@@ -56,7 +64,7 @@
   </section>
 </main>
 <script src="browser.js"></script>
-<script src="dev-client.js?v=20260917-1"></script>
+<script src="dev-client.js?v=20260917-2"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -78,8 +86,41 @@ const bridgeUrl=()=>{
 };
 const setExpansionButtons=(enabled)=>{
   $('expansion-check').disabled=!enabled;
+  $('perception-query').disabled=!enabled;
   $('expansion-run').disabled=!enabled;
   $('expansion-upgrade').disabled=!enabled;
+};
+const arr=v=>Array.isArray(v)?v:[];
+const short=id=>typeof id==='string'&&id.length>18?id.slice(0,12)+'…':(id||'–');
+const renderPerception=(r)=>{
+  const self=r.self||{},loc=self.location||{},ks=r.knowledge_summary||{};
+  const neighbors=arr(r.neighbors),actions=arr(r.actions),boundaries=arr(r.boundaries),unknowns=arr(r.unknowns),poss=arr(r.possibilities);
+  const lines=[];
+  lines.push(`WO BIN ICH?`);
+  lines.push(`  Zelle: ${short(self.cell_id)} · Generation ${self.generation??'–'} · Zustand ${self.state||'–'}`);
+  lines.push(`  Ort: ${loc.base_url||'–'} · Gebiet ${loc.territory||'–'} · Pfad ${loc.logical_path||'–'}`);
+  lines.push(`  Wissen: ${r.knowledge_state||'UNKNOWN'} · bekannt ${ks.known??0} · unbekannt ${ks.unknown??0} · verboten ${ks.forbidden??0} · veraltet ${ks.stale??0}`);
+  lines.push('');
+  lines.push(`WELCHE NACHBARN KENNE ICH? (${neighbors.length})`);
+  if(!neighbors.length) lines.push('  Keine evidenzbasiert bekannten Nachbarn.');
+  neighbors.forEach(n=>lines.push(`  ${n.role||'peer'}: ${short(n.cell_id)} · ${n.state||'UNKNOWN'} · Gen ${n.generation??'–'} · Fähigkeiten ${arr(n.capabilities).length}`));
+  lines.push('');
+  lines.push(`WAS KANN ICH? (${actions.length} modellierte Handlungen)`);
+  actions.forEach(a=>lines.push(`  ${a.id||'–'}: ${a.state||'UNKNOWN'} · ${a.authority||'–'}`));
+  lines.push('');
+  lines.push(`WO SIND GRENZEN? (${boundaries.length})`);
+  boundaries.forEach(b=>lines.push(`  ${b.id||'–'}: ${b.state||'UNKNOWN'} · erweiterbar=${b.extendable===true?'ja':b.extendable===false?'nein':'–'}${b.reason?' · '+b.reason:''}`));
+  lines.push('');
+  lines.push(`WELCHE ERWEITERUNGEN SIND DENKBAR? (${poss.length})`);
+  poss.forEach(p=>lines.push(`  ${p.id||'–'}: ${p.state||'UNKNOWN'} · ${p.authority||'–'}`));
+  lines.push('');
+  lines.push(`WAS WEISS ICH NOCH NICHT? (${unknowns.length})`);
+  unknowns.forEach(u=>lines.push(`  ${u.subject||'–'}: ${u.state||'UNKNOWN'} · ${u.reason||'–'}`));
+  lines.push('');
+  lines.push(`Pausiert: autonome Reproduktion=${r.paused?.autonomous_reproduction||'UNKNOWN'} · ausführbare Evolution=${r.paused?.autonomous_executable_evolution||'UNKNOWN'}`);
+  $('perception-view').textContent=lines.join('\n');
+  $('perception-summary').textContent=`World Model ${r.knowledge_state||'UNKNOWN'} · ${neighbors.length} Nachbar · ${ks.unknown??0} unbekannt`;
+  $('perception-summary').className='status '+((r.knowledge_state==='AVAILABLE'||r.knowledge_state==='STALE')?'ok':'');
 };
 async function refresh(){
   const saved=KiComDev.load();
@@ -124,6 +165,16 @@ $('expansion-check').addEventListener('click',async()=>{
     $('expansion-status').textContent=code==='DEV_CAPABILITY_FORBIDDEN'?'Neue Passkey-DEV-Sitzung erforderlich':'Sandbox nicht bereit';$('expansion-status').className='status err';log(d);
   }finally{b.disabled=false;}
 });
+$('perception-query').addEventListener('click',async()=>{
+  const b=$('perception-query');b.disabled=true;
+  try{
+    $('perception-summary').textContent='Signierte Wahrnehmungsabfrage läuft …';$('perception-summary').className='status';
+    const r=await KiComDev.querySandboxPerception();
+    if(!r.ok||!r.report) throw Object.assign(new Error(r.code||'Perception query failed'),{data:r});
+    renderPerception(r.report);log({ok:r.ok,code:r.code,cell:r.cell,proof:r.proof,world_id:r.report.world_id});
+  }catch(e){$('perception-summary').textContent='Wahrnehmungsabfrage fehlgeschlagen';$('perception-summary').className='status err';log(e.data||e.message);}
+  finally{b.disabled=!KiComDev.load();}
+});
 $('expansion-run').addEventListener('click',async()=>{
   const b=$('expansion-run');setExpansionButtons(false);
   try{
@@ -140,7 +191,8 @@ $('expansion-upgrade').addEventListener('click',async()=>{
     $('expansion-status').textContent='Living-Upgrade läuft …';$('expansion-status').className='status';
     const r=await KiComDev.upgradeSandboxLiving();
     if(!r.ok) throw Object.assign(new Error(r.code||'Living upgrade failed'),{data:r});
-    $('expansion-status').textContent='Sandbox-Zelle vollständig · living_ready=true';$('expansion-status').className='status ok';log(r);
+    const world=r.cell&&r.cell.world_model_ready?' · world_model_ready=true':'';
+    $('expansion-status').textContent='Sandbox-Zelle vollständig · living_ready=true'+world;$('expansion-status').className='status ok';log(r);
   }catch(e){$('expansion-status').textContent='Living-Upgrade fehlgeschlagen';$('expansion-status').className='status err';log(e.data||e.message);}
   finally{setExpansionButtons(!!KiComDev.load());}
 });
