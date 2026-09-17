@@ -36,7 +36,7 @@ if(!is_array($body)) devExpansionOut(['ok'=>false,'code'=>'DEV_EXPANSION_JSON_IN
 $operation=strtoupper(trim((string)($body['operation']??'')));
 $capability=match($operation){
     'STATUS'=>'expansion.resource.status',
-    'EXECUTE_SANDBOX','REPAIR_SANDBOX_FEDERATION'=>'expansion.test.execute',
+    'EXECUTE_SANDBOX','REPAIR_SANDBOX_FEDERATION','UPGRADE_SANDBOX_LIVING'=>'expansion.test.execute',
     default=>'',
 };
 if($capability==='') devExpansionOut(['ok'=>false,'code'=>'DEV_EXPANSION_OPERATION_FORBIDDEN'],403);
@@ -58,6 +58,7 @@ try{
         'STATUS'=>$bindings->resourceStatus(),
         'EXECUTE_SANDBOX'=>$bindings->executeSandbox(),
         'REPAIR_SANDBOX_FEDERATION'=>$bindings->repairSandboxFederation(),
+        'UPGRADE_SANDBOX_LIVING'=>$bindings->upgradeSandboxLiving(),
         default=>['ok'=>false,'code'=>'DEV_EXPANSION_OPERATION_FORBIDDEN'],
     };
     $observer->finish($opId,!empty($result['ok']),(string)($result['code']??'UNKNOWN'),[
