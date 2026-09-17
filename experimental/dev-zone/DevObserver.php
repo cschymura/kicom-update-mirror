@@ -56,7 +56,8 @@ final class KiComDevObserver
     {
         $devDir=rtrim($devDir,'/');
         $required=[
-            'dev-api.php','dev-auth.php','dev-expansion.php','dev-artifact.php','DevSession.php','DevExpansionBindings.php','DevSandboxPerception.php','DevArtifactImporter.php',
+            'dev-api.php','dev-auth.php','dev-expansion.php','dev-artifact.php','dev-bootstrap.php','bootstrap.html',
+            'DevSession.php','DevExpansionBindings.php','DevSandboxPerception.php','DevArtifactImporter.php','DevModuleBootstrap0916.php',
             'expansion/ExpansionService.php','expansion/ExpansionOrchestrator.php','expansion/ExpansionCellPackageBuilder.php',
             'expansion/ExpansionLocalFilesystemDeployer.php','expansion/ExpansionKiComDeployTargetResolver.php',
             'expansion/cell-runtime/common.php','expansion/cell-runtime/bootstrap.php','expansion/cell-runtime/federation.php','expansion/cell-runtime/status.php',
