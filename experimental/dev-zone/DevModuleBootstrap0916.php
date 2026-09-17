@@ -55,7 +55,8 @@ PHP;
         $replace=$loader.$find;
         $r=self::appendPatch($working,$patches,'trusted-module-loader',$find,$replace);if(empty($r['ok']))return $r;$working=(string)$r['source'];
 
-        $assets=self::matchUnique($working,"~^\\s*if\\(str_starts_with\\(\\$path,'assets/'\\)\\)return[^\\r\\n]+$~m",'BOOTSTRAP_ASSETS_ALLOWLIST_ANCHOR');
+        $assetsPattern='~^\s*if\(str_starts_with\(\$path,\'assets/\'\)\)return[^\r\n]+$~m';
+        $assets=self::matchUnique($working,$assetsPattern,'BOOTSTRAP_ASSETS_ALLOWLIST_ANCHOR');
         if(empty($assets['ok']))return $assets;
         $find=(string)$assets['match'];
         preg_match('/^(\\s*)/',$find,$indent);$sp=(string)($indent[1]??'    ');
