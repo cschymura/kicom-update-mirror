@@ -38,6 +38,16 @@ $result=KiComExpansionProtocol::signEnvelope(
 $verified=KiComExpansionCronRelay::verifyTickResult($result,$parent,$child);
 cronMust(!empty($verified['ok']),'parent verifies child tick result');
 
+// Regression guard for the live 2026-09-17 failure: transport metadata must
+// never be injected into a successful signed federation envelope before verify.
+$mutated=$result;
+$mutated['http_status']=200;
+$mutatedCheck=KiComExpansionCronRelay::verifyTickResult($mutated,$parent,$child);
+cronMust(empty($mutatedCheck['ok'])&&($mutatedCheck['code']??'')==='FEDERATION_SIGNATURE_INVALID','post-signature field injection is rejected');
+$transportSource=(string)file_get_contents(__DIR__.'/ExpansionHttpTransport.php');
+cronMust(!str_contains($transportSource,"return \$decoded+['http_status'=>\$status]"),'https transport preserves successful protocol payloads');
+cronMust(str_contains($transportSource,'return $decoded;'),'https transport returns decoded success unchanged');
+
 $wrong=KiComExpansionProtocol::signEnvelope(
     $child['cell_id'],
     $parent['cell_id'],
