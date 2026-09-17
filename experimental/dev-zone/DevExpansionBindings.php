@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 /**
  * Narrow DEV binding for the first real Expansion Cell test and its managed
- * repair path.
+ * repair/upgrade paths.
  *
  * This adapter is intentionally fixed to the existing allowlisted KiCom
  * deployment resource `sandbox` and its HTTPS origin. It cannot select an
@@ -74,6 +74,82 @@ final class KiComDevExpansionBindings
             self::TARGET_BASE_URL,
             self::EXPECTED_BUGGY_FEDERATION_SHA
         );
+    }
+
+    /**
+     * Upgrade the already-active first sandbox child from the thin federation
+     * runtime to the complete intrinsic Living daughter architecture. Identity,
+     * signing key, lineage and all existing var/ state are preserved.
+     *
+     * @return array<string,mixed>
+     */
+    public function upgradeSandboxLiving(): array
+    {
+        $service=$this->service();
+        $ready=$service->deploymentResourceStatus(self::RESOURCE_ALIAS);
+        if(empty($ready['ok'])) return $ready;
+        $resource=(array)($ready['resource']??[]);
+        if(($resource['class']??'')!=='test'||empty($resource['writable'])) return ['ok'=>false,'code'=>'DEV_EXPANSION_SANDBOX_NOT_READY'];
+
+        $resolved=KiComExpansionKiComDeployTargetResolver::resolve(self::RESOURCE_ALIAS);
+        if(!is_string($resolved)||$resolved==='') return ['ok'=>false,'code'=>'DEV_EXPANSION_SANDBOX_RESOLVE_FAILED'];
+        $childBase=self::TARGET_BASE_URL.'/kicom';
+        $http=new KiComExpansionHttpsTransport($childBase);
+        $before=$http->getJson($childBase.'/status.php');
+        $beforeCell=is_array($before['cell']??null)?(array)$before['cell']:[];
+        if(empty($before['ok'])||($before['code']??'')!=='CELL_STATUS'||($beforeCell['state']??'')!=='active') return ['ok'=>false,'code'=>'DEV_EXPANSION_SANDBOX_CELL_NOT_ACTIVE'];
+        if(!preg_match('/^cell-[a-f0-9]{24}$/',(string)($beforeCell['cell_id']??''))) return ['ok'=>false,'code'=>'DEV_EXPANSION_SANDBOX_CELL_ID_INVALID'];
+        $beforeCellId=(string)$beforeCell['cell_id'];
+        $beforePublic=(string)($beforeCell['public_key']??'');
+
+        $updater=new KiComExpansionManagedCellUpdater();
+        $upgrade=$updater->upgradeLivingRuntime($resolved,$this->sourceDir,$childBase);
+        if(empty($upgrade['ok'])) return $this->publicUpgradeResult($upgrade);
+
+        $after=$http->getJson($childBase.'/status.php');
+        $afterCell=is_array($after['cell']??null)?(array)$after['cell']:[];
+        $identityOk=!empty($after['ok'])&&($after['code']??'')==='CELL_STATUS'&&($afterCell['state']??'')==='active'
+            &&hash_equals($beforeCellId,(string)($afterCell['cell_id']??''))
+            &&hash_equals($beforePublic,(string)($afterCell['public_key']??''));
+        $livingReady=!empty($afterCell['living_ready'])&&!empty($afterCell['living']['living_ready']);
+        if(!$identityOk||!$livingReady){
+            $rollback=!empty($upgrade['changed'])?$updater->rollbackLivingRuntime($resolved,$upgrade):['ok'=>true,'code'=>'NO_CHANGE'];
+            return ['ok'=>false,'code'=>!empty($rollback['ok'])?'DEV_EXPANSION_LIVING_VERIFY_FAILED_ROLLED_BACK':'DEV_EXPANSION_LIVING_VERIFY_FAILED_ROLLBACK_FAILED','rollback'=>$rollback];
+        }
+
+        // Reuse the existing managed federation repair path as a signed tick
+        // smoke test. If federation.php is already current it performs no write.
+        $tick=$service->repairFederationEndpoint(
+            self::RESOURCE_ALIAS,
+            self::TARGET_BASE_URL,
+            self::EXPECTED_BUGGY_FEDERATION_SHA
+        );
+        if(empty($tick['ok'])){
+            $rollback=!empty($upgrade['changed'])?$updater->rollbackLivingRuntime($resolved,$upgrade):['ok'=>true,'code'=>'NO_CHANGE'];
+            return ['ok'=>false,'code'=>!empty($rollback['ok'])?'DEV_EXPANSION_LIVING_TICK_FAILED_ROLLED_BACK':'DEV_EXPANSION_LIVING_TICK_FAILED_ROLLBACK_FAILED','tick'=>$tick,'rollback'=>$rollback];
+        }
+
+        $public=$this->publicUpgradeResult($upgrade);
+        return [
+            'ok'=>true,
+            'code'=>!empty($upgrade['changed'])?'EXPANSION_LIVING_UPGRADE_OK':'EXPANSION_LIVING_ALREADY_CURRENT',
+            'cell'=>[
+                'cell_id'=>$beforeCellId,
+                'base_url'=>$childBase,
+                'state'=>'active',
+                'living_ready'=>true,
+                'living'=>$afterCell['living']??null,
+            ],
+            'upgrade'=>$public,
+            'federation_smoke'=>$tick,
+        ];
+    }
+
+    /** @param array<string,mixed> $row @return array<string,mixed> */
+    private function publicUpgradeResult(array $row): array
+    {
+        unset($row['_rollback']);
+        return $row;
     }
 
     private function service(): KiComExpansionService
