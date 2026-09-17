@@ -77,11 +77,19 @@ This gives the loop:
 
 `goal -> perceive -> remember -> identify gap/opportunity -> cultivate -> practice -> evaluate -> use -> observe result -> heal/evolve when needed`
 
-## Intended 0.9.16/g17 integration
+## Trusted integration sequence
 
-The first trusted integration should:
+The current 0.9.15 verifier cannot accept a new arbitrary `modules/*.php` path. That trust boundary is preserved rather than bypassed.
 
-1. add this engine as a genome-bound module rather than a loose `/dev/` file;
+### 0.9.16 / g17 — module bootstrap
+
+The first release adds the already-designed genome-bound trusted module loader and controlled `modules/` update allowlist. It does **not** smuggle the Skill Cultivation engine into the tree before 0.9.15 can verify that path.
+
+### 0.9.17 / g18 — Skill Cultivation activation
+
+The next genome generation can then:
+
+1. install this engine as a genome-bound module rather than a loose `/dev/` file;
 2. persist its derived state under the KiCom living state area and its evidence as append-only JSONL;
 3. feed repeated human mediation and repeated action failures from Experience Memory into `observeGap()`;
 4. expose mature skills to the World/Action Model as `AVAILABLE`, immature skills as `DEGRADED`/`UNKNOWN`, and superseded skills as `STALE`;
