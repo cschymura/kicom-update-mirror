@@ -69,12 +69,18 @@ final class KiComExpansionCellWorldModel
         $access=$this->accessMap();
         $knownCaps=is_array($perception['capabilities']??null)?$perception['capabilities']:[];
         $peers=is_array($peerMemory['peers']??null)?$peerMemory['peers']:[];
-        $unknowns=is_array($perception['unknowns']??null)?$perception['unknowns']:[];
-        $unknowns[]=['subject'=>'unsolicited_outbound_network','state'=>'FORBIDDEN','reason'=>'cell has no arbitrary remote-fetch authority'];
+        $unknowns=[];
+        foreach((is_array($perception['unknowns']??null)?$perception['unknowns']:[]) as $row){
+            if(is_array($row)&&strtoupper((string)($row['state']??''))==='UNKNOWN')$unknowns[]=$row;
+        }
         if(!$this->hasPeerCapabilityEvidence($peers)) $unknowns[]=['subject'=>'peer_capability_roster','state'=>'UNKNOWN','reason'=>'no fresh signed peer capability evidence'];
+        $constraints=[
+            ['subject'=>'unsolicited_outbound_network','state'=>'FORBIDDEN','reason'=>'cell has no arbitrary remote-fetch authority'],
+            ['subject'=>'direct_secret_visibility','state'=>'FORBIDDEN','reason'=>'perception/action layer cannot expose credential material'],
+        ];
 
         $world=[
-            'schema'=>1,
+            'schema'=>2,
             'observed_at'=>gmdate('c',$now),
             'expires_at'=>gmdate('c',$now+900),
             'trigger'=>$this->safeToken($trigger,64,'manual'),
@@ -116,6 +122,7 @@ final class KiComExpansionCellWorldModel
                 'autonomous_reproduction'=>'DEFERRED',
             ],
             'unknowns'=>$unknowns,
+            'constraints'=>$constraints,
             'evidence_policy'=>'Evidence can update knowledge; memory and goals never grant authority.',
         ];
         $world['knowledge_summary']=$this->knowledgeSummary($world);
@@ -177,7 +184,8 @@ final class KiComExpansionCellWorldModel
 
     /**
      * Bounded report intended for a signed federation response. No secret bytes,
-     * server filesystem paths or credentials are included.
+     * server filesystem paths or credentials are included. Experience memory is
+     * returned only as a small sanitized tail; complete histories stay private.
      *
      * @return array<string,mixed>
      */
@@ -205,7 +213,65 @@ final class KiComExpansionCellWorldModel
             'possibilities'=>$poss['possibilities']??[],
             'paused'=>$world['paused']??[],
             'unknowns'=>$world['unknowns']??[],
+            'constraints'=>$world['constraints']??[],
             'knowledge_summary'=>$world['knowledge_summary']??[],
+            'experience_memory'=>$this->experienceMemory(),
+        ];
+    }
+
+    /** @return array<string,mixed> */
+    private function experienceMemory(): array
+    {
+        $worldChanges=[];
+        foreach($this->recentJsonLines($this->livingDir.'/perception/world-changes.jsonl',5) as $row){
+            $worldChanges[]=[
+                'ts'=>(string)($row['ts']??''),
+                'trigger'=>(string)($row['trigger']??''),
+                'before_world_id'=>(string)($row['before_world_id']??''),
+                'after_world_id'=>(string)($row['after_world_id']??''),
+                'knowledge_summary'=>is_array($row['knowledge_summary']??null)?$row['knowledge_summary']:[],
+            ];
+        }
+
+        $perceptionChanges=[];
+        foreach($this->recentJsonLines($this->livingDir.'/perception/changes.jsonl',5) as $row){
+            $perceptionChanges[]=[
+                'ts'=>(string)($row['ts']??''),
+                'trigger'=>(string)($row['trigger']??''),
+                'summary'=>is_array($row['summary']??null)?$this->sanitizeSummary((array)$row['summary']):[],
+            ];
+        }
+
+        $actions=[];
+        foreach($this->recentJsonLines($this->livingDir.'/action/history.jsonl',8) as $row){
+            $safe=$this->sanitizeAction($row);
+            if($safe!==null)$actions[]=$safe;
+        }
+
+        $possibilityChanges=[];
+        foreach($this->recentJsonLines($this->livingDir.'/action/possibility-history.jsonl',5) as $row){
+            $model=is_array($row['model']??null)?(array)$row['model']:[];
+            $items=[];
+            foreach((is_array($model['possibilities']??null)?$model['possibilities']:[]) as $p){
+                if(!is_array($p))continue;
+                $items[]=[
+                    'id'=>(string)($p['id']??''),
+                    'state'=>(string)($p['state']??'UNKNOWN'),
+                    'authority'=>(string)($p['authority']??''),
+                ];
+                if(count($items)>=12)break;
+            }
+            $possibilityChanges[]=['ts'=>(string)($row['ts']??''),'possibilities'=>$items];
+        }
+
+        return [
+            'retention'=>'append-only',
+            'complete_history_private'=>true,
+            'tail_window_bytes'=>65536,
+            'recent_world_changes'=>$worldChanges,
+            'recent_perception_changes'=>$perceptionChanges,
+            'recent_actions'=>$actions,
+            'recent_possibility_changes'=>$possibilityChanges,
         ];
     }
 
@@ -358,7 +424,7 @@ final class KiComExpansionCellWorldModel
                 $walk($x);
             }}
         };
-        $walk($world['access']??[]);$walk($world['capabilities']??[]);$walk($world['neighbors']??[]);$walk($world['boundaries']??[]);
+        $walk($world['access']??[]);$walk($world['capabilities']??[]);$walk($world['neighbors']??[]);$walk($world['boundaries']??[]);$walk($world['constraints']??[]);
         return $c;
     }
 
@@ -379,6 +445,47 @@ final class KiComExpansionCellWorldModel
         ];
     }
 
+    /** @param array<string,mixed> $summary @return array<string,mixed> */
+    private function sanitizeSummary(array $summary): array
+    {
+        $out=[];
+        foreach($summary as $k=>$v){
+            $key=(string)$k;
+            if(strlen($key)>80)continue;
+            if(is_bool($v)||is_int($v)||is_float($v)||$v===null){$out[$key]=$v;continue;}
+            if(is_string($v)){$out[$key]=mb_substr($v,0,180);continue;}
+            if(is_array($v)){
+                $items=[];
+                foreach($v as $item){
+                    if(is_string($item))$items[]=mb_substr($item,0,120);
+                    elseif(is_bool($item)||is_int($item)||is_float($item)||$item===null)$items[]=$item;
+                    if(count($items)>=12)break;
+                }
+                $out[$key]=$items;
+            }
+        }
+        return $out;
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function recentJsonLines(string $path,int $limit): array
+    {
+        $limit=max(1,min(12,$limit));
+        if(!is_file($path)||is_link($path))return [];
+        $size=@filesize($path);if(!is_int($size)||$size<=0)return [];
+        $window=min($size,65536);$start=max(0,$size-$window);
+        $fh=@fopen($path,'rb');if($fh===false)return [];
+        if($start>0){@fseek($fh,$start);fgets($fh);}else{@rewind($fh);}
+        $rows=[];
+        while(($line=fgets($fh))!==false){
+            $line=trim($line);if($line==='')continue;
+            $j=json_decode($line,true);if(is_array($j))$rows[]=$j;
+            if(count($rows)>64)$rows=array_slice($rows,-32);
+        }
+        fclose($fh);
+        return array_slice($rows,-$limit);
+    }
+
     /** @param array<string,mixed> $world */
     private function worldHash(array $world): string
     {
@@ -397,9 +504,7 @@ final class KiComExpansionCellWorldModel
     /** @return array<string,mixed>|null */
     private function lastJsonLine(string $path): ?array
     {
-        if(!is_file($path))return null;$fh=@fopen($path,'rb');if($fh===false)return null;
-        $last='';while(($line=fgets($fh))!==false){$line=trim($line);if($line!=='')$last=$line;}fclose($fh);
-        if($last==='')return null;$j=json_decode($last,true);return is_array($j)?$j:null;
+        $rows=$this->recentJsonLines($path,1);return $rows[0]??null;
     }
 
     private function safeToken(string $value,int $max,string $fallback): string
