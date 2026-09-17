@@ -85,15 +85,17 @@ final class KiComExpansionOrchestrator
         $accepted=$this->registry->enroll($id,(array)($hello['descriptor']??[]),(string)($hello['proof']??''));
         if(empty($accepted['ok'])) return $accepted;
         $cell=(array)$accepted['cell'];
+        $peerContext=$this->peerContext((string)$cell['cell_id']);
         $activation=KiComExpansionProtocol::signEnvelope((string)$this->parent['cell_id'],(string)$cell['cell_id'],'EXPANSION_ACTIVATE',[
             'root_id'=>(string)$cell['root_id'],'parent_id'=>(string)$cell['parent_id'],'generation'=>(int)$cell['generation'],
+            'peer_context'=>$peerContext,
         ],$this->parentSecret);
         $active=$http->postJson($childBase.'/federation.php',$activation);
         if(empty($active['ok'])||($active['code']??'')!=='CELL_ACTIVE'){
             $this->registry->revokeCell((string)$cell['cell_id'],'activation failed');
             return ['ok'=>false,'code'=>'EXPANSION_ACTIVATION_FAILED','detail'=>$active['code']??'UNKNOWN'];
         }
-        $tick=KiComExpansionCronRelay::createTick($this->parent,$this->parentSecret,$cell,['reason'=>'activation-smoke']);
+        $tick=KiComExpansionCronRelay::createTick($this->parent,$this->parentSecret,$cell,['reason'=>'activation-smoke','peer_context'=>$peerContext]);
         $reply=$http->postJson($childBase.'/federation.php',$tick);
         $tickCheck=KiComExpansionCronRelay::verifyTickResult($reply,$this->parent,$cell);
         if(empty($tickCheck['ok'])) return ['ok'=>true,'code'=>'EXPANSION_ACTIVE_WITH_TICK_WARNING','cell'=>$cell,'tick'=>$tickCheck];
@@ -154,5 +156,30 @@ final class KiComExpansionOrchestrator
         $d=$this->deployPreparedLocal($prep,$localWebRoot,(string)$pkg['directory']); if(empty($d['ok'])) return ['ok'=>false,'code'=>'EXPANSION_DEPLOY_FAILED','detail'=>$d];
         $http=new KiComExpansionHttpsTransport((string)$prep['child_base_url']);
         return $this->activatePrepared($prep,$http)+['deployment'=>$d];
+    }
+
+    /** @return array<string,mixed> */
+    private function peerContext(string $forChildId): array
+    {
+        $parentCaps=[];
+        foreach((is_array($this->parent['capabilities']??null)?$this->parent['capabilities']:[]) as $cap){
+            $cap=strtolower(trim((string)$cap));if($cap!==''&&preg_match('/^[a-z0-9_.-]{1,64}$/',$cap))$parentCaps[$cap]=true;
+        }
+        $parent=[
+            'cell_id'=>(string)$this->parent['cell_id'],
+            'base_url'=>rtrim((string)$this->parent['base_url'],'/'),
+            'generation'=>max(0,(int)$this->parent['generation']),
+            'capabilities'=>array_keys($parentCaps),
+        ];
+        $peers=[];
+        foreach($this->registry->cells() as $row){
+            if(($row['state']??'')!=='active'||($row['cell_id']??'')===$forChildId)continue;
+            $caps=[];foreach((is_array($row['capabilities']??null)?$row['capabilities']:[]) as $cap){$cap=strtolower(trim((string)$cap));if($cap!==''&&preg_match('/^[a-z0-9_.-]{1,64}$/',$cap))$caps[$cap]=true;}
+            $peers[]=[
+                'cell_id'=>(string)$row['cell_id'],'base_url'=>rtrim((string)($row['base_url']??''),'/'),
+                'generation'=>max(0,(int)($row['generation']??0)),'capabilities'=>array_keys($caps),
+            ];
+        }
+        return ['schema'=>1,'parent'=>$parent,'peers'=>$peers,'generated_at'=>gmdate('c')];
     }
 }
