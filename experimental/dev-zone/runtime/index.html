@@ -28,16 +28,17 @@
   <section class="card">
     <h2>Sandbox Expansion Cell</h2>
     <div id="expansion-status" class="status">Noch nicht geprüft</div>
-    <div class="muted">Erster realer Federation-Test: KiCom legt ausschließlich <code>/kicom/</code> auf <code>sandbox.rurtalbahn.info</code> an. Bestehende Sandbox-Inhalte bleiben unverändert. Der Test benutzt die bereits allowlistete KiCom-Ressource <code>sandbox</code>; FTP und absolute Serverpfade sind nicht erforderlich.</div>
+    <div class="muted">Verwaltete Testzelle ausschließlich unter <code>https://sandbox.rurtalbahn.info/kicom/</code>. Bestehende Sandbox-Inhalte außerhalb dieses Verzeichnisses bleiben unverändert. Der Living-Upgrade-Pfad erhält Zell-ID, Schlüssel, Lineage und <code>var/</code>-State.</div>
     <div class="row">
       <button id="expansion-check" class="secondary">Sandbox prüfen</button>
       <button id="expansion-run">Sandbox-Zelle starten</button>
+      <button id="expansion-upgrade" class="secondary">Living-Unterbau aktualisieren</button>
     </div>
   </section>
 
   <section class="card">
     <h2>Agenten-Zugang</h2>
-    <div class="muted">Der Agentenlink enthält ausschließlich die DEV-Berechtigung. Er darf Quellstand, Workspace und isolierte Builds bearbeiten, aber keine Produktion, Updates, Recovery, Auth-Verwaltung oder Secrets. Der Link ist für GET-basierte Entwicklungstools gedacht und bleibt bis zum Sitzungsende widerrufbar. Der Sandbox-Expansion-Start ist absichtlich nicht über den GET-Agentenlink verfügbar.</div>
+    <div class="muted">Der Agentenlink enthält ausschließlich die DEV-Berechtigung. Er darf Quellstand, Workspace und isolierte Builds bearbeiten, aber keine Produktion, Updates, Recovery, Auth-Verwaltung oder Secrets. Der Link ist für GET-basierte Entwicklungstools gedacht und bleibt bis zum Sitzungsende widerrufbar. Sandbox-Expansion und Living-Upgrade sind absichtlich nicht über den GET-Agentenlink verfügbar.</div>
   </section>
 
   <section class="card">
@@ -55,7 +56,7 @@
   </section>
 </main>
 <script src="browser.js"></script>
-<script src="dev-client.js?v=20260916-4"></script>
+<script src="dev-client.js?v=20260917-1"></script>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -75,11 +76,15 @@ const bridgeUrl=()=>{
   u.searchParams.set('p','e30');
   return u.toString();
 };
+const setExpansionButtons=(enabled)=>{
+  $('expansion-check').disabled=!enabled;
+  $('expansion-run').disabled=!enabled;
+  $('expansion-upgrade').disabled=!enabled;
+};
 async function refresh(){
   const saved=KiComDev.load();
   $('bridge').disabled=!saved;
-  $('expansion-check').disabled=!saved;
-  $('expansion-run').disabled=!saved;
+  setExpansionButtons(!!saved);
   if(!saved){$('status').textContent='Nicht verbunden';$('status').className='status';$('details').textContent='Passkey öffnen, dann kann die DEV-Sitzung bis zu 7 Tage genutzt werden.';$('expansion-status').textContent='DEV-Sitzung erforderlich';return;}
   try{
     const s=await KiComDev.status();
@@ -120,14 +125,24 @@ $('expansion-check').addEventListener('click',async()=>{
   }finally{b.disabled=false;}
 });
 $('expansion-run').addEventListener('click',async()=>{
-  const b=$('expansion-run');b.disabled=true;$('expansion-check').disabled=true;
+  const b=$('expansion-run');setExpansionButtons(false);
   try{
     $('expansion-status').textContent='Expansion läuft …';$('expansion-status').className='status';
     const r=await KiComDev.expandSandbox();
     if(!r.ok) throw Object.assign(new Error(r.code||'Expansion failed'),{data:r});
-    $('expansion-status').textContent=r.code==='EXPANSION_ACTIVE'?'Sandbox-Zelle aktiv':'Sandbox-Zelle gestartet';$('expansion-status').className='status ok';log(r);
+    $('expansion-status').textContent=r.code==='EXPANSION_ACTIVE'?'Sandbox-Zelle aktiv':'Sandbox-Zelle vorhanden';$('expansion-status').className='status ok';log(r);
   }catch(e){$('expansion-status').textContent='Expansion fehlgeschlagen';$('expansion-status').className='status err';log(e.data||e.message);}
-  finally{b.disabled=false;$('expansion-check').disabled=!KiComDev.load();}
+  finally{setExpansionButtons(!!KiComDev.load());}
+});
+$('expansion-upgrade').addEventListener('click',async()=>{
+  const b=$('expansion-upgrade');setExpansionButtons(false);
+  try{
+    $('expansion-status').textContent='Living-Upgrade läuft …';$('expansion-status').className='status';
+    const r=await KiComDev.upgradeSandboxLiving();
+    if(!r.ok) throw Object.assign(new Error(r.code||'Living upgrade failed'),{data:r});
+    $('expansion-status').textContent='Sandbox-Zelle vollständig · living_ready=true';$('expansion-status').className='status ok';log(r);
+  }catch(e){$('expansion-status').textContent='Living-Upgrade fehlgeschlagen';$('expansion-status').className='status err';log(e.data||e.message);}
+  finally{setExpansionButtons(!!KiComDev.load());}
 });
 $('enroll').addEventListener('click',async()=>{
   const b=$('enroll');const code=$('otp').value.replace(/\D/g,'');if(code.length!==6){log('Bitte einen 6-stelligen Code eingeben.');return;}b.disabled=true;
