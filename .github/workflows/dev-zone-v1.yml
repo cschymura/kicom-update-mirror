@@ -46,6 +46,7 @@ jobs:
           php -l experimental/dev-zone/DevDiagnostics.php
           php -l experimental/dev-zone/DevObserver.php
           php -l experimental/dev-zone/DevExpansionBindings.php
+          php -l experimental/dev-zone/DevSandboxPerception.php
           php -l experimental/dev-zone/runtime/dev-auth.php
           php -l experimental/dev-zone/runtime/dev-api.php
           php -l experimental/dev-zone/runtime/dev-expansion.php
@@ -96,6 +97,10 @@ jobs:
           grep -q "expansion.test.execute" experimental/dev-zone/runtime/dev-expansion.php
           grep -q "EXECUTE_SANDBOX" experimental/dev-zone/runtime/dev-expansion.php
           grep -q "REPAIR_SANDBOX_FEDERATION" experimental/dev-zone/runtime/dev-expansion.php
+          grep -q "QUERY_SANDBOX_PERCEPTION" experimental/dev-zone/runtime/dev-expansion.php
+          grep -q "PERCEPTION_QUERY" experimental/dev-zone/DevSandboxPerception.php
+          grep -q "PERCEPTION_QUERY_RESULT" experimental/dev-zone/DevSandboxPerception.php
+          grep -q "verifyEnvelope" experimental/dev-zone/DevSandboxPerception.php
           grep -q "RESOURCE_ALIAS='sandbox'" experimental/dev-zone/DevExpansionBindings.php
           grep -q "TARGET_BASE_URL='https://sandbox.rurtalbahn.info'" experimental/dev-zone/DevExpansionBindings.php
           grep -q "EXPECTED_BUGGY_FEDERATION_SHA='d648b1b20c41f39049aa4cabd23ced3d9794cf2c1e92e602886b2e2674730653'" experimental/dev-zone/DevExpansionBindings.php
@@ -157,6 +162,7 @@ jobs:
           cp experimental/dev-zone/DevDiagnostics.php dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/DevObserver.php dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/DevExpansionBindings.php dist/kicom-dev-zone-v1/dev/
+          cp experimental/dev-zone/DevSandboxPerception.php dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/dev-client.js dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/runtime/dev-auth.php dist/kicom-dev-zone-v1/dev/
           cp experimental/dev-zone/runtime/dev-api.php dist/kicom-dev-zone-v1/dev/
@@ -184,6 +190,7 @@ jobs:
           php -l dist/kicom-dev-zone-v1/dev/DevDiagnostics.php
           php -l dist/kicom-dev-zone-v1/dev/DevObserver.php
           php -l dist/kicom-dev-zone-v1/dev/DevExpansionBindings.php
+          php -l dist/kicom-dev-zone-v1/dev/DevSandboxPerception.php
           php -l dist/kicom-dev-zone-v1/dev/dev-auth.php
           php -l dist/kicom-dev-zone-v1/dev/dev-api.php
           php -l dist/kicom-dev-zone-v1/dev/dev-expansion.php
@@ -197,6 +204,7 @@ jobs:
           php -l dist/kicom-dev-zone-v1/dev/expansion/CellPerceptionAction.php
           php -l dist/kicom-dev-zone-v1/dev/expansion/CellWorldModel.php
           php -l dist/kicom-dev-zone-v1/dev/expansion/cell-runtime/doctor.php
+          test -f dist/kicom-dev-zone-v1/dev/DevSandboxPerception.php
           test -f dist/kicom-dev-zone-v1/dev/expansion/CellLiving.php
           test -f dist/kicom-dev-zone-v1/dev/expansion/CellPerceptionAction.php
           test -f dist/kicom-dev-zone-v1/dev/expansion/CellWorldModel.php
