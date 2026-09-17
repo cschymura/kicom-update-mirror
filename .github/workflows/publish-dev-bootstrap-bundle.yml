@@ -1,0 +1,112 @@
+name: Publish KiCom DEV bootstrap bundle
+
+on:
+  push:
+    branches:
+      - candidate/expansion-cell-v1
+    paths:
+      - 'experimental/dev-zone/DevObserver.php'
+      - 'experimental/dev-zone/DevModuleBootstrap0916.php'
+      - 'experimental/dev-zone/runtime/dev-bootstrap.php'
+      - 'experimental/dev-zone/runtime/bootstrap.html'
+      - '.github/workflows/publish-dev-bootstrap-bundle.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kicom-dev-bootstrap-publisher
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: candidate/expansion-cell-v1
+          fetch-depth: 1
+
+      - name: Generate exact hash-bound bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dev-bundles
+          php <<'PHP'
+          <?php
+          declare(strict_types=1);
+          $map=[
+            'experimental/dev-zone/DevObserver.php'=>'DevObserver.php',
+            'experimental/dev-zone/DevModuleBootstrap0916.php'=>'DevModuleBootstrap0916.php',
+            'experimental/dev-zone/runtime/dev-bootstrap.php'=>'dev-bootstrap.php',
+            'experimental/dev-zone/runtime/bootstrap.html'=>'bootstrap.html',
+          ];
+          $files=[];
+          foreach($map as $source=>$target){
+              $raw=file_get_contents($source);
+              if($raw===false||$raw==='') throw new RuntimeException('read failed: '.$source);
+              if(str_ends_with($target,'.php')) token_get_all($raw,TOKEN_PARSE);
+              $files[]=['path'=>$target,'sha256'=>hash('sha256',$raw),'content_b64'=>base64_encode($raw)];
+          }
+          $bundle=[
+              'schema'=>1,
+              'type'=>'kicom-dev-bundle',
+              'target'=>'dev',
+              'name'=>'KiCom DEV 0.9.16 bootstrap builder',
+              'source_commit'=>getenv('GITHUB_SHA')?:'',
+              'files'=>$files,
+          ];
+          $json=json_encode($bundle,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
+          if(!is_string($json)) throw new RuntimeException('json encode failed');
+          $path='dev-bundles/kicom-dev-bootstrap-0916.json';
+          file_put_contents($path,$json."\n",LOCK_EX);
+          $sha=hash_file('sha256',$path);
+          if(!is_string($sha)||strlen($sha)!==64) throw new RuntimeException('sha failed');
+          file_put_contents($path.'.sha256',$sha.'  '.basename($path)."\n",LOCK_EX);
+          echo "bundle_sha256=$sha\n";
+          PHP
+
+      - name: Verify generated bundle against sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          php <<'PHP'
+          <?php
+          declare(strict_types=1);
+          $path='dev-bundles/kicom-dev-bootstrap-0916.json';
+          $j=json_decode((string)file_get_contents($path),true,64,JSON_THROW_ON_ERROR);
+          if(($j['schema']??0)!==1||($j['type']??'')!=='kicom-dev-bundle'||($j['target']??'')!=='dev') exit(1);
+          $expected=[
+            'DevObserver.php'=>'experimental/dev-zone/DevObserver.php',
+            'DevModuleBootstrap0916.php'=>'experimental/dev-zone/DevModuleBootstrap0916.php',
+            'dev-bootstrap.php'=>'experimental/dev-zone/runtime/dev-bootstrap.php',
+            'bootstrap.html'=>'experimental/dev-zone/runtime/bootstrap.html',
+          ];
+          if(count($j['files']??[])!==count($expected)) exit(1);
+          foreach($j['files'] as $row){
+              $target=(string)($row['path']??'');
+              if(!isset($expected[$target])) exit(1);
+              $raw=base64_decode((string)($row['content_b64']??''),true);
+              $source=file_get_contents($expected[$target]);
+              if(!is_string($raw)||$source===false||!hash_equals($source,$raw)) exit(1);
+              if(!hash_equals((string)$row['sha256'],hash('sha256',$raw))) exit(1);
+              if(str_ends_with($target,'.php')) token_get_all($raw,TOKEN_PARSE);
+          }
+          echo "bundle verified\n";
+          PHP
+          sha256sum -c dev-bundles/kicom-dev-bootstrap-0916.json.sha256
+
+      - name: Publish generated files to candidate branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'KiCom Artifact Publisher'
+          git config user.email 'actions@users.noreply.github.com'
+          git add dev-bundles/kicom-dev-bootstrap-0916.json dev-bundles/kicom-dev-bootstrap-0916.json.sha256
+          if git diff --cached --quiet; then
+            echo 'Bundle already current.'
+            exit 0
+          fi
+          git commit -m 'Publish generated DEV 0.9.16 bootstrap bundle'
+          git push origin HEAD:candidate/expansion-cell-v1
