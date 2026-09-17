@@ -28,6 +28,7 @@
     "DevKiComBindings.php",
     "DevDiagnostics.php",
     "DevExpansionBindings.php",
+    "DevSandboxPerception.php",
     "dev-client.js",
     "dev-auth.php",
     "dev-api.php",
@@ -53,7 +54,8 @@
       "target_base_url": "https://sandbox.rurtalbahn.info",
       "deploy_mode": "resource",
       "allowed_target_class": "test",
-      "agent_get_execute": false
+      "agent_get_execute": false,
+      "signed_perception_query": true
     }
   },
   "capabilities": [
