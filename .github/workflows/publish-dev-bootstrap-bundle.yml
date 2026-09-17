@@ -95,7 +95,7 @@ jobs:
           }
           echo "bundle verified\n";
           PHP
-          sha256sum -c dev-bundles/kicom-dev-bootstrap-0916.json.sha256
+          (cd dev-bundles && sha256sum -c kicom-dev-bootstrap-0916.json.sha256)
 
       - name: Publish generated files to candidate branch
         shell: bash
