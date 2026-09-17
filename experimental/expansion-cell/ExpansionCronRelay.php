@@ -18,6 +18,26 @@ final class KiComExpansionCronRelay
         self::requireDescriptor($parent,'PARENT');
         self::requireDescriptor($child,'CHILD');
         if (($child['state'] ?? '') !== 'active') throw new InvalidArgumentException('CHILD_NOT_ACTIVE');
+
+        // Every verified parent tick carries at least the parent's own bounded
+        // capability descriptor. Otherwise a tick without explicit peer_context
+        // could accidentally replace previously evidenced parent capabilities
+        // with an empty roster and make delegation oscillate AVAILABLE->UNKNOWN.
+        $caps=[];
+        foreach((is_array($parent['capabilities']??null)?$parent['capabilities']:[]) as $cap){
+            $cap=strtolower(trim((string)$cap));
+            if($cap!==''&&preg_match('/^[a-z0-9_.-]{1,64}$/',$cap))$caps[$cap]=true;
+        }
+        $peerContext=is_array($payload['peer_context']??null)?(array)$payload['peer_context']:[];
+        $peerContext['parent']=[
+            'cell_id'=>(string)$parent['cell_id'],
+            'base_url'=>rtrim((string)$parent['base_url'],'/'),
+            'generation'=>max(0,(int)($parent['generation']??0)),
+            'capabilities'=>array_keys($caps),
+        ];
+        if(!is_array($peerContext['peers']??null))$peerContext['peers']=[];
+        $payload['peer_context']=$peerContext;
+
         $payload += [
             'tick_id'=>KiComExpansionProtocol::randomId('tick-'),
             'sent_at'=>gmdate('c'),
