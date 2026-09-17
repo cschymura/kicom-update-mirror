@@ -2,13 +2,14 @@
 declare(strict_types=1);
 
 require_once __DIR__.'/ExpansionProtocol.php';
+require_once __DIR__.'/CellLiving.php';
 
 /**
  * Child-side federation state machine for an Expansion Cell.
  *
- * The child creates its own signing key locally. Bootstrap enrollment material
- * is removed after activation. Only signed parent messages are accepted once
- * active.
+ * The child creates its own signing key locally. Its intrinsic living substrate
+ * is materialized before node birth commits. Bootstrap enrollment material is
+ * removed after activation. Only signed parent messages are accepted once active.
  */
 final class KiComExpansionCellNode
 {
@@ -24,7 +25,11 @@ final class KiComExpansionCellNode
     }
 
     /**
-     * Called once after the package lands on the target host.
+     * Called once after the complete package lands on the target host.
+     *
+     * Birth is fail-closed: the node is committed only after the daughter has
+     * local memory, workspace, observer, genome/LKG, immune and evolution
+     * substrate. Enrollment later establishes lineage/trust only.
      *
      * @param array<string,mixed> $bootstrap
      * @return array<string,mixed>
@@ -32,6 +37,9 @@ final class KiComExpansionCellNode
     public function initialize(array $bootstrap): array
     {
         if (is_file($this->dir.'/node.json')) return ['ok'=>false,'code'=>'CELL_ALREADY_INITIALIZED'];
+        $living=new KiComExpansionCellLiving($this->dir);
+        $living->destroyIfUncommitted();
+
         foreach (['expansion_id','enrollment_token','base_url','parent_id','parent_public_key','parent_base_url'] as $key) {
             if (!isset($bootstrap[$key]) || !is_string($bootstrap[$key]) || trim($bootstrap[$key])==='') {
                 return ['ok'=>false,'code'=>'CELL_BOOTSTRAP_INVALID'];
@@ -46,9 +54,6 @@ final class KiComExpansionCellNode
         $identity=KiComExpansionProtocol::createIdentity();
         $secret=KiComExpansionProtocol::b64urlDecode($identity['secret_key']);
         if ($secret===null) return ['ok'=>false,'code'=>'CELL_IDENTITY_CREATE_FAILED'];
-        if (@file_put_contents($this->dir.'/signing.secret',$secret,LOCK_EX)===false) return ['ok'=>false,'code'=>'CELL_SECRET_WRITE_FAILED'];
-        @chmod($this->dir.'/signing.secret',0600);
-        if (function_exists('sodium_memzero')) sodium_memzero($secret);
 
         $public=[
             'schema'=>1,
@@ -59,7 +64,30 @@ final class KiComExpansionCellNode
             'capabilities'=>self::normalizeCapabilities($bootstrap['capabilities']??['federation.tick','status.report']),
             'created_at'=>gmdate('c'),
         ];
-        if (!$this->writeJson($this->dir.'/node.json',$public)) return ['ok'=>false,'code'=>'CELL_PUBLIC_WRITE_FAILED'];
+
+        $born=$living->initialize([
+            'cell_id'=>$public['cell_id'],
+            'base_url'=>$public['base_url'],
+            'parent_id'=>(string)$bootstrap['parent_id'],
+            'capabilities'=>$public['capabilities'],
+        ]);
+        if (empty($born['ok'])) {
+            if (function_exists('sodium_memzero')) sodium_memzero($secret);
+            return $born;
+        }
+
+        if (@file_put_contents($this->dir.'/signing.secret',$secret,LOCK_EX)===false) {
+            if (function_exists('sodium_memzero')) sodium_memzero($secret);
+            $this->rollbackBirth($living);
+            return ['ok'=>false,'code'=>'CELL_SECRET_WRITE_FAILED'];
+        }
+        @chmod($this->dir.'/signing.secret',0600);
+        if (function_exists('sodium_memzero')) sodium_memzero($secret);
+
+        if (!$this->writeJson($this->dir.'/node.json',$public)) {
+            $this->rollbackBirth($living);
+            return ['ok'=>false,'code'=>'CELL_PUBLIC_WRITE_FAILED'];
+        }
 
         $privateBootstrap=[
             'schema'=>1,
@@ -70,9 +98,25 @@ final class KiComExpansionCellNode
             'parent_base_url'=>rtrim((string)$bootstrap['parent_base_url'],'/'),
             'created_at'=>gmdate('c'),
         ];
-        if (!$this->writeJson($this->dir.'/bootstrap.private.json',$privateBootstrap)) return ['ok'=>false,'code'=>'CELL_BOOTSTRAP_WRITE_FAILED'];
+        if (!$this->writeJson($this->dir.'/bootstrap.private.json',$privateBootstrap)) {
+            $this->rollbackBirth($living);
+            return ['ok'=>false,'code'=>'CELL_BOOTSTRAP_WRITE_FAILED'];
+        }
 
-        return ['ok'=>true,'code'=>'CELL_INITIALIZED','cell_id'=>$public['cell_id'],'base_url'=>$public['base_url']];
+        $livingStatus=$living->status();
+        if (empty($livingStatus['living_ready'])) {
+            $this->rollbackBirth($living);
+            return ['ok'=>false,'code'=>'CELL_BIRTH_INCOMPLETE','living'=>$livingStatus];
+        }
+
+        return [
+            'ok'=>true,
+            'code'=>'CELL_INITIALIZED',
+            'cell_id'=>$public['cell_id'],
+            'base_url'=>$public['base_url'],
+            'living_ready'=>true,
+            'intrinsic_subsystems'=>$livingStatus['subsystems']??[],
+        ];
     }
 
     /** @return array<string,mixed> */
@@ -81,11 +125,14 @@ final class KiComExpansionCellNode
         $node=$this->readJson($this->dir.'/node.json');
         $boot=$this->readJson($this->dir.'/bootstrap.private.json');
         if ($node===null||$boot===null||($node['state']??'')!=='enrolling') return ['ok'=>false,'code'=>'CELL_NOT_ENROLLING'];
+        $living=(new KiComExpansionCellLiving($this->dir))->status();
+        if (empty($living['living_ready'])) return ['ok'=>false,'code'=>'CELL_LIVING_NOT_READY','living'=>$living];
         $descriptor=[
             'cell_id'=>(string)$node['cell_id'],
             'public_key'=>(string)$node['public_key'],
             'base_url'=>(string)$node['base_url'],
             'capabilities'=>self::normalizeCapabilities($node['capabilities']??[]),
+            'living_ready'=>true,
         ];
         $proof=KiComExpansionProtocol::enrollmentProof($descriptor,(string)$boot['enrollment_token']);
         return [
@@ -122,6 +169,7 @@ final class KiComExpansionCellNode
         foreach (['root_id','parent_id','generation'] as $key) if (!array_key_exists($key,$payload)) return ['ok'=>false,'code'=>'CELL_ACTIVATION_PAYLOAD_INVALID'];
         if (!hash_equals((string)$boot['parent_id'],(string)$payload['parent_id'])) return ['ok'=>false,'code'=>'CELL_PARENT_MISMATCH'];
 
+        $before=$node;
         $node['state']='active';
         $node['root_id']=(string)$payload['root_id'];
         $node['parent_id']=(string)$payload['parent_id'];
@@ -131,15 +179,21 @@ final class KiComExpansionCellNode
         $node['activated_at']=gmdate('c');
         if (!$this->writeJson($this->dir.'/node.json',$node)) return ['ok'=>false,'code'=>'CELL_ACTIVATION_WRITE_FAILED'];
 
+        $living=new KiComExpansionCellLiving($this->dir);
+        if (!$living->recordActivation($node)) {
+            $this->writeJson($this->dir.'/node.json',$before);
+            return ['ok'=>false,'code'=>'CELL_LIVING_ACTIVATION_WRITE_FAILED'];
+        }
+
         // Enrollment token is no longer needed after signed activation.
         @unlink($this->dir.'/bootstrap.private.json');
-        return ['ok'=>true,'code'=>'CELL_ACTIVE','cell_id'=>(string)$node['cell_id'],'root_id'=>$node['root_id'],'parent_id'=>$node['parent_id'],'generation'=>$node['generation']];
+        return ['ok'=>true,'code'=>'CELL_ACTIVE','cell_id'=>(string)$node['cell_id'],'root_id'=>$node['root_id'],'parent_id'=>$node['parent_id'],'generation'=>$node['generation'],'living_ready'=>true];
     }
 
     /**
      * Verify one parent cron/federation message and return a signed child reply.
-     * This v1 implementation intentionally recognizes only FEDERATION_TICK and
-     * FEDERATION_STATUS_REQUEST.
+     * FEDERATION_TICK also runs the local immune doctor; no parent capability is
+     * installed by the tick.
      *
      * @param array<string,mixed> $envelope
      * @return array<string,mixed>
@@ -158,6 +212,7 @@ final class KiComExpansionCellNode
         $op=strtoupper((string)($envelope['operation']??''));
         if (!in_array($op,['FEDERATION_TICK','FEDERATION_STATUS_REQUEST'],true)) return ['ok'=>false,'code'=>'CELL_OPERATION_FORBIDDEN'];
 
+        $doctor=(new KiComExpansionCellLiving($this->dir))->doctor($op==='FEDERATION_TICK');
         $result=[
             'ok'=>true,
             'cell_id'=>(string)$node['cell_id'],
@@ -166,6 +221,9 @@ final class KiComExpansionCellNode
             'operation'=>$op,
             'received_message_id'=>(string)($envelope['message_id']??''),
             'time'=>gmdate('c'),
+            'living_ready'=>!empty($doctor['status']['living_ready']),
+            'living_drift_count'=>(int)($doctor['status']['drift_count']??0),
+            'living_lkg_ok'=>!empty($doctor['status']['lkg_ok']),
         ];
         $secret=@file_get_contents($this->dir.'/signing.secret');
         if (!is_string($secret)||strlen($secret)!==SODIUM_CRYPTO_SIGN_SECRETKEYBYTES) return ['ok'=>false,'code'=>'CELL_SECRET_UNAVAILABLE'];
@@ -187,7 +245,12 @@ final class KiComExpansionCellNode
     /** @return array<string,mixed>|null */
     public function status(): ?array
     {
-        return $this->readJson($this->dir.'/node.json');
+        $node=$this->readJson($this->dir.'/node.json');
+        if ($node===null) return null;
+        $living=(new KiComExpansionCellLiving($this->dir))->status();
+        $node['living_ready']=!empty($living['living_ready']);
+        $node['living']=$living;
+        return $node;
     }
 
     /** @param mixed $caps @return list<string> */
@@ -223,5 +286,13 @@ final class KiComExpansionCellNode
         if (!@rename($tmp,$path)) { @unlink($tmp); return false; }
         @chmod($path,0600);
         return true;
+    }
+
+    private function rollbackBirth(KiComExpansionCellLiving $living): void
+    {
+        @unlink($this->dir.'/bootstrap.private.json');
+        @unlink($this->dir.'/node.json');
+        @unlink($this->dir.'/signing.secret');
+        $living->destroyIfUncommitted();
     }
 }
