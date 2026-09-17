@@ -17,10 +17,11 @@ function rmTree(string $dir): void {
 }
 function seedChildRuntime(string $root): void {
     @mkdir($root.'/lib',0700,true);@mkdir($root.'/var',0700,true);
-    foreach(['ExpansionProtocol.php','CellNode.php','CellLiving.php'] as $f) must(copy(__DIR__.'/'.$f,$root.'/lib/'.$f),'seed lib '.$f);
+    foreach(['ExpansionProtocol.php','CellNode.php','CellLiving.php','CellPerceptionAction.php'] as $f) must(copy(__DIR__.'/'.$f,$root.'/lib/'.$f),'seed lib '.$f);
     foreach(['common.php','bootstrap.php','federation.php','status.php','doctor.php'] as $f) must(copy(__DIR__.'/cell-runtime/'.$f,$root.'/'.$f),'seed endpoint '.$f);
     must(copy(__DIR__.'/cell-runtime/living-schema.json',$root.'/living-schema.json'),'seed living schema');
 }
+function jsonFile(string $path): array { $j=json_decode((string)file_get_contents($path),true); must(is_array($j),'json '.$path); return $j; }
 
 $base=sys_get_temp_dir().'/kicom-expansion-selftest-'.bin2hex(random_bytes(5));
 @mkdir($base,0700,true);
@@ -55,10 +56,22 @@ try {
     ]);
     must(!empty($init['ok']),'child initialize');
     must(!empty($init['living_ready']),'complete living substrate at birth');
+    must(!empty($init['perception_action_ready']),'perception/action ready at birth');
     $born=$child->status();
     must(is_array($born)&&!empty($born['living_ready']),'status proves living ready before enrollment');
-    foreach(['identity','canonical_memory','workspace','observer','genome_lkg','immune','evolution'] as $sub) must(!empty($born['living']['subsystems'][$sub]),'born subsystem '.$sub);
+    must(!empty($born['perception_action_ready']),'status proves perception/action ready before enrollment');
+    foreach(['identity','canonical_memory','workspace','observer','genome_lkg','immune','evolution','perception','action'] as $sub) must(!empty($born['living']['subsystems'][$sub]),'born subsystem '.$sub);
     foreach(['PROJECT_STATE.kcl','ARCHITECTURE.kcl','PROTOCOL.kcl','DECISIONS.kcl','CHANGELOG.kcl','NEXT.kcl'] as $f) must(is_file($childRoot.'/var/living/memory/'.$f),'local canonical memory '.$f);
+    foreach(['current.json','history.jsonl','changes.jsonl','neighbors.json'] as $f) must(is_file($childRoot.'/var/living/perception/'.$f),'perception memory '.$f);
+    foreach(['model.json','history.jsonl','boundaries.json','expansion-opportunities.json'] as $f) must(is_file($childRoot.'/var/living/action/'.$f),'action memory '.$f);
+
+    $perception=jsonFile($childRoot.'/var/living/perception/current.json');
+    must(($perception['unknowns'][0]['state']??'')==='UNKNOWN','unprobed external remains UNKNOWN');
+    must(($perception['environment']['arbitrary_filesystem']??'')==='FORBIDDEN','arbitrary filesystem explicitly FORBIDDEN');
+    $actionModel=jsonFile($childRoot.'/var/living/action/model.json');
+    $actionIndex=[];foreach($actionModel['actions']??[] as $a)if(is_array($a))$actionIndex[(string)($a['id']??'')]=$a;
+    must(($actionIndex['protected.external.write']['state']??'')==='FORBIDDEN','protected external write forbidden without boundary authorization');
+    must(($actionIndex['internal.capability.extend']['promotion']??'')==='DEFERRED','internal executable promotion deferred');
 
     $living=new KiComExpansionCellLiving($childRoot.'/var');
     $doctor=$living->doctor(false);must(!empty($doctor['ok']),'doctor healthy after birth');
@@ -71,12 +84,15 @@ try {
     $candidateContent="<?php\ndeclare(strict_types=1);\n// inert candidate fitness fixture\n";
     $candidate=$living->stageCandidate(['changes'=>[['path'=>'status.php','sha256'=>hash('sha256',$candidateContent),'content_b64'=>base64_encode($candidateContent)]]]);
     must(!empty($candidate['ok'])&&($candidate['fitness']['fitness']??'')==='pass','static evolution fitness passes valid inert candidate');
+    must(($candidate['fitness']['eligible_for_internal_promotion']??true)===false,'candidate promotion not active');
+    must(($candidate['promotion_state']??'')==='DEFERRED','candidate promotion explicitly deferred');
     must(is_file($childRoot.'/var/living/evolution/candidates/'.$candidate['candidate_id'].'.json'),'candidate persisted only in inert candidate area');
 
     $hello=$child->enrollmentHello();
     must(!empty($hello['ok']),'child hello');
     must(isset($hello['proof'],$hello['descriptor']),'hello proof+descriptor');
     must(($hello['descriptor']['living_ready']??false)===true,'enrollment proves cell was complete before trust');
+    must(($hello['descriptor']['perception_action_ready']??false)===true,'enrollment proves perception/action existed before trust');
 
     $bad=$registry->enroll((string)$prep['expansion_id'],(array)$hello['descriptor'],str_repeat('0',64));
     must(empty($bad['ok'])&&($bad['code']??'')==='EXPANSION_ENROLLMENT_PROOF_INVALID','bad proof rejected');
@@ -105,8 +121,15 @@ try {
     $active=$child->activate($activation);
     must(!empty($active['ok'])&&($active['code']??'')==='CELL_ACTIVE','child activation');
     must(!is_file($childRoot.'/var/bootstrap.private.json'),'bootstrap token erased after activation');
-    must(!empty($child->status()['living_ready']),'activation does not add or remove intrinsic capabilities');
+    $activeStatus=$child->status();
+    must(!empty($activeStatus['living_ready'])&&!empty($activeStatus['perception_action_ready']),'activation preserves intrinsic living+PA readiness');
 
+    $neighbors=jsonFile($childRoot.'/var/living/perception/neighbors.json');
+    $parentSeen=false;foreach($neighbors['neighbors']??[] as $n)if(is_array($n)&&($n['cell_id']??'')===$parent['cell_id']){$parentSeen=(($n['state']??'')==='AVAILABLE');}
+    must($parentSeen,'signed activation marks parent AVAILABLE');
+
+    $historyBefore=count(file($childRoot.'/var/living/perception/history.jsonl',FILE_IGNORE_NEW_LINES)?:[]);
+    $actionsBefore=count(file($childRoot.'/var/living/action/history.jsonl',FILE_IGNORE_NEW_LINES)?:[]);
     $tick=KiComExpansionProtocol::signEnvelope(
         $parent['cell_id'],
         (string)$accepted['cell']['cell_id'],
@@ -124,6 +147,13 @@ try {
     );
     must(!empty($replyCheck['ok']),'parent verifies child reply');
     must(($reply['payload']['living_ready']??false)===true,'tick reports intrinsic living readiness');
+    must(($reply['payload']['perception_action_ready']??false)===true,'tick reports perception/action readiness');
+    must(($reply['payload']['known_neighbors']??0)>=1,'tick reports known neighbor');
+    must(($reply['payload']['known_boundaries']??0)>=1,'tick reports known boundaries');
+    $historyAfter=count(file($childRoot.'/var/living/perception/history.jsonl',FILE_IGNORE_NEW_LINES)?:[]);
+    $actionsAfter=count(file($childRoot.'/var/living/action/history.jsonl',FILE_IGNORE_NEW_LINES)?:[]);
+    must($historyAfter>$historyBefore,'tick appends perception history');
+    must($actionsAfter>$actionsBefore,'tick appends action history');
 
     $stale=KiComExpansionProtocol::signEnvelope(
         $parent['cell_id'],
