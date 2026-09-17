@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "name": "kicom-expansion-living-cell/1",
+  "name": "kicom-expansion-living-cell/2",
   "required_subsystems": [
     "identity",
     "canonical_memory",
@@ -8,7 +8,9 @@
     "observer",
     "genome_lkg",
     "immune",
-    "evolution"
+    "evolution",
+    "perception",
+    "action"
   ],
   "memory_resources": [
     "PROJECT_STATE.kcl",
@@ -27,10 +29,13 @@
     {"path": "lib/ExpansionProtocol.php", "role": "federation-protocol"},
     {"path": "lib/CellNode.php", "role": "cell-state-machine"},
     {"path": "lib/CellLiving.php", "role": "intrinsic-living-substrate"},
+    {"path": "lib/CellPerceptionAction.php", "role": "persistent-perception-action-memory"},
     {"path": "living-schema.json", "role": "intrinsic-schema"}
   ],
+  "perception_states": ["UNKNOWN", "AVAILABLE", "UNAVAILABLE", "FORBIDDEN", "DEGRADED", "STALE"],
+  "perception_action_loop": "observe -> remember -> derive capabilities/boundaries -> act -> observe result -> update perception/action memory",
   "birth_policy": "all intrinsic subsystems materialized and verified before node initialization commits",
-  "evolution_policy": "autonomous internal promotion only after deterministic static fitness with local LKG rollback",
+  "evolution_policy": "candidate creation and deterministic static fitness remain available; executable autonomous promotion is deferred until perception/action memory is verified",
   "external_boundary_policy": "human authorization only when a protected external system, credential or permission requires it",
   "inheritance_policy": "architecture may be inherited; identity, secrets, mutable state and project memory are local"
 }
