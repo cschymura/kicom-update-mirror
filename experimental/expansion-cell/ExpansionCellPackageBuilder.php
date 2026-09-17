@@ -16,7 +16,7 @@ final class KiComExpansionCellPackageBuilder
     }
 
     /** @param array<string,mixed> $prepared @param array<string,mixed> $parent */
-    public function build(string $outputDir,array $prepared,array $parent,array $capabilities=['federation.tick','status.report']): array
+    public function build(string $outputDir,array $prepared,array $parent,array $capabilities=['federation.tick','status.report','perception.query']): array
     {
         foreach (['expansion_id','enrollment_token','child_base_url'] as $key) {
             if (!isset($prepared[$key]) || !is_string($prepared[$key]) || trim($prepared[$key])==='') {
@@ -37,6 +37,7 @@ final class KiComExpansionCellPackageBuilder
             'CellNode.php',
             'CellLiving.php',
             'CellPerceptionAction.php',
+            'CellWorldModel.php',
             'cell-runtime/common.php',
             'cell-runtime/bootstrap.php',
             'cell-runtime/federation.php',
@@ -56,6 +57,7 @@ final class KiComExpansionCellPackageBuilder
             'CellNode.php'=>'lib/CellNode.php',
             'CellLiving.php'=>'lib/CellLiving.php',
             'CellPerceptionAction.php'=>'lib/CellPerceptionAction.php',
+            'CellWorldModel.php'=>'lib/CellWorldModel.php',
             'cell-runtime/common.php'=>'common.php',
             'cell-runtime/bootstrap.php'=>'bootstrap.php',
             'cell-runtime/federation.php'=>'federation.php',
@@ -109,7 +111,7 @@ final class KiComExpansionCellPackageBuilder
     {
         $required=[
             '.htaccess','var/.htaccess','bootstrap.config.php','common.php','bootstrap.php','federation.php','status.php','doctor.php','living-schema.json',
-            'lib/ExpansionProtocol.php','lib/CellNode.php','lib/CellLiving.php','lib/CellPerceptionAction.php',
+            'lib/ExpansionProtocol.php','lib/CellNode.php','lib/CellLiving.php','lib/CellPerceptionAction.php','lib/CellWorldModel.php',
         ];
         $listed=[];foreach(($manifest['files']??[]) as $row)if(is_array($row)&&isset($row['path']))$listed[(string)$row['path']]=true;
         foreach($required as $path){
@@ -118,6 +120,7 @@ final class KiComExpansionCellPackageBuilder
         $schemaRaw=@file_get_contents($root.'/living-schema.json');$schema=is_string($schemaRaw)?json_decode($schemaRaw,true):null;
         if(!is_array($schema)||(int)($schema['schema']??0)!==1)return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_LIVING_SCHEMA_INVALID'];
         foreach(['identity','canonical_memory','workspace','observer','genome_lkg','immune','evolution','perception','action'] as $sub)if(!in_array($sub,$schema['required_subsystems']??[],true))return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_INTRINSIC_SUBSYSTEM_MISSING','subsystem'=>$sub];
+        if(($schema['world_model']??'')!=='persistent-situational-awareness')return ['ok'=>false,'code'=>'EXPANSION_PACKAGE_WORLD_MODEL_MISSING'];
         return ['ok'=>true,'required_files'=>$required];
     }
 
