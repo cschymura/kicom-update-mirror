@@ -1,22 +1,22 @@
 {
   "schema": 1,
-  "updated_at": "2026-09-18T10:14:00+02:00",
+  "updated_at": "2026-09-18T10:40:00+02:00",
   "objective": "Make kicom@rurtalbahn.info operational as KiCom's bounded mail channel",
-  "state": "WAITING_FOR_CRITICAL_0917_INSTALL_FREEOTP",
+  "state": "ACTIVE_VERIFIED",
   "live": {
-    "version": "0.9.16",
-    "genome": "kicom-0.9.16-g17",
+    "version": "0.9.17",
+    "genome": "kicom-0.9.17-g18",
     "healthy": true,
     "trusted": true,
     "lkg_ok": true,
     "drift_count": 0,
     "unknown_count": 0,
-    "installed_history_id": "20260918081358-c6fc9da9"
+    "installed_history_id": "20260918084450-09f604aa"
   },
   "transport": {
     "tinyfish": "WORKING",
     "opera_connector": "INSTALLED_NOT_YET_CONNECTED",
-    "opera_note": "Connector previously reported browser not connected; enable Allow AI connection and sign in in Opera if it is to be used as an alternate path."
+    "opera_note": "Connector previously reported browser not connected; optional alternate path only."
   },
   "mail_release_0917": {
     "build_id": "d352c9205eca6ca3e488",
@@ -24,28 +24,27 @@
     "genome_id": "kicom-0.9.17-g18",
     "package_sha256": "a8b37e7d0b1ed67f9c137cadc43451521965d559e1ad80b5fb0213a8d36a62f2",
     "risk_class": "red",
-    "verifier_result": "STAGED_DECISION_REQUIRED",
     "approval_id": "48b99f9bf060fa494f381e41",
     "approval_binding_sha256": "878f403734ae9106da297c0e5c3c3770b6d6ba793785f4221dd052355b40b925",
     "kernel_update": false,
-    "contents": [
-      "protected server-side mailbox password storage under var/secrets or KICOM_MAIL_PASSWORD environment",
-      "TLS peer and peer-name verified IMAPS probe on w021efff.kasserver.com:993",
-      "TLS peer and peer-name verified SMTPS AUTH probe on w021efff.kasserver.com:465",
-      "self-only SMTP loopback to kicom@rurtalbahn.info with exact Message-ID search in INBOX",
-      "KCL MAIL_STATUS, MAIL_PROBE and MAIL_LOOPBACK endpoints",
-      "admin control-plane form for password provisioning and manual probe/loopback",
-      "no arbitrary-recipient KCL send endpoint"
-    ],
-    "production_changed": false
+    "installed": true
   },
-  "after_install": [
-    "Verify live 0.9.17/g18 healthy, trusted, LKG OK, drift=0, unknown=0.",
-    "User opens KiCom admin.php and enters the mailbox password only in the protected KiCom E-Mail form.",
-    "Confirm MAIL_STATUS configured=true.",
-    "Run MAIL_PROBE through the still-active autonomy session.",
-    "Run MAIL_LOOPBACK; require SMTP accepted and exact Message-ID found over IMAP.",
-    "Persist only non-secret success evidence."
+  "mail_runtime": {
+    "identity": "kicom@rurtalbahn.info",
+    "configured": true,
+    "imap_host": "w021efff.kasserver.com",
+    "imap_port": 993,
+    "smtp_host": "w021efff.kasserver.com",
+    "smtp_port": 465,
+    "tls": true,
+    "probe": "passed",
+    "loopback": "passed",
+    "loopback_evidence": "user-confirmed admin tests; public MAIL_STATUS confirms configured=true",
+    "secret_material_recorded": false
+  },
+  "remaining": [
+    "Synchronize canonical PROJECT_STATE and CHANGELOG from 0.9.15 to live 0.9.17/g18 during the next authenticated KiCom autonomy session.",
+    "Persist non-secret mail activation evidence in canonical memory."
   ],
   "invariants": [
     "No OTP stored in GitHub.",
