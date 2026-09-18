@@ -39,9 +39,9 @@ final class KiComMailChannel
     public function capabilities(): array
     {
         return [
-            'mail.receive' => 'CONFIGURED',
+            'mail.receive' => 'CONFIGURED_UNTRUSTED_INBOX',
             'mail.send' => 'CONFIGURED_EXTERNAL_AUTH_REQUIRED',
-            'mail.attachments' => 'UNTRUSTED',
+            'mail.attachments' => 'QUARANTINE_ONLY',
             'mail.links' => 'UNTRUSTED',
             'mail.grant_authority' => 'FORBIDDEN',
             'mail.secret_visibility' => 'FORBIDDEN',
