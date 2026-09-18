@@ -1,0 +1,65 @@
+name: KiCom Interaction Character v1
+
+on:
+  push:
+    branches: [candidate/expansion-cell-v1]
+    paths:
+      - 'experimental/interaction-character/**'
+      - 'candidates/interaction-character-v1/**'
+      - '.github/workflows/interaction-character-v1.yml'
+  pull_request:
+    paths:
+      - 'experimental/interaction-character/**'
+      - 'candidates/interaction-character-v1/**'
+      - '.github/workflows/interaction-character-v1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PHP syntax
+        run: |
+          php -l experimental/interaction-character/InteractionCharacter.php
+          php -l experimental/interaction-character/interaction-character-selftest.php
+
+      - name: Candidate JSON
+        run: |
+          python -m json.tool candidates/interaction-character-v1/PROFILE_SEED.json >/dev/null
+          python -m json.tool candidates/interaction-character-v1/CANONICAL_MEMORY_PATCH.json >/dev/null
+
+      - name: Boundary static checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=experimental/interaction-character/InteractionCharacter.php
+          ! grep -nE '\b(shell_exec|exec|system|passthru|proc_open|popen)\s*\(' "$f"
+          ! grep -nE '\b(curl_init|fsockopen|stream_socket_client)\s*\(' "$f"
+          grep -q "CHARACTER_SENSITIVE_PROFILE_FORBIDDEN" "$f"
+          grep -q "CHARACTER_CORE_REQUIRES_HUMAN_CONFIRMATION" "$f"
+          grep -q "sensitive_user_profiling.*FORBIDDEN" "$f"
+          grep -q "credential_storage.*FORBIDDEN" "$f"
+          grep -q "safety_override.*FORBIDDEN" "$f"
+          grep -q "history_hard_delete.*FORBIDDEN" "$f"
+
+      - name: Functional selftest
+        run: php experimental/interaction-character/interaction-character-selftest.php
+
+      - name: Canonical proposal checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          f=candidates/interaction-character-v1/CANONICAL_MEMORY_PATCH.json
+          grep -q '"id": "D028"' "$f"
+          grep -q '"live_mutation_performed": false' "$f"
+          grep -q '"interaction_character"' "$f"
+          grep -q '"core", "adaptive", "session"' "$f"
+          s=candidates/interaction-character-v1/PROFILE_SEED.json
+          grep -q '"command.mach"' "$s"
+          grep -q '"command.weiter"' "$s"
+          grep -q '"current_chat.high_context"' "$s"

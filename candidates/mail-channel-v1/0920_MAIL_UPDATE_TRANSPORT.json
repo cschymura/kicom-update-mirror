@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "candidate": "kicom-mail-update-transport-0.9.20-g20",
+  "status": "ACTIVE_VERIFIED_PRODUCTION",
+  "base": {
+    "version": "0.9.18",
+    "genome": "kicom-0.9.18-g19"
+  },
+  "target": {
+    "version": "0.9.20",
+    "genome": "kicom-0.9.20-g20"
+  },
+  "build_id": "e5a82e5a27abaa9c1779",
+  "package_sha256": "60be933f61d69fc22e2fea8170e634a5e3d30cb06f30524514ac2e7788948544",
+  "risk_class": "red",
+  "approval_id": "1712cc2a68139b1194d229da",
+  "approval_binding_sha256": "cc7816fe35144ef2335b692f5577a3371227ab1a707c7073129ba57b07bd7e7e",
+  "kernel_update": false,
+  "capabilities": [
+    "MAIL_UPDATE_CANDIDATES lists only hash-verified quarantined ZIP objects",
+    "MAIL_UPDATE_IMPORT accepts quarantine_id only; no arbitrary filesystem path",
+    "mail ZIP is re-hashed before verifier entry",
+    "existing self-update verifier is reused unchanged",
+    "GREEN mail auto-install requires exact version+SHA corroboration from at least one configured update feed and no observed feed conflict",
+    "uncorroborated GREEN and all YELLOW/RED packages remain staged for normal approval",
+    "existing pending update is never silently overwritten by a different mail package"
+  ],
+  "invariants": [
+    "mail is transport, never authority",
+    "no OTP/session/mailbox secret stored",
+    "no verifier or allowlist weakening",
+    "spam remains human review boundary",
+    "quarantine remains non-executable"
+  ],
+  "supersedes_candidate": {
+    "version": "0.9.19",
+    "purpose": "automatic Junk/Spam folder polling",
+    "status": "not installed by design; history retained"
+  },
+  "production_changed": true,
+  "install": {
+    "history_id": "20260918095157-b6206571",
+    "from_version": "0.9.18",
+    "to_version": "0.9.20"
+  },
+  "live": {
+    "version": "0.9.20",
+    "genome": "kicom-0.9.20-g20",
+    "healthy": true,
+    "trusted": true,
+    "lkg_ok": true,
+    "drift_count": 0,
+    "unknown_count": 0
+  },
+  "production_validation": {
+    "candidate_listing": {
+      "count": 1,
+      "quarantine_id": "20260918-c17948642ae6e30660979f32-936f3d",
+      "filename": "KiCom-0.9.18-Quarantine-Test.zip",
+      "bytes": 307,
+      "sha256": "c17948642ae6e30660979f324e6fc83cffb46f18ba1f5267233610d77c21b386",
+      "trust": "UNTRUSTED",
+      "verifier_required": true
+    },
+    "invalid_package_rejection": {
+      "http_status": 422,
+      "local_zip_entries": [
+        "README.txt"
+      ],
+      "manifest_present": false,
+      "expected_verifier_reason": "MANIFEST_MISSING",
+      "installed": false,
+      "staged": false,
+      "pending_version": "",
+      "live_version_after_test": "0.9.20"
+    }
+  },
+  "notes": [
+    "The negative production test proves that mail transport cannot bypass the existing update verifier.",
+    "A real future KiCom release received by mail will be re-hashed, genome/manifest/syntax verified and risk-classified before staging or installation.",
+    "GREEN auto-install requires exact version and SHA corroboration from a configured feed; otherwise normal approval remains required."
+  ]
+}

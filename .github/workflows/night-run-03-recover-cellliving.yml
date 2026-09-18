@@ -1,0 +1,22 @@
+name: KiCom Night Run 03 Recovery
+on:
+  push:
+    branches: [candidate/expansion-cell-v1]
+permissions:
+  contents: write
+jobs:
+  recover:
+    if: github.event.head_commit.message == 'Arm one-shot CellLiving recovery'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore exact verified CellLiving source
+        run: |
+          git checkout de3d77a0954de62e53bb36dc30fd2d8b0252a29c -- experimental/expansion-cell/CellLiving.php
+          git config user.name "kicom-recovery"
+          git config user.email "kicom-recovery@users.noreply.github.com"
+          git add experimental/expansion-cell/CellLiving.php
+          git commit -m "Recover CellLiving after interrupted diagnostic integration"
+          git push origin HEAD:candidate/expansion-cell-v1

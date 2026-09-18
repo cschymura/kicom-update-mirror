@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "policy": {
+    "strategy": "try-all-enabled-in-priority-order",
+    "sha256_required": true,
+    "transport_does_not_install": true,
+    "history": "append-only"
+  },
+  "sources": [
+    {
+      "id": "primary-channel",
+      "type": "https-channel",
+      "priority": 10,
+      "enabled": true,
+      "url": "https://update.rurtalbahn.info/kicom/channel.json",
+      "allowed_hosts": ["update.rurtalbahn.info"],
+      "package_hosts": ["update.rurtalbahn.info"]
+    },
+    {
+      "id": "github-mirror",
+      "type": "https-channel",
+      "priority": 20,
+      "enabled": true,
+      "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/channel.json",
+      "allowed_hosts": ["raw.githubusercontent.com"],
+      "package_hosts": ["raw.githubusercontent.com"]
+    },
+    {
+      "id": "independent-web-mirror",
+      "type": "https-channel",
+      "priority": 30,
+      "enabled": false,
+      "url": "",
+      "allowed_hosts": [],
+      "package_hosts": [],
+      "note": "Reserved for an independent Daisy/Sites mirror once a public URL exists."
+    },
+    {
+      "id": "local-update-inbox",
+      "type": "local-inbox",
+      "priority": 70,
+      "enabled": true
+    },
+    {
+      "id": "ftps-fallback",
+      "type": "external-adapter",
+      "adapter": "ftp",
+      "mode": "ftps",
+      "priority": 80,
+      "enabled": false,
+      "remote_path": "/kicom/{filename}",
+      "note": "Enable only when runtime credentials are configured outside this file."
+    },
+    {
+      "id": "ftp-break-glass",
+      "type": "external-adapter",
+      "adapter": "ftp",
+      "mode": "ftp",
+      "allow_plaintext_ftp": false,
+      "priority": 90,
+      "enabled": false,
+      "remote_path": "/kicom/{filename}",
+      "note": "Plain FTP remains explicit break-glass only."
+    },
+    {
+      "id": "browser-manual-upload",
+      "type": "manual-upload",
+      "priority": 900,
+      "enabled": true,
+      "note": "Existing manual upload remains a request-only fallback into the same verifier/updater pipeline."
+    },
+    {
+      "id": "recovery-break-glass",
+      "type": "recovery",
+      "priority": 999,
+      "enabled": true,
+      "note": "Recovery path remains request-only and independent of normal runtime health."
+    }
+  ]
+}

@@ -29,12 +29,15 @@ final class KiComDevSessionManager
         'candidate.read',
         'candidate.discard',
         'logs.read',
+        'expansion.resource.status',
+        'expansion.test.execute',
     ];
 
     /** @var list<string> */
     private const FORBIDDEN_PREFIXES = [
         'production.',
         'deploy.production',
+        'expansion.production',
         'self_update.',
         'kernel.',
         'recovery.',
@@ -218,80 +221,69 @@ final class KiComDevSessionManager
         ];
     }
 
-    /** @return list<string> */
-    public static function capabilities(): array { return self::CAPABILITIES; }
-
     public static function capabilityDefined(string $capability): bool
     {
-        $capability=trim($capability);
+        $capability=strtolower(trim($capability));
         if ($capability==='') return false;
-        foreach (self::FORBIDDEN_PREFIXES as $prefix) if (str_starts_with($capability,$prefix)) return false;
-        return in_array($capability,self::CAPABILITIES,true);
-    }
-
-    /** @param Closure(string):array $fn */
-    private function withSessionLock(string $id,Closure $fn): array
-    {
-        $lock=$this->lockFile($id);
-        $fh=@fopen($lock,'c+');
-        if ($fh===false) return ['ok'=>false,'code'=>'DEV_SESSION_LOCK_FAILED'];
-        try {
-            if (!flock($fh,LOCK_EX)) return ['ok'=>false,'code'=>'DEV_SESSION_LOCK_FAILED'];
-            return $fn($this->sessionFile($id));
-        } finally {
-            @flock($fh,LOCK_UN);
-            @fclose($fh);
+        foreach (self::FORBIDDEN_PREFIXES as $prefix) {
+            if (str_starts_with($capability,$prefix)) return false;
         }
+        return in_array($capability,self::CAPABILITIES,true);
     }
 
     private function ensureStorage(): bool
     {
-        foreach ([$this->storageDir,$this->storageDir.'/sessions'] as $dir) {
-            if (!is_dir($dir)&&!@mkdir($dir,0700,true)&&!is_dir($dir)) return false;
-            @chmod($dir,0700);
-            $deny=$dir.'/.htaccess';
-            if (!is_file($deny)) @file_put_contents($deny,"Options -Indexes\nRequire all denied\n",LOCK_EX);
-        }
+        if (!is_dir($this->storageDir)&&!@mkdir($this->storageDir,0700,true)&&!is_dir($this->storageDir)) return false;
+        @chmod($this->storageDir,0700);
+        $deny=$this->storageDir.'/.htaccess';
+        if (!is_file($deny)) @file_put_contents($deny,"Require all denied\n",LOCK_EX);
         return true;
     }
 
     private function cleanup(): void
     {
-        $cutoff=time()-86400;
-        foreach (glob($this->storageDir.'/sessions/*.json')?:[] as $file) {
+        $now=time();
+        foreach (glob($this->storageDir.'/*.json')?:[] as $file) {
             $row=$this->readJson($file);
-            if (!is_array($row)) continue;
-            $terminal=in_array((string)($row['state']??''),['expired','idle_expired','revoked'],true);
-            $end=max((int)($row['expires_at']??0),(int)($row['idle_expires_at']??0));
-            if ($terminal&&$end>0&&$end<$cutoff) {
-                $id=basename($file,'.json');
-                @unlink($file);
-                @unlink($this->lockFile($id));
-            }
+            if (!is_array($row)||(int)($row['expires_at']??0)<$now-86400) @unlink($file);
         }
     }
 
-    private function appendAudit(string $event,string $sessionId,array $extra=[]): void
+    private function sessionFile(string $id): string { return $this->storageDir.'/'.$id.'.json'; }
+    private function lockFile(string $id): string { return $this->storageDir.'/'.$id.'.lock'; }
+
+    /** @param callable(string):array $callback */
+    private function withSessionLock(string $id,callable $callback): array
     {
-        $row=['at'=>gmdate('c'),'event'=>$event,'session_id'=>$sessionId]+$extra;
-        $line=json_encode($row,JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
-        if (is_string($line)) @file_put_contents($this->storageDir.'/audit.jsonl',$line."\n",FILE_APPEND|LOCK_EX);
+        if (!$this->ensureStorage()) return ['ok'=>false,'code'=>'DEV_SESSION_STORAGE_UNAVAILABLE'];
+        $lock=@fopen($this->lockFile($id),'c+');
+        if ($lock===false) return ['ok'=>false,'code'=>'DEV_SESSION_LOCK_FAILED'];
+        @chmod($this->lockFile($id),0600);
+        try {
+            if (!flock($lock,LOCK_EX)) return ['ok'=>false,'code'=>'DEV_SESSION_LOCK_FAILED'];
+            return $callback($this->sessionFile($id));
+        } finally {
+            @flock($lock,LOCK_UN);
+            fclose($lock);
+        }
     }
 
+    /** @return array<string,mixed>|null */
     private function readJson(string $file): ?array
     {
         if (!is_file($file)) return null;
         $raw=@file_get_contents($file);
-        if ($raw===false) return null;
+        if (!is_string($raw)) return null;
         $row=json_decode($raw,true);
         return is_array($row)?$row:null;
     }
 
+    /** @param array<string,mixed> $row */
     private function writeJson(string $file,array $row): bool
     {
-        $json=json_encode($row,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);
+        $json=json_encode($row,JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT);
         if (!is_string($json)) return false;
-        $tmp=$file.'.tmp-'.bin2hex(random_bytes(4));
+        $tmp=$file.'.tmp.'.bin2hex(random_bytes(4));
         if (@file_put_contents($tmp,$json."\n",LOCK_EX)===false) return false;
         @chmod($tmp,0600);
         if (!@rename($tmp,$file)) { @unlink($tmp); return false; }
@@ -299,6 +291,12 @@ final class KiComDevSessionManager
         return true;
     }
 
-    private function sessionFile(string $id): string { return $this->storageDir.'/sessions/'.$id.'.json'; }
-    private function lockFile(string $id): string { return $this->storageDir.'/sessions/'.$id.'.lock'; }
+    private function appendAudit(string $event,string $id,array $detail=[]): void
+    {
+        if (!$this->ensureStorage()) return;
+        $line=json_encode(['time'=>gmdate('c'),'event'=>$event,'session_id'=>$id,'detail'=>$detail],JSON_UNESCAPED_SLASHES);
+        if (!is_string($line)) return;
+        @file_put_contents($this->storageDir.'/audit.jsonl',$line."\n",FILE_APPEND|LOCK_EX);
+        @chmod($this->storageDir.'/audit.jsonl',0600);
+    }
 }

@@ -1,0 +1,49 @@
+name: KiCom Mail Channel v1
+
+on:
+  push:
+    branches: [ candidate/expansion-cell-v1 ]
+    paths:
+      - 'experimental/mail-channel/**'
+      - 'candidates/mail-channel-v1/**'
+      - '.github/workflows/mail-channel-v1.yml'
+  pull_request:
+    paths:
+      - 'experimental/mail-channel/**'
+      - 'candidates/mail-channel-v1/**'
+      - '.github/workflows/mail-channel-v1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax
+        run: |
+          php -l experimental/mail-channel/KiComMailChannel.php
+          php -l experimental/mail-channel/KiComMailSecretStore.php
+          php -l experimental/mail-channel/KiComMailTransport.php
+          php -l experimental/mail-channel/KiComMailLoopback.php
+          php -l experimental/mail-channel/KiComMailMime.php
+          php -l experimental/mail-channel/KiComMailQuarantine.php
+          php -l experimental/mail-channel/KiComMailInbox.php
+          php -l experimental/mail-channel/mail-inbox-selftest.php
+      - name: Mail channel selftest
+        run: php experimental/mail-channel/mail-channel-selftest.php
+      - name: Mail runtime selftest
+        run: php experimental/mail-channel/mail-runtime-selftest.php
+      - name: Mail inbox and quarantine selftest
+        run: php experimental/mail-channel/mail-inbox-selftest.php
+      - name: Assert credential is reference-only
+        shell: bash
+        run: |
+          jq -e '
+            .credentials.password_source == "KICOM_MAIL_PASSWORD"
+            and (.credentials | has("password") | not)
+            and .credentials.repository_storage == "FORBIDDEN"
+            and .credentials.memory_storage == "FORBIDDEN"
+            and .credentials.log_storage == "FORBIDDEN"
+          ' candidates/mail-channel-v1/MAIL_ACCOUNT.json >/dev/null

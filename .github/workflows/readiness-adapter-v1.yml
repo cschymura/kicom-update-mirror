@@ -1,0 +1,23 @@
+name: KiCom Readiness Adapter v1
+on:
+  pull_request:
+    paths:
+      - 'experimental/expansion-cell/CellEvolutionReadiness.php'
+      - 'experimental/expansion-cell/CellEvolutionReadinessAdapter.php'
+      - 'experimental/expansion-cell/readiness-adapter-selftest.php'
+      - '.github/workflows/readiness-adapter-v1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax
+        run: |
+          php -l experimental/expansion-cell/CellEvolutionReadiness.php
+          php -l experimental/expansion-cell/CellEvolutionReadinessAdapter.php
+          php -l experimental/expansion-cell/readiness-adapter-selftest.php
+      - name: Fail-closed adapter selftest
+        run: php experimental/expansion-cell/readiness-adapter-selftest.php

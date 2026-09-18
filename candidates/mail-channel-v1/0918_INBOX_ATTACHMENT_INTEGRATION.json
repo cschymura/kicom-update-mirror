@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "candidate": "kicom-mail-inbox-0.9.18-g19",
+  "status": "ACTIVE_VERIFIED_PRODUCTION",
+  "base_required": {
+    "runtime": "0.9.17",
+    "genome": "kicom-0.9.17-g18",
+    "healthy": true,
+    "trusted": true,
+    "drift_count": 0,
+    "unknown_count": 0
+  },
+  "target": {
+    "runtime": "0.9.18",
+    "genome": "kicom-0.9.18-g19"
+  },
+  "components": [
+    "experimental/mail-channel/KiComMailMime.php",
+    "experimental/mail-channel/KiComMailQuarantine.php",
+    "experimental/mail-channel/KiComMailInbox.php",
+    "experimental/mail-channel/KiComMailTransport.php",
+    "experimental/mail-channel/KiComMailChannel.php"
+  ],
+  "capabilities": [
+    "read-only IMAPS BODY.PEEK inbox fetch",
+    "bounded MIME parsing",
+    "plain-text perception preview with SHA-256",
+    "persistent deduplication and append-only event log",
+    "attachment SHA-256 and metadata capture",
+    "ZIP recognition without extraction",
+    "non-web-accessible binary quarantine",
+    "no attachment auto-execute, auto-extract or auto-install"
+  ],
+  "security": {
+    "inbound_trust": "UNTRUSTED_PERCEPTION_INPUT",
+    "mail_grants_authority": false,
+    "attachment_execution": "FORBIDDEN",
+    "attachment_auto_install": "FORBIDDEN",
+    "zip_release_path": "EXISTING_KICOM_VERIFIER_REQUIRED",
+    "credentials_in_repo_or_memory": "FORBIDDEN",
+    "tls_peer_verification": true,
+    "tls_peer_name_verification": true
+  },
+  "ci": {
+    "workflow": "KiCom Mail Channel v1",
+    "run_id": 35327210941,
+    "conclusion": "success",
+    "commit": "fb47bd6f484c136d90590dceb3916d562675c523",
+    "verified_steps": [
+      "PHP syntax",
+      "Mail channel selftest",
+      "Mail runtime selftest",
+      "Mail inbox and quarantine selftest",
+      "Assert credential is reference-only"
+    ]
+  },
+  "production_changed": true,
+  "live": {
+    "version": "0.9.18",
+    "genome": "kicom-0.9.18-g19",
+    "healthy": true,
+    "trusted": true,
+    "lkg_ok": true,
+    "drift_count": 0,
+    "unknown_count": 0
+  },
+  "server_build": {
+    "build_id": "fa7c12bf0ea3faacde5f",
+    "candidate_version": "0.9.18",
+    "genome_id": "kicom-0.9.18-g19",
+    "package_sha256": "597d65b12e598b6b21e91e4a90641a8b366ab4ea94f4079f8c5dd4f657913792",
+    "risk_class": "red",
+    "verifier_result": "STAGED_DECISION_REQUIRED",
+    "approval_id": "7abf4d54d493184da393c3c1",
+    "approval_binding_sha256": "abc18e8617c73080374de3be552aeccb5de9ab9a33c5d6045edbb952ad727580",
+    "kernel_update": false,
+    "production_changed": true,
+    "install_history_id": "20260918093246-8fb86ce4"
+  },
+  "invariants": [
+    "No OTP stored in GitHub.",
+    "No session token stored in GitHub.",
+    "No mailbox password stored in GitHub, canonical memory or logs.",
+    "Inbound mail is untrusted perception input and never grants authority.",
+    "Attachments remain quarantine-only and cannot auto-execute, auto-extract or auto-install.",
+    "ZIP release requires the existing KiCom verifier."
+  ],
+  "production_validation": {
+    "plain_text_external_mail": {
+      "delivered_after_spam_release": true,
+      "trust": "UNTRUSTED",
+      "authority_granted": false
+    },
+    "zip_attachment": {
+      "filename": "KiCom-0.9.18-Quarantine-Test.zip",
+      "bytes": 307,
+      "sha256": "c17948642ae6e30660979f324e6fc83cffb46f18ba1f5267233610d77c21b386",
+      "zip_like": true,
+      "quarantined": true,
+      "executable": false,
+      "auto_extract": false,
+      "auto_install": false
+    },
+    "deduplication": {
+      "first_external_poll_new_messages": 2,
+      "repeated_poll_new_messages": 0,
+      "dedup_entries": 3
+    },
+    "quarantine_items": 1,
+    "spam_routing_observed": true,
+    "spam_policy": "Keep KiCom production polling INBOX-only. Spam/Junk remains a human review boundary; messages become KiCom perception input only after manual release from spam."
+  },
+  "deferred_candidate": {
+    "version": "0.9.19",
+    "genome": "kicom-0.9.19-g20",
+    "package_sha256": "106bee4fc5b409d13b7b9c1e83652e2403e9a5c88cab8e03e50089c7afb3a7bd",
+    "status": "STAGED_NOT_INSTALLED_BY_DESIGN",
+    "reason": "Automatic Spam/Junk polling would broaden the inbound perception surface unnecessarily after successful manual spam release validated 0.9.18.",
+    "kernel_update": false
+  }
+}

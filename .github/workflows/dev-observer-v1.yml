@@ -1,0 +1,46 @@
+name: KiCom DEV Observer v1
+
+on:
+  pull_request:
+    paths:
+      - 'experimental/dev-zone/DevObserver.php'
+      - 'experimental/dev-zone/runtime/doctor.php'
+      - 'experimental/dev-zone/runtime/dev-expansion.php'
+      - 'experimental/dev-zone/dev-observer-selftest.php'
+      - '.github/workflows/dev-observer-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: PHP syntax
+        run: |
+          php -l experimental/dev-zone/DevObserver.php
+          php -l experimental/dev-zone/runtime/doctor.php
+          php -l experimental/dev-zone/runtime/dev-expansion.php
+          php -l experimental/dev-zone/dev-observer-selftest.php
+      - name: Observer selftest
+        run: php experimental/dev-zone/dev-observer-selftest.php
+      - name: Public doctor boundary guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q "DEV_DOCTOR_OK" experimental/dev-zone/DevObserver.php
+          grep -q "recent_trace" experimental/dev-zone/DevObserver.php
+          grep -q "kicomDeployTarget('sandbox',true)" experimental/dev-zone/DevObserver.php
+          if grep -nE "token|password|secret|credential|otp" experimental/dev-zone/runtime/doctor.php; then
+            echo 'Public doctor endpoint must not handle credentials' >&2
+            exit 1
+          fi
+          if grep -nE "\['root'\]|local_web_root|realpath" experimental/dev-zone/runtime/doctor.php; then
+            echo 'Public doctor endpoint must not expose absolute paths' >&2
+            exit 1
+          fi

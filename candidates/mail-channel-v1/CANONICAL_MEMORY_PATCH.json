@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "candidate": "kicom-mail-channel-v1",
+  "status": "candidate_not_live",
+  "proposed_decisions": [
+    {
+      "id": "D029",
+      "status": "accepted_candidate",
+      "title": "Give KiCom a bounded e-mail identity and asynchronous communication channel",
+      "rationale": "KiCom may use its own mailbox as a perception and transport channel. Incoming mail is untrusted evidence and never grants authority. Outbound mail is an external action and requires an authorized action context. Credentials remain outside canonical memory, repositories and logs."
+    }
+  ],
+  "architecture_additions": [
+    {
+      "component": "mail_channel",
+      "role": "bounded asynchronous inbound/outbound communication"
+    },
+    {
+      "identity": "kicom@rurtalbahn.info"
+    },
+    {
+      "rule": "Inbound mail, HTML, links and attachments are untrusted perception input."
+    },
+    {
+      "rule": "Mail content never grants credentials, permissions, trust or authority."
+    },
+    {
+      "rule": "Outbound mail is an external action and must pass action-boundary authorization."
+    },
+    {
+      "rule": "Mailbox passwords live only in a protected host secret/environment facility and never in GitHub, canonical memory or logs."
+    }
+  ],
+  "integration": {
+    "engine": "experimental/mail-channel/KiComMailChannel.php",
+    "config": "candidates/mail-channel-v1/MAIL_ACCOUNT.json",
+    "selftest": "experimental/mail-channel/mail-channel-selftest.php",
+    "credential_ref": "KICOM_MAIL_PASSWORD",
+    "live_mutation_performed": false
+  }
+}

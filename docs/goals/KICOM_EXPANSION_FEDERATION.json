@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "project": "KiCom",
+  "goal_id": "expansion-federation-v1",
+  "status": "active",
+  "recorded_at": "2026-09-16",
+  "summary": "KiCom can expand to an operator-authorized target webspace using transient FTP/FTPS bootstrap access, create a child cell under kicom/, enroll it into a signed parent/child federation, and drive it through parent cron forwarding.",
+  "default_remote_directory": "kicom/",
+  "bootstrap_transport": ["FTPS", "FTP-explicit-opt-in"],
+  "post_enrollment_transport": "signed HTTPS",
+  "lifecycle": [
+    "EXPANSION_PREPARE",
+    "EXPANSION_DEPLOY",
+    "EXPANSION_PROBE",
+    "EXPANSION_ENROLL",
+    "EXPANSION_ACTIVATE",
+    "EXPANSION_STATUS",
+    "EXPANSION_REVOKE"
+  ],
+  "states": ["prepared", "deployed", "reachable", "enrolled", "active", "failed", "expired", "revoked"],
+  "node_identity": ["cell_id", "root_id", "parent_id", "generation", "public_signing_key", "base_url", "state", "capabilities"],
+  "credential_policy": "Temporary FTP/FTPS credentials are transient and must never be persisted in Git, KiCom project memory, logs, diagnostics, release notes or child configuration.",
+  "cron_model": "Parent/root cron sends signed FEDERATION_TICK messages over HTTPS to active child cells.",
+  "recursive_expansion": "Explicit capability only; not automatically inherited.",
+  "preservation_rule": "Preserve and archive goal/design history rather than destructively deleting it unless explicitly requested."
+}

@@ -1,0 +1,223 @@
+name: KiCom Expansion Cell v1
+
+on:
+  pull_request:
+    paths:
+      - 'experimental/expansion-cell/**'
+      - 'docs/goals/KICOM_EXPANSION_FEDERATION.*'
+      - 'docs/checkpoints/KICOM_2026-09-16_EXPANSION_*.md'
+      - 'docs/checkpoints/KICOM_2026-09-16_MEMORY_FIRST_ACTIVE_CELL.md'
+      - '.github/workflows/expansion-cell-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  expansion-cell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Runtime inventory
+        run: |
+          php -v
+          php -r 'foreach (["sodium","ftp"] as $e) { if (!extension_loaded($e)) { fwrite(STDERR,"Missing extension: $e\n"); exit(1); } } echo "sodium+ftp available\n";'
+
+      - name: PHP syntax
+        run: |
+          php -l experimental/expansion-cell/ExpansionProtocol.php
+          php -l experimental/expansion-cell/ExpansionRegistry.php
+          php -l experimental/expansion-cell/ExpansionFtpDeployer.php
+          php -l experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php
+          php -l experimental/expansion-cell/ExpansionManagedCellUpdater.php
+          php -l experimental/expansion-cell/ExpansionKiComDeployTargetResolver.php
+          php -l experimental/expansion-cell/CellPerceptionAction.php
+          php -l experimental/expansion-cell/CellWorldModel.php
+          php -l experimental/expansion-cell/CellLiving.php
+          php -l experimental/expansion-cell/CellNode.php
+          php -l experimental/expansion-cell/ExpansionCellRuntime.php
+          php -l experimental/expansion-cell/ExpansionCronRelay.php
+          php -l experimental/expansion-cell/ExpansionCellPackageBuilder.php
+          php -l experimental/expansion-cell/ExpansionHttpTransport.php
+          php -l experimental/expansion-cell/ExpansionOrchestrator.php
+          php -l experimental/expansion-cell/ExpansionParentIdentity.php
+          php -l experimental/expansion-cell/ExpansionService.php
+          php -l experimental/expansion-cell/cell-runtime/common.php
+          php -l experimental/expansion-cell/cell-runtime/bootstrap.php
+          php -l experimental/expansion-cell/cell-runtime/federation.php
+          php -l experimental/expansion-cell/cell-runtime/status.php
+          php -l experimental/expansion-cell/cell-runtime/doctor.php
+          php -l experimental/expansion-cell/expansion-selftest.php
+          php -l experimental/expansion-cell/expansion-cron-selftest.php
+          php -l experimental/expansion-cell/orchestrator-selftest.php
+          php -l experimental/expansion-cell/service-selftest.php
+          php -l experimental/expansion-cell/local-deploy-selftest.php
+          php -l experimental/expansion-cell/managed-updater-selftest.php
+          php -l experimental/expansion-cell/resource-resolver-selftest.php
+          php -l experimental/expansion-cell/package-completeness-selftest.php
+
+      - name: Expansion/federation selftest
+        run: php experimental/expansion-cell/expansion-selftest.php
+
+      - name: Complete daughter package selftest
+        run: php experimental/expansion-cell/package-completeness-selftest.php
+
+      - name: Cron federation selftest
+        run: php experimental/expansion-cell/expansion-cron-selftest.php
+
+      - name: Orchestrator/package selftest
+        run: php experimental/expansion-cell/orchestrator-selftest.php
+
+      - name: Parent service selftest
+        run: php experimental/expansion-cell/service-selftest.php
+
+      - name: Local filesystem deploy selftest
+        run: php experimental/expansion-cell/local-deploy-selftest.php
+
+      - name: Managed child runtime updater selftest
+        run: php experimental/expansion-cell/managed-updater-selftest.php
+
+      - name: KiCom deployment resource resolver selftest
+        run: php experimental/expansion-cell/resource-resolver-selftest.php
+
+      - name: Secret persistence guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RniE 'BEGIN (RSA|OPENSSH|EC|PRIVATE) PRIVATE KEY|AKIA[0-9A-Z]{16}' docs/goals experimental/expansion-cell; then
+            echo 'Secret-like material found in expansion candidate' >&2
+            exit 1
+          fi
+          grep -q "enrollmentVerifier" experimental/expansion-cell/ExpansionRegistry.php
+          grep -q "unset(\$row\['enrollment_verifier'\])" experimental/expansion-cell/ExpansionRegistry.php
+          grep -q 'Credentials are method arguments only' experimental/expansion-cell/ExpansionFtpDeployer.php
+          grep -q 'bootstrap.private.json' experimental/expansion-cell/CellNode.php
+          grep -q "unlink(\$this->dir.'/bootstrap.private.json')" experimental/expansion-cell/CellNode.php
+          grep -q 'sodium_memzero' experimental/expansion-cell/CellNode.php
+          grep -q 'builder->destroy($packageDir)' experimental/expansion-cell/ExpansionOrchestrator.php
+          grep -q 'sodium_memzero' experimental/expansion-cell/ExpansionService.php
+
+      - name: Complete daughter birth guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'CELL_LIVING_BORN' experimental/expansion-cell/CellLiving.php
+          grep -q 'living_ready' experimental/expansion-cell/CellNode.php
+          grep -q 'perception_action_ready' experimental/expansion-cell/CellNode.php
+          grep -q 'world_model_ready' experimental/expansion-cell/CellNode.php
+          grep -q 'canonical_memory' experimental/expansion-cell/cell-runtime/living-schema.json
+          grep -q 'genome_lkg' experimental/expansion-cell/cell-runtime/living-schema.json
+          grep -q '"perception"' experimental/expansion-cell/cell-runtime/living-schema.json
+          grep -q '"action"' experimental/expansion-cell/cell-runtime/living-schema.json
+          grep -q 'persistent-situational-awareness' experimental/expansion-cell/cell-runtime/living-schema.json
+          grep -q 'CellWorldModel.php' experimental/expansion-cell/ExpansionCellPackageBuilder.php
+          grep -q 'EXPANSION_PACKAGE_WORLD_MODEL_MISSING' experimental/expansion-cell/ExpansionCellPackageBuilder.php
+          grep -q 'EXPANSION_PACKAGE_INTRINSIC_SUBSYSTEM_MISSING' experimental/expansion-cell/ExpansionCellPackageBuilder.php
+          grep -q 'missing intrinsic subsystem fails build' experimental/expansion-cell/package-completeness-selftest.php
+          if grep -RniE 'parent_(private|secret)_key|passkey|totp_secret|dev_bearer' experimental/expansion-cell/cell-runtime/living-schema.json; then
+            echo 'Living schema must not inherit parent or platform secrets' >&2
+            exit 1
+          fi
+
+      - name: Perception action boundary guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'UNKNOWN' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'AVAILABLE' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'UNAVAILABLE' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'FORBIDDEN' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'DEGRADED' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'STALE' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'perception/history.jsonl' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'action/history.jsonl' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'protected.external.write' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q 'internal.capability.extend' experimental/expansion-cell/CellPerceptionAction.php
+          grep -q "promotion'=>'DEFERRED" experimental/expansion-cell/CellPerceptionAction.php
+          if grep -nE 'curl_init|fsockopen|pfsockopen|https?://' experimental/expansion-cell/CellPerceptionAction.php; then
+            echo 'Perception layer must not gain arbitrary network probing primitives' >&2
+            exit 1
+          fi
+          if grep -nE '\b(shell_exec|exec|system|passthru|proc_open|popen)\s*\(' experimental/expansion-cell/CellPerceptionAction.php; then
+            echo 'Perception/action memory must not execute shell commands' >&2
+            exit 1
+          fi
+
+      - name: Situational world model guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'perception/world-history.jsonl' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'perception/peer-memory.json' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'action/possibility-history.jsonl' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'cell.secrets' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'external.unprobed' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'autonomous_reproduction' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'autonomous_executable_evolution' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'signed-parent-peer-context' experimental/expansion-cell/CellWorldModel.php
+          grep -q 'PERCEPTION_QUERY' experimental/expansion-cell/CellNode.php
+          grep -q 'world_report' experimental/expansion-cell/CellNode.php
+          if grep -nE '\b(curl_init|fsockopen|pfsockopen)\s*\(' experimental/expansion-cell/CellWorldModel.php; then
+            echo 'World model must not gain arbitrary network probing primitives' >&2
+            exit 1
+          fi
+          if grep -nE '\b(shell_exec|exec|system|passthru|proc_open|popen)\s*\(' experimental/expansion-cell/CellWorldModel.php; then
+            echo 'World model must not execute shell commands' >&2
+            exit 1
+          fi
+
+      - name: Shared-hosting package guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Fq '<DirectoryMatch' experimental/expansion-cell/cell-runtime/.htaccess; then
+            echo 'DirectoryMatch is not valid in ordinary shared-host .htaccess context' >&2
+            exit 1
+          fi
+          grep -Fq 'Require all denied' experimental/expansion-cell/ExpansionCellPackageBuilder.php
+          grep -Fq 'bootstrap\.config\.php' experimental/expansion-cell/cell-runtime/.htaccess
+
+      - name: Local/resource deploy and repair boundary guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'realpath' experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php
+          grep -q 'EXPANSION_TARGET_EXISTS' experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php
+          grep -q 'expandLocal' experimental/expansion-cell/ExpansionOrchestrator.php
+          grep -q 'KiComExpansionKiComDeployTargetResolver' experimental/expansion-cell/ExpansionService.php
+          grep -q "\['test','staging'\]" experimental/expansion-cell/ExpansionKiComDeployTargetResolver.php
+          grep -q "!array_key_exists('root'" experimental/expansion-cell/resource-resolver-selftest.php
+          grep -q 'EXPANSION_REPAIR_HASH_CONFLICT' experimental/expansion-cell/ExpansionManagedCellUpdater.php
+          grep -q 'living_snapshots' experimental/expansion-cell/ExpansionManagedCellUpdater.php
+          grep -q 'world_model_ready' experimental/expansion-cell/ExpansionManagedCellUpdater.php
+          grep -q "cell-manifest.json" experimental/expansion-cell/ExpansionManagedCellUpdater.php
+          grep -q "kicom/federation.php" experimental/expansion-cell/ExpansionManagedCellUpdater.php
+          if grep -Fq '@include $cfg' experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php; then
+            echo 'Sibling bootstrap config must never be executed during repair' >&2
+            exit 1
+          fi
+          if grep -q "'local_directory'=>\|'stage_directory'=>" experimental/expansion-cell/ExpansionLocalFilesystemDeployer.php; then
+            echo 'Local deploy result must not expose absolute server paths' >&2
+            exit 1
+          fi
+
+      - name: Boundary guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RniE '\b(shell_exec|exec|system|passthru|proc_open|popen)\s*\(' experimental/expansion-cell; then
+            echo 'Unexpected shell primitive in expansion candidate' >&2
+            exit 1
+          fi
+          if grep -RniE 'kicomReceiveSelfUpdatePackage|self_update\.install|kernel\.write|recovery\.write|secrets\.read' experimental/expansion-cell; then
+            echo 'Production/recovery authority must not exist in expansion candidate' >&2
+            exit 1
+          fi
+          grep -q 'FTP credentials are supplied transiently' docs/goals/KICOM_EXPANSION_FEDERATION.md
+          grep -q 'FEDERATION_TICK' docs/goals/KICOM_EXPANSION_FEDERATION.md
+          grep -q "follow_location'=>0" experimental/expansion-cell/ExpansionHttpTransport.php
+          grep -q 'EXPANSION_ACTIVE' experimental/expansion-cell/ExpansionOrchestrator.php

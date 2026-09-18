@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "name": "kicom-expansion-living-cell/3",
+  "required_subsystems": [
+    "identity",
+    "canonical_memory",
+    "workspace",
+    "observer",
+    "genome_lkg",
+    "immune",
+    "evolution",
+    "perception",
+    "action"
+  ],
+  "memory_resources": [
+    "PROJECT_STATE.kcl",
+    "ARCHITECTURE.kcl",
+    "PROTOCOL.kcl",
+    "DECISIONS.kcl",
+    "CHANGELOG.kcl",
+    "NEXT.kcl"
+  ],
+  "runtime_components": [
+    {"path": "common.php", "role": "http-common"},
+    {"path": "bootstrap.php", "role": "enrollment-bootstrap"},
+    {"path": "federation.php", "role": "signed-federation-endpoint"},
+    {"path": "status.php", "role": "public-status"},
+    {"path": "doctor.php", "role": "local-living-doctor"},
+    {"path": "lib/ExpansionProtocol.php", "role": "federation-protocol"},
+    {"path": "lib/CellNode.php", "role": "cell-state-machine"},
+    {"path": "lib/CellLiving.php", "role": "intrinsic-living-substrate"},
+    {"path": "lib/CellPerceptionAction.php", "role": "persistent-perception-action-memory"},
+    {"path": "lib/CellWorldModel.php", "role": "persistent-situational-world-model"},
+    {"path": "living-schema.json", "role": "intrinsic-schema"}
+  ],
+  "perception_action_memory": true,
+  "world_model": "persistent-situational-awareness",
+  "world_model_scope": ["self", "location", "logical access", "resources", "capabilities", "neighbors", "boundaries", "expansion opportunities", "unknowns", "freshness"],
+  "perception_states": ["UNKNOWN", "AVAILABLE", "UNAVAILABLE", "FORBIDDEN", "DEGRADED", "STALE"],
+  "perception_action_loop": "observe -> remember -> derive capabilities/boundaries -> act -> observe result -> update perception/action/world memory",
+  "peer_evidence_policy": "neighbor knowledge beyond lineage requires verified signed federation evidence; arbitrary remote probing remains forbidden",
+  "birth_policy": "all intrinsic subsystems and the situational world model are materialized and verified before node initialization commits",
+  "evolution_policy": "candidate creation and deterministic static fitness remain available; executable autonomous promotion is explicitly deferred by current project priority",
+  "reproduction_policy": "autonomous reproduction is explicitly deferred by current project priority",
+  "external_boundary_policy": "human authorization only when a protected external system, credential or permission requires it",
+  "inheritance_policy": "architecture may be inherited; identity, secrets, mutable state and project memory are local"
+}

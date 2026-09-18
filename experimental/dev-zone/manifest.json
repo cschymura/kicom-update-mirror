@@ -27,24 +27,65 @@
     "DevHttpAdapter.php",
     "DevKiComBindings.php",
     "DevDiagnostics.php",
+    "DevExpansionBindings.php",
+    "DevSandboxPerception.php",
+    "DevArtifactImporter.php",
     "dev-client.js",
     "dev-auth.php",
     "dev-api.php",
+    "dev-expansion.php",
+    "dev-artifact.php",
     "dev-bridge.php",
     "agent/index.php",
-    "index.html"
+    "index.html",
+    "expansion/*"
   ],
   "runtime": {
     "ui": "dev/index.html",
     "auth_endpoint": "dev/dev-auth.php",
     "api_endpoint": "dev/dev-api.php",
+    "expansion_endpoint": "dev/dev-expansion.php",
+    "artifact_bootstrap_endpoint": "dev/dev-artifact.php",
     "agent_bridge": "dev/agent/",
     "agent_bridge_delegate": "dev/dev-bridge.php",
     "one_time_enrollment": "existing FreeOTP verifier",
     "normal_entry": "WebAuthn passkey",
     "bridge_link": "one-click copy from first-party DEV UI",
-    "diagnostics": ["dev_audit", "living_experience"]
+    "diagnostics": ["dev_audit", "living_experience"],
+    "artifact_bootstrap": {
+      "scope": "dev-only",
+      "https_only": true,
+      "sha256_required": true,
+      "install_root": "dev/",
+      "production_self_update_bridge": false,
+      "purpose": "bootstrap transport until the central multi-transport artifact bus is promoted"
+    },
+    "sandbox_expansion": {
+      "resource_alias": "sandbox",
+      "target_base_url": "https://sandbox.rurtalbahn.info",
+      "deploy_mode": "resource",
+      "allowed_target_class": "test",
+      "agent_get_execute": false,
+      "signed_perception_query": true
+    }
   },
+  "capabilities": [
+    "source.snapshot.read",
+    "workspace.read",
+    "workspace.write",
+    "workspace.delete",
+    "workspace.history",
+    "build.begin",
+    "build.patch",
+    "build.status",
+    "build.test",
+    "build.finalize_candidate",
+    "candidate.read",
+    "candidate.discard",
+    "logs.read",
+    "expansion.resource.status",
+    "expansion.test.execute"
+  ],
   "candidate_export": {
     "uses_existing_verifier": true,
     "creates_production_pending": false,
@@ -52,12 +93,14 @@
   },
   "forbidden_authority": [
     "production deploy",
+    "production expansion",
     "self-update install",
     "kernel mutation",
     "recovery mutation",
     "auth administration",
     "secret-store access",
-    "arbitrary log paths"
+    "arbitrary log paths",
+    "arbitrary remote fetch"
   ],
   "promotion": "separate production approval"
 }
