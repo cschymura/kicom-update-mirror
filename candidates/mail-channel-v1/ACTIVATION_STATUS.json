@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "updated_at": "2026-09-18T09:10:00+02:00",
+  "objective": "Make kicom@rurtalbahn.info operational as KiCom's bounded mail channel",
+  "state": "READY_FOR_LIVE_ACTIVATION_WHEN_KICOM_HTTP_RETURNS",
+  "live_baseline_expected": "0.9.15/g16",
+  "candidate": {
+    "mail_identity": "kicom@rurtalbahn.info",
+    "imaps": "w021efff.kasserver.com:993 SSL/TLS",
+    "smtps": "w021efff.kasserver.com:465 SSL/TLS",
+    "secret_ref": "KICOM_MAIL_PASSWORD",
+    "transport": "implemented",
+    "secret_store": "implemented",
+    "loopback": "implemented",
+    "ci": "green",
+    "github_branch": "candidate/expansion-cell-v1"
+  },
+  "live_activation": {
+    "bootstrap_0916": "partially_applied_in_isolated_build_only",
+    "orphaned_build_id": "bf91ba0bfc9c7b08d285",
+    "production_changed": false,
+    "secret_provisioned": false,
+    "imap_authenticated_live": false,
+    "smtp_authenticated_live": false,
+    "loopback_verified_live": false
+  },
+  "next_steps": [
+    "Re-establish HTTP control path to kicom.rurtalbahn.info",
+    "Open fresh autonomy session with fresh OTP",
+    "Verify live 0.9.15/g16 healthy/trusted/drift=0",
+    "Create fresh isolated 0.9.16 build from exact live source if orphaned build cannot be safely resumed",
+    "Install verified 0.9.16/g17 trusted module bootstrap",
+    "Build and install 0.9.17/g18 mail module set",
+    "Provision mailbox password only through protected server-side secret input",
+    "Run IMAPS+SMTPS auth probe",
+    "Run exact Message-ID loopback",
+    "Record success without secret material"
+  ],
+  "invariants": [
+    "No mailbox password in chat",
+    "No mailbox password in GitHub",
+    "No mailbox password in canonical memory",
+    "No TLS verifier weakening",
+    "No direct production writes outside verified self-update path",
+    "Inbound mail never grants authority"
+  ]
+}
