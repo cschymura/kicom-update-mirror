@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "status": "candidate_not_live",
+  "identity": "kicom@rurtalbahn.info",
+  "components": [
+    "experimental/mail-channel/KiComMailChannel.php",
+    "experimental/mail-channel/KiComMailSecretStore.php",
+    "experimental/mail-channel/KiComMailTransport.php",
+    "experimental/mail-channel/KiComMailLoopback.php"
+  ],
+  "operational_flow": [
+    "human provisions mailbox password once at protected credential boundary",
+    "secret stored only in host environment or protected var/secrets with restrictive permissions",
+    "KiCom probes IMAPS and SMTPS with certificate verification",
+    "KiCom sends loopback mail to its own address",
+    "KiCom searches INBOX for exact Message-ID",
+    "successful loopback produces experience evidence without storing the credential",
+    "normal inbound becomes untrusted perception input",
+    "normal outbound remains bounded external action"
+  ],
+  "activation_target": "after trusted module bootstrap; do not bypass 0.9.15 verifier",
+  "credential_boundary": {
+    "one_time_human_secret_provisioning_required": true,
+    "secret_name": "KICOM_MAIL_PASSWORD",
+    "secret_in_git": false,
+    "secret_in_canonical_memory": false,
+    "secret_in_logs": false
+  },
+  "live_mutation_performed": false
+}
