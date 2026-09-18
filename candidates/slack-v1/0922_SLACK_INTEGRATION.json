@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "candidate": "kicom-slack-v1-0.9.22-g22",
+  "status": "ACTIVE_SERVER_SIDE_WAITING_FOR_SLACK_APP_CREDENTIALS",
+  "live": {
+    "version": "0.9.22",
+    "genome": "kicom-0.9.22-g22",
+    "healthy": true,
+    "trusted": true,
+    "lkg_ok": true,
+    "drift_count": 0,
+    "unknown_count": 0,
+    "install_history_id": "20260918105055-6a22331c"
+  },
+  "slack": {
+    "workspace": "KIcom",
+    "team_id": "T0C2WFYUM7T",
+    "channel": "#kicom",
+    "channel_id": "C0C2Y7VNSDA",
+    "events_url": "https://kicom.rurtalbahn.info/?q=SLACK_EVENTS",
+    "scopes": [
+      "app_mentions:read",
+      "chat:write"
+    ],
+    "inbound": "APP_MENTION_ONLY",
+    "outbound": "ALLOWLISTED_CHANNEL_ONLY",
+    "trust": "UNTRUSTED_PERCEPTION_INPUT",
+    "rate_limit_per_hour": 20,
+    "bot_token_configured": false,
+    "signing_secret_configured": false
+  },
+  "protections": [
+    "Slack content never grants authority",
+    "exact team and channel allowlist",
+    "Slack request signature verification and five-minute timestamp window",
+    "event deduplication",
+    "no DMs, files or channel-history scope in v1",
+    "bot token and signing secret stored only under protected var/secrets or server environment",
+    "secrets never returned, logged or stored in this checkpoint",
+    "audit stores hashes and metadata, not message text"
+  ],
+  "external_blocker": {
+    "site": "Slack developer portal",
+    "state": "human CAPTCHA required before app creation/login",
+    "policy": "not bypassed"
+  },
+  "package_sha256": "c552466c707561e96edff96cab9f8121f89fff01308b068263a36bb72b2d8945",
+  "production_changed": true
+}
