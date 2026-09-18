@@ -167,3 +167,5 @@ jobs:
           fi
           git commit -m 'KiCom 0.9.26 verified candidate'
           git push origin HEAD:work/kicom-0.9.26
+
+# trigger: candidate-build-2
