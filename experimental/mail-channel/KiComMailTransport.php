@@ -177,6 +177,119 @@ final class KiComMailTransport
         }
     }
 
+    public function fetchRecentRawMessages(int $limit = 10): array
+    {
+        $limit = max(1, min(25, $limit));
+        $in = $this->config['inbound'] ?? [];
+        $socket = $this->openTlsSocket((string)$in['host'], (int)$in['port']);
+        try {
+            $greeting = $this->readImapUntilGreeting($socket);
+            if (!preg_match('/^\\*\\s+(OK|PREAUTH)\\b/i', $greeting)) {
+                throw new RuntimeException('IMAP_GREETING_INVALID');
+            }
+            $password = $this->secret();
+            $this->writeAll($socket, 'K201 LOGIN ' . $this->imapQuote((string)$in['username']) . ' ' . $this->imapQuote($password) . "\r\n");
+            if (!preg_match('/^K201\\s+OK\\b/im', $this->readUntilTagged($socket, 'K201'))) {
+                throw new RuntimeException('IMAP_AUTH_FAILED');
+            }
+            $this->writeAll($socket, "K202 SELECT INBOX\r\n");
+            if (!preg_match('/^K202\\s+OK\\b/im', $this->readUntilTagged($socket, 'K202'))) {
+                throw new RuntimeException('IMAP_SELECT_FAILED');
+            }
+            $this->writeAll($socket, "K203 UID SEARCH ALL\r\n");
+            $search = $this->readUntilTagged($socket, 'K203');
+            if (!preg_match('/^K203\\s+OK\\b/im', $search)) {
+                throw new RuntimeException('IMAP_SEARCH_FAILED');
+            }
+
+            $uids = [];
+            if (preg_match('/^\\* SEARCH(.*)$/mi', $search, $m)) {
+                foreach (preg_split('/\\s+/', trim((string)$m[1])) ?: [] as $uid) {
+                    if (preg_match('/^[1-9][0-9]*$/', $uid)) {
+                        $uids[] = $uid;
+                    }
+                }
+            }
+            $uids = array_slice($uids, -$limit);
+            $items = [];
+            foreach ($uids as $i => $uid) {
+                $tag = 'K' . (300 + $i);
+                $this->writeAll($socket, $tag . ' UID FETCH ' . $uid . " (BODY.PEEK[])\r\n");
+                $raw = $this->readFetchLiteral($socket, $tag, 41943040);
+                if ($raw !== null) {
+                    $items[] = ['uid' => $uid, 'raw' => $raw];
+                }
+            }
+            $this->writeAll($socket, "K399 LOGOUT\r\n");
+            return $items;
+        } finally {
+            fclose($socket);
+        }
+    }
+
+    private function readFetchLiteral($socket, string $tag, int $maxBytes): ?string
+    {
+        $literal = null;
+        $oversize = false;
+        while (!feof($socket)) {
+            $line = fgets($socket, 65536);
+            if (!is_string($line)) {
+                break;
+            }
+            if ($literal === null && !$oversize && preg_match('/\\{([0-9]+)\\}\\r?\\n$/', $line, $m)) {
+                $length = (int)$m[1];
+                if ($length < 0) {
+                    throw new RuntimeException('IMAP_LITERAL_INVALID');
+                }
+                if ($length > $maxBytes) {
+                    $this->discardExact($socket, $length);
+                    $oversize = true;
+                } else {
+                    $literal = $this->readExact($socket, $length);
+                }
+                continue;
+            }
+            if (preg_match('/^' . preg_quote($tag, '/') . '\\s+(OK|NO|BAD)\\b/i', $line, $m)) {
+                if (strtoupper((string)$m[1]) !== 'OK') {
+                    throw new RuntimeException('IMAP_FETCH_FAILED');
+                }
+                if ($oversize) {
+                    return null;
+                }
+                if (!is_string($literal)) {
+                    throw new RuntimeException('IMAP_FETCH_LITERAL_MISSING');
+                }
+                return $literal;
+            }
+        }
+        throw new RuntimeException('IMAP_FETCH_RESPONSE_INCOMPLETE');
+    }
+
+    private function readExact($socket, int $length): string
+    {
+        $data = '';
+        while (strlen($data) < $length) {
+            $chunk = fread($socket, min(65536, $length - strlen($data)));
+            if (!is_string($chunk) || $chunk === '') {
+                throw new RuntimeException('IMAP_LITERAL_READ_FAILED');
+            }
+            $data .= $chunk;
+        }
+        return $data;
+    }
+
+    private function discardExact($socket, int $length): void
+    {
+        $remaining = $length;
+        while ($remaining > 0) {
+            $chunk = fread($socket, min(65536, $remaining));
+            if (!is_string($chunk) || $chunk === '') {
+                throw new RuntimeException('IMAP_LITERAL_DISCARD_FAILED');
+            }
+            $remaining -= strlen($chunk);
+        }
+    }
+
     private function secret(): string
     {
         $value = ($this->secretProvider)();
