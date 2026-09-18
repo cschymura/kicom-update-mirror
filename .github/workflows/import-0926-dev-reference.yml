@@ -1,0 +1,79 @@
+name: KiCom 0.9.26 import DEV reference
+
+on:
+  push:
+    branches:
+      - work/kicom-0.9.26
+    paths:
+      - .github/workflows/import-0926-dev-reference.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  import-dev-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 0.9.26 work branch
+        uses: actions/checkout@v4
+        with:
+          ref: work/kicom-0.9.26
+          fetch-depth: 0
+
+      - name: Extract previous DEV repair artifact for review
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin repair/dev-bridge-20260918:refs/remotes/origin/repair/dev-bridge-20260918
+          git show refs/remotes/origin/repair/dev-bridge-20260918:artifacts/KiCom-DEV-Bruecke-Reparatur.zip > /tmp/KiCom-DEV-Bruecke-Reparatur.zip
+
+          echo "Artifact SHA-256:"
+          sha256sum /tmp/KiCom-DEV-Bruecke-Reparatur.zip
+
+          rm -rf /tmp/kicom-dev-reference build/0.9.26/dev-reference
+          mkdir -p /tmp/kicom-dev-reference build/0.9.26/dev-reference
+          unzip -q /tmp/KiCom-DEV-Bruecke-Reparatur.zip -d /tmp/kicom-dev-reference
+
+          test -f /tmp/kicom-dev-reference/dev/dev-bridge.php
+          test -f /tmp/kicom-dev-reference/dev/agent/index.php
+
+          mapfile -t FILES < <(find /tmp/kicom-dev-reference -type f -printf '%P\n' | sort)
+          printf '%s\n' "${FILES[@]}"
+          test "${#FILES[@]}" -eq 2
+          test "${FILES[0]}" = "dev/agent/index.php"
+          test "${FILES[1]}" = "dev/dev-bridge.php"
+
+          php -l /tmp/kicom-dev-reference/dev/dev-bridge.php
+          php -l /tmp/kicom-dev-reference/dev/agent/index.php
+
+          if grep -RIE 'xox[baprs]-|BEGIN[[:space:]]+PRIVATE[[:space:]]+KEY|otpauth://|KICOM_MAIL_PASSWORD' /tmp/kicom-dev-reference/dev; then
+            echo "Secret-like material found in DEV reference." >&2
+            exit 1
+          fi
+
+          cp -a /tmp/kicom-dev-reference/dev build/0.9.26/dev-reference/
+          {
+            echo "# KiCom 0.9.26 DEV reference"
+            echo
+            echo "Source: repair/dev-bridge-20260918"
+            echo "Purpose: review-only input for trusted 0.9.26 integration; not a deployable drop-in."
+            echo
+            echo "## SHA-256"
+            sha256sum /tmp/KiCom-DEV-Bruecke-Reparatur.zip
+            find build/0.9.26/dev-reference/dev -type f -print0 | sort -z | xargs -0 sha256sum
+          } > build/0.9.26/dev-reference/REFERENCE.md
+
+      - name: Commit reviewed reference source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'kicom-mirror-bot'
+          git config user.email 'kicom-mirror-bot@users.noreply.github.com'
+          git add build/0.9.26/dev-reference
+          if git diff --cached --quiet; then
+            echo "DEV reference already current."
+            exit 0
+          fi
+          git commit -m 'KiCom 0.9.26: import DEV bridge reference for trusted integration'
+          git push origin HEAD:work/kicom-0.9.26
