@@ -1,4 +1,4 @@
-name: Build KiCom 0.9.26
+name: Build KiCom 0.9.26 R2
 
 on:
   push:
@@ -28,7 +28,7 @@ jobs:
           set -euo pipefail
           git fetch origin candidate/dev-zone-v1:refs/remotes/origin/candidate/dev-zone-v1
           git fetch origin candidate/passkey-auth-resilience-v1:refs/remotes/origin/candidate/passkey-auth-resilience-v1
-          rm -rf /tmp/kicom-dev-src /tmp/kicom-passkey-src /tmp/kicom-0926
+          rm -rf /tmp/kicom-dev-src /tmp/kicom-passkey-src /tmp/kicom-0926 /tmp/kicom-0926-smoke
           mkdir -p /tmp/kicom-dev-src /tmp/kicom-passkey-src /tmp/kicom-0926
 
           for f in DevSession.php DevAuthAdapter.php DevAuthFlow.php DevRouter.php DevHttpAdapter.php DevKiComBindings.php DevDiagnostics.php; do
@@ -37,12 +37,11 @@ jobs:
           for f in dev-selftest.php dev-router-selftest.php dev-http-selftest.php dev-bindings-selftest.php dev-diagnostics-selftest.php; do
             git show "refs/remotes/origin/candidate/dev-zone-v1:experimental/dev-zone/$f" > "/tmp/kicom-dev-src/$f"
           done
-
           for f in PasskeyBridge.php security-selftest.php selftest.php; do
             git show "refs/remotes/origin/candidate/passkey-auth-resilience-v1:experimental/passkey-auth/$f" > "/tmp/kicom-passkey-src/$f"
           done
 
-      - name: Build 0.9.26 source tree
+      - name: Build 0.9.26 R2 source tree
         shell: bash
         run: |
           set -euo pipefail
@@ -74,98 +73,144 @@ jobs:
           php /tmp/kicom-dev-src/dev-http-selftest.php
           php /tmp/kicom-dev-src/dev-diagnostics-selftest.php
 
-      - name: Package release
+      - name: Runtime KCL memory and SQLite upgrade smoke
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf releases/0.9.26 source/0.9.26 build/status/0.9.26.json
-          mkdir -p releases/0.9.26 source/0.9.26 build/status
-          cp -a /tmp/kicom-0926/source/. source/0.9.26/
+          cp -a /tmp/kicom-0926/source /tmp/kicom-0926-smoke
+          rm -rf /tmp/kicom-0926-smoke/var
+          mkdir -p /tmp/kicom-0926-smoke/var/project_memory
+          cp /tmp/kicom-0926/source/var/.htaccess /tmp/kicom-0926-smoke/var/.htaccess
+          cp source/0.9.25/memory/*.kcl /tmp/kicom-0926-smoke/var/project_memory/
+
+          php -d display_errors=1 -r '
+            chdir($argv[1]);
+            require "lib.php";
+            if(!kicomEnsureStorage()){fwrite(STDERR,"STORAGE_OR_MEMORY_SYNC_FAILED\n");exit(41);}
+            foreach(kicomMemoryResources() as $name=>$filename){
+              $seed=file_get_contents(kicomMemorySeedDir()."/".$filename);
+              $v=kicomValidateMemoryContent($name,$seed);
+              if(($v["status"]??"error")!=="ok"){fwrite(STDERR,"KCL_INVALID ".$name." ".($v["message"]??"UNKNOWN")."\n");exit(42);}
+              $cur=kicomReadMemoryResource($name);
+              if(!is_array($cur)||!hash_equals(hash("sha256",$seed),(string)$cur["sha256"])){fwrite(STDERR,"MEMORY_NOT_SYNCED ".$name."\n");exit(43);}
+              if(kicomMemoryHistoryCount($name)<2){fwrite(STDERR,"MEMORY_HISTORY_MISSING ".$name."\n");exit(44);}
+            }
+            if(!is_file(kicomMemoryStateDir()."/.release-sync-0.9.26.json")){fwrite(STDERR,"MEMORY_SYNC_MARKER_MISSING\n");exit(45);}
+            if(!function_exists("kicomDevReady")){fwrite(STDERR,"DEV_MODULES_NOT_LOADED\n");exit(46);}
+
+            $db=kicomSqliteDb();
+            if(!$db){fwrite(STDERR,"SQLITE_OPEN_FAILED\n");exit(47);}
+            $row=["at"=>"2026-09-18T18:00:00+00:00","type"=>"ci_dedupe","severity"=>"info","payload"=>"same"];
+            if(!kicomSqliteEventAppend("ci",$row,null)){fwrite(STDERR,"SQLITE_FIRST_INSERT_FAILED\n");exit(48);}
+            if(kicomSqliteEventAppend("ci",$row,null)){fwrite(STDERR,"SQLITE_DUPLICATE_COUNTED_AS_INSERT\n");exit(49);}
+            $snap=kicomSqliteSnapshot("ci-r2");
+            if(empty($snap["ok"])){fwrite(STDERR,"SQLITE_SNAPSHOT_FAILED ".($snap["code"]??"UNKNOWN")."\n");exit(50);}
+            $diag=kicomSqliteDiagnostics();
+            if(empty($diag["ok"])||((int)($diag["duplicate_sha_rows"]??-1))!==0){fwrite(STDERR,"SQLITE_DIAGNOSTICS_FAILED\n");exit(51);}
+
+            $bad=str_repeat("0",64);
+            $db->exec("UPDATE schema_migrations SET checksum=".$db->quote($bad)." WHERE version=1");
+            $reopened=kicomSqliteDb(true);
+            if($reopened instanceof PDO){fwrite(STDERR,"SQLITE_MIGRATION_CHECKSUM_TAMPER_NOT_REJECTED\n");exit(52);}
+            echo "RUNTIME_SMOKE_OK\n";
+          ' /tmp/kicom-0926-smoke
+
+      - name: Package append-only R2 release
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf source/0.9.26-r2 build/status/0.9.26-r2.json
+          rm -f releases/0.9.26/KiCom-0.9.26-R2.zip releases/0.9.26/SHA256SUMS-R2.txt
+          mkdir -p releases/0.9.26 source/0.9.26-r2 build/status
+          cp -a /tmp/kicom-0926/source/. source/0.9.26-r2/
 
           python3 - <<'PY'
           from pathlib import Path
           import zipfile
-          src=Path('source/0.9.26')
+          src=Path('source/0.9.26-r2')
           manifest=src/'MANIFEST.sha256'
           paths=[]
           for line in manifest.read_text().splitlines():
               if not line.strip(): continue
               _,p=line.split(None,1)
               paths.append(p.strip())
-          out=Path('releases/0.9.26/KiCom-0.9.26.zip')
+          out=Path('releases/0.9.26/KiCom-0.9.26-R2.zip')
           with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
               for p in paths:
                   z.write(src/p,p)
               z.write(manifest,'MANIFEST.sha256')
           PY
 
-      - name: Verify with unchanged 0.9.25 verifier
+      - name: Verify R2 with unchanged 0.9.25 verifier
         shell: bash
         run: |
           set -euo pipefail
-          ZIP="$(pwd)/releases/0.9.26/KiCom-0.9.26.zip"
+          ZIP="$(pwd)/releases/0.9.26/KiCom-0.9.26-R2.zip"
           php -r '
             chdir("source/0.9.25");
             require "lib.php";
             $zip=$argv[1];
             $x=kicomSelfUpdateZipInspect($zip);
-            if(empty($x["ok"])){fwrite(STDERR,"VERIFIER_REJECTED ".($x["code"]??"UNKNOWN")."\n");exit(2);}
+            if(empty($x["ok"])){fwrite(STDERR,"VERIFIER_REJECTED ".($x["code"]??"UNKNOWN")."\n");exit(61);}
             $r=kicomSelfUpdateRiskClass($x);
-            echo "VERIFIER_OK risk=".($r["class"]??"unknown")." files=".count($x["entries"]??[])."\n";
+            if(($x["version"]??"")!=="0.9.26"||($x["genome"]["id"]??"")!=="kicom-0.9.26-g25r2"){fwrite(STDERR,"IDENTITY_MISMATCH\n");exit(62);}
+            echo "VERIFIER_OK risk=".($r["class"]??"unknown")." files=".count($x["entries"]??[])." genome=".($x["genome"]["id"]??"?")."\n";
           ' "$ZIP"
 
       - name: Static authority checks
         shell: bash
         run: |
           set -euo pipefail
-          grep -q "production_requires_totp'=>true" source/0.9.26/living.php
-          grep -q "red_requires_totp'=>false" source/0.9.26/living.php
-          grep -q "internal_self_update'=>true" source/0.9.26/living.php
-          grep -q "DEV_CAPABILITY_FORBIDDEN" source/0.9.26/modules/dev/DevSession.php
-          ! grep -RIE "shell_exec|exec\(|system\(|passthru\(|proc_open|popen\(" source/0.9.26/modules/dev
-          ! grep -RIE "xox[baprs]-[A-Za-z0-9-]{10,}|otpauth://|BEGIN[[:space:]]+PRIVATE[[:space:]]+KEY" source/0.9.26/modules/dev
+          grep -q "production_requires_totp'=>true" source/0.9.26-r2/living.php
+          grep -q "red_requires_totp'=>false" source/0.9.26-r2/living.php
+          grep -q "internal_self_update'=>true" source/0.9.26-r2/living.php
+          grep -q "DEV_CAPABILITY_FORBIDDEN" source/0.9.26-r2/modules/dev/DevSession.php
+          grep -q "release-sync-0.9.26" source/0.9.26-r2/lib.php
+          ! grep -RIE "shell_exec|exec\(|system\(|passthru\(|proc_open|popen\(" source/0.9.26-r2/modules/dev
+          ! grep -RIE "xox[baprs]-[A-Za-z0-9-]{10,}|otpauth://|BEGIN[[:space:]]+PRIVATE[[:space:]]+KEY" source/0.9.26-r2/modules/dev
 
-      - name: Record source/release metadata
+      - name: Record R2 source and release metadata
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          import hashlib,json,datetime,subprocess
-          src=Path('source/0.9.26')
-          z=Path('releases/0.9.26/KiCom-0.9.26.zip')
+          import hashlib,json,datetime
+          src=Path('source/0.9.26-r2')
+          z=Path('releases/0.9.26/KiCom-0.9.26-R2.zip')
           zsha=hashlib.sha256(z.read_bytes()).hexdigest()
           meta={
             "schema":1,
             "version":"0.9.26",
+            "release_revision":"R2",
+            "supersedes_candidate_sha256":"9ddecab969d43b0d634cd91d40ad8192312aeb62aafbbb852edcfee346a6314d",
             "source_version":"0.9.25",
-            "genome":"kicom-0.9.26-g25",
+            "genome":"kicom-0.9.26-g25r2",
             "release_file":str(z),
             "release_sha256":zsha,
             "built_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "branch":"work/kicom-0.9.26",
             "dev_backend":"trusted-modules",
             "sqlite_hardening":True,
+            "canonical_memory_sync":"revision-preserving",
             "authority_model":"risk-separated-from-authority"
           }
           (src/'SOURCE-SNAPSHOT.json').write_text(json.dumps(meta,indent=2)+"\n")
-          Path('build/status/0.9.26.json').write_text(json.dumps(meta|{"status":"verified_candidate"},indent=2)+"\n")
+          Path('build/status/0.9.26-r2.json').write_text(json.dumps(meta|{"status":"verified_candidate_r2"},indent=2)+"\n")
           print(json.dumps(meta,indent=2))
           PY
-          sha256sum releases/0.9.26/KiCom-0.9.26.zip > releases/0.9.26/SHA256SUMS.txt
+          sha256sum releases/0.9.26/KiCom-0.9.26-R2.zip > releases/0.9.26/SHA256SUMS-R2.txt
 
-      - name: Commit verified candidate
+      - name: Commit verified R2 candidate
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'kicom-mirror-bot'
           git config user.email 'kicom-mirror-bot@users.noreply.github.com'
-          git add source/0.9.26 releases/0.9.26 build/status/0.9.26.json
+          git add source/0.9.26-r2 releases/0.9.26/KiCom-0.9.26-R2.zip releases/0.9.26/SHA256SUMS-R2.txt build/status/0.9.26-r2.json
           if git diff --cached --quiet; then
-            echo "Candidate already current."
+            echo "R2 candidate already current."
             exit 0
           fi
-          git commit -m 'KiCom 0.9.26 verified candidate'
+          git commit -m 'KiCom 0.9.26 R2 verified candidate'
           git push origin HEAD:work/kicom-0.9.26
-
-# trigger: candidate-build-2
