@@ -1,0 +1,27 @@
+name: KiCom Readiness Managed Component Policy
+
+on:
+  pull_request:
+    paths:
+      - 'experimental/expansion-cell/CellEvolutionReadiness.php'
+      - 'experimental/expansion-cell/cell-evolution-readiness-status.php'
+      - 'experimental/expansion-cell/readiness-managed-component-policy.json'
+      - 'experimental/expansion-cell/readiness-managed-component-policy-selftest.php'
+      - '.github/workflows/readiness-managed-component-policy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax
+        run: |
+          php -l experimental/expansion-cell/CellEvolutionReadiness.php
+          php -l experimental/expansion-cell/cell-evolution-readiness-status.php
+          php -l experimental/expansion-cell/readiness-managed-component-policy-selftest.php
+      - name: Fail-closed managed-component policy
+        run: php experimental/expansion-cell/readiness-managed-component-policy-selftest.php
