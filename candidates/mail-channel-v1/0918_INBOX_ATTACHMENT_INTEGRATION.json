@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "candidate": "kicom-mail-inbox-0.9.18-g19",
+  "status": "CI_GREEN_READY_FOR_LIVE_SOURCE_BUILD",
+  "base_required": {
+    "runtime": "0.9.17",
+    "genome": "kicom-0.9.17-g18",
+    "healthy": true,
+    "trusted": true,
+    "drift_count": 0,
+    "unknown_count": 0
+  },
+  "target": {
+    "runtime": "0.9.18",
+    "genome": "kicom-0.9.18-g19"
+  },
+  "components": [
+    "experimental/mail-channel/KiComMailMime.php",
+    "experimental/mail-channel/KiComMailQuarantine.php",
+    "experimental/mail-channel/KiComMailInbox.php",
+    "experimental/mail-channel/KiComMailTransport.php",
+    "experimental/mail-channel/KiComMailChannel.php"
+  ],
+  "capabilities": [
+    "read-only IMAPS BODY.PEEK inbox fetch",
+    "bounded MIME parsing",
+    "plain-text perception preview with SHA-256",
+    "persistent deduplication and append-only event log",
+    "attachment SHA-256 and metadata capture",
+    "ZIP recognition without extraction",
+    "non-web-accessible binary quarantine",
+    "no attachment auto-execute, auto-extract or auto-install"
+  ],
+  "security": {
+    "inbound_trust": "UNTRUSTED_PERCEPTION_INPUT",
+    "mail_grants_authority": false,
+    "attachment_execution": "FORBIDDEN",
+    "attachment_auto_install": "FORBIDDEN",
+    "zip_release_path": "EXISTING_KICOM_VERIFIER_REQUIRED",
+    "credentials_in_repo_or_memory": "FORBIDDEN",
+    "tls_peer_verification": true,
+    "tls_peer_name_verification": true
+  },
+  "ci": {
+    "workflow": "KiCom Mail Channel v1",
+    "run_id": 35327210941,
+    "conclusion": "success",
+    "commit": "fb47bd6f484c136d90590dceb3916d562675c523",
+    "verified_steps": [
+      "PHP syntax",
+      "Mail channel selftest",
+      "Mail runtime selftest",
+      "Mail inbox and quarantine selftest",
+      "Assert credential is reference-only"
+    ]
+  },
+  "production_changed": false
+}
