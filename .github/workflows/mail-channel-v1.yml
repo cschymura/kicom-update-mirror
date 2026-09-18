@@ -25,6 +25,8 @@ jobs:
         run: php -l experimental/mail-channel/KiComMailChannel.php
       - name: Mail channel selftest
         run: php experimental/mail-channel/mail-channel-selftest.php
+      - name: Mail runtime selftest
+        run: php experimental/mail-channel/mail-runtime-selftest.php
       - name: Assert credential is reference-only
         shell: bash
         run: |
