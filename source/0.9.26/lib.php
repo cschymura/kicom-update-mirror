@@ -143,6 +143,29 @@ function kicomSqliteDiagnostics(): array {
 function kicomSqliteStatus(): array {$s=kicomSqliteSupport();$hl=kicomSqliteHealth(false);$last=kicomSqliteLatestSnapshot();$ev=kicomSqliteEvolutionStatus();return ['ok'=>!empty($hl['ok']),'primary'=>true,'compatibility_mirror'=>true,'support'=>$s,'health'=>$hl,'last_snapshot'=>is_array($last)?['id'=>$last['id']??'','created_at'=>$last['created_at']??'','sha256'=>$last['sha256']??'','bytes'=>$last['bytes']??0]:null,'evolution_experiments'=>count($ev['experiments']??[])];}
 function kicomSqliteMaintenanceTick(bool $force=false): array {static $running=false;if($running)return ['ok'=>true,'code'=>'SQLITE_MAINTENANCE_REENTRANT'];$running=true;try{if(!kicomSqliteEnsureDirs())return ['ok'=>false,'code'=>'SQLITE_STORAGE_FAILED'];$mf=kicomSqliteMaintenanceFile();if(!$force&&is_file($mf)&&(time()-(int)filemtime($mf))<300)return ['ok'=>true,'code'=>'SQLITE_MAINTENANCE_THROTTLED'];$hl=kicomSqliteHealth(false);if(empty($hl['ok'])){$r=kicomSqliteRecover('automatic-health');if(empty($r['ok']))return $r;$hl=kicomSqliteHealth(true);}if(kicomSqliteMetaGet('legacy_import_complete','')!=='1'){kicomSqliteImportLegacy();$hl=kicomSqliteHealth(true);}$last=kicomSqliteLatestSnapshot();$at=is_array($last)?(int)strtotime((string)($last['created_at']??'')):0;if($at<=0||time()-$at>=86400)kicomSqliteSnapshot('automatic-daily');$evAt=(int)kicomSqliteMetaGet('last_evolution_tick','0');if($force||time()-$evAt>=3600){kicomSqliteEvolutionTick(false);kicomSqliteMetaSet('last_evolution_tick',(string)time());}kicomSqliteMirrorJson($mf,['at'=>gmdate('c'),'ok'=>!empty($hl['ok']),'schema_version'=>$hl['schema_version']??0,'events'=>$hl['events']??0,'kv_rows'=>$hl['kv_rows']??0]);@touch($mf);return ['ok'=>!empty($hl['ok']),'code'=>!empty($hl['ok'])?'SQLITE_MAINTENANCE_OK':'SQLITE_MAINTENANCE_FAILED']+$hl;}finally{$running=false;}}
 
+function kicomReleaseMemorySync0926(): bool {
+    if(KICOM_VERSION!=='0.9.26')return true;
+    $marker=kicomMemoryStateDir().'/.release-sync-0.9.26.json';
+    if(is_file($marker)){
+        $m=json_decode((string)@file_get_contents($marker),true);
+        if(is_array($m)&&($m['status']??'')==='complete')return true;
+    }
+    foreach(kicomMemoryResources() as $name=>$filename){
+        $seed=kicomMemorySeedDir().'/'.$filename;$raw=@file_get_contents($seed);
+        if(!is_string($raw))return false;
+        $v=kicomValidateMemoryContent((string)$name,$raw);if(($v['status']??'error')==='error')return false;
+        $current=kicomReadMemoryResource((string)$name);if(!is_array($current))return false;
+        $targetSha=hash('sha256',$raw);
+        if(hash_equals((string)$current['sha256'],$targetSha))continue;
+        $w=kicomAtomicMemoryWrite((string)$name,$raw,'release_sync_0.9.26',(string)$current['sha256']);
+        if(empty($w['ok']))return false;
+    }
+    $row=['schema'=>1,'release'=>'0.9.26','status'=>'complete','synced_at'=>gmdate('c'),'policy'=>'revision-preserving canonical-memory release sync'];
+    $json=json_encode($row,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);if($json===false)return false;
+    $tmp=$marker.'.tmp-'.strtolower(kicomRequestId());
+    if(@file_put_contents($tmp,$json."\n",LOCK_EX)===false)return false;@chmod($tmp,0600);
+    if(!@rename($tmp,$marker)){@unlink($tmp);return false;}@chmod($marker,0600);return true;
+}
 function kicomEnsureStorage(): bool {
     foreach ([kicomVarDir(), kicomPendingDir(), kicomHistoryDir(), kicomTempDir(), kicomStageDir(), kicomMemoryStateDir(), kicomMemoryHistoryDir(), kicomIntentDir(), kicomDeployBackupDir(), kicomDeployHistoryDir(), kicomSelfUpdateDir(), kicomSelfUpdatePackagesDir(), kicomSelfUpdateWorkDir(), kicomSelfUpdateHistoryDir(), kicomSelfUpdateSupersededDir()] as $dir) {
         if (!is_dir($dir) && !@mkdir($dir, 0700, true) && !is_dir($dir)) return false;
@@ -155,8 +178,10 @@ function kicomEnsureStorage(): bool {
     $resources=kicomMemoryResources();
     $stateFile=kicomMemoryStateDir().'/'.$resources['PROJECT_STATE'];
     if (is_file($stateFile)) {
-        /* Never silently mix a persistent memory set with seed files from a later package. */
+        /* Persistent canonical memory is release-synchronized only through the explicit,
+           revision-preserving 0.9.26 migration below. */
         foreach ($resources as $filename) if (!is_file(kicomMemoryStateDir().'/'.$filename)) return false;
+        if(!kicomReleaseMemorySync0926())return false;
         return kicomLivingEnsure();
     }
     $seedState=kicomMemorySeedDir().'/'.$resources['PROJECT_STATE'];
@@ -170,6 +195,7 @@ function kicomEnsureStorage(): bool {
         if ($raw === false || @file_put_contents($target, $raw, LOCK_EX) === false) return false;
         @chmod($target, 0600);
     }
+    if(!kicomReleaseMemorySync0926())return false;
     return kicomLivingEnsure();
 }
 function kicomCleanupPending(): void {
@@ -484,7 +510,7 @@ function kicomMemoryHistoryGet(string $name,string $revision): ?array {
     $row=json_decode((string)@file_get_contents($file),true); return is_array($row)&&(($row['resource']??null)===$name)?$row:null;
 }
 function kicomRecordMemoryRevision(string $name,string $content,string $action): ?string {
-    $name=strtoupper(trim($name)); if(!isset(kicomMemoryResources()[$name])||!kicomEnsureStorage())return null;
+    $name=strtoupper(trim($name)); if(!isset(kicomMemoryResources()[$name]))return null;
     $dir=kicomMemoryHistoryResourceDir($name); if(!is_dir($dir)&&!@mkdir($dir,0700,true)&&!is_dir($dir))return null;
     $sha=hash('sha256',$content); $revision=gmdate('YmdHis').'-'.substr($sha,0,12).'-'.strtolower(kicomRequestId());
     $row=['revision'=>$revision,'created_at'=>gmdate('c'),'resource'=>$name,'action'=>$action,'bytes'=>strlen($content),'sha256'=>$sha,'content_b64'=>base64_encode($content)];

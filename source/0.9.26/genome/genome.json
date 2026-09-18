@@ -93,7 +93,7 @@
         },
         {
             "path": "lib.php",
-            "sha256": "e5e1deed02b73c453f77d50e39df152a2cfaafafc7b04aec27fa46d98dcf117c",
+            "sha256": "d9190870f12c2fa0b27778c8ec6b81bcc55e6d810584fcdf6b93429f3140649e",
             "role": "core-library",
             "auto_heal": true
         },
