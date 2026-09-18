@@ -6,7 +6,7 @@ function pc(bool $ok,string $m):void{if(!$ok){fwrite(STDERR,"FAIL $m\n");exit(1)
 function pcRm(string $d):void{if(!is_dir($d))return;$it=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($d,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST);foreach($it as $f){$p=$f->getPathname();$f->isDir()?@rmdir($p):@unlink($p);}@rmdir($d);}
 function pcSeed(string $src):void{
     @mkdir($src.'/cell-runtime',0700,true);
-    foreach(['ExpansionProtocol.php','CellNode.php','CellLiving.php','CellPerceptionAction.php','CellWorldModel.php'] as $f)pc(copy(__DIR__.'/'.$f,$src.'/'.$f),'copy '.$f);
+    foreach(['ExpansionProtocol.php','CellNode.php','CellLiving.php','CellPerceptionAction.php','CellWorldModel.php','CellEvolutionReadiness.php','CellEvolutionReadinessAdapter.php'] as $f)pc(copy(__DIR__.'/'.$f,$src.'/'.$f),'copy '.$f);
     foreach(['common.php','bootstrap.php','federation.php','status.php','doctor.php','living-schema.json'] as $f)pc(copy(__DIR__.'/cell-runtime/'.$f,$src.'/cell-runtime/'.$f),'copy runtime '.$f);
 }
 $base=sys_get_temp_dir().'/kicom-package-complete-'.bin2hex(random_bytes(5));@mkdir($base,0700,true);
@@ -22,9 +22,18 @@ try{
     $manifest=json_decode((string)file_get_contents($base.'/pkg-ok/cell-manifest.json'),true);
     pc(is_array($manifest)&&($manifest['intrinsic_complete']??false)===true,'manifest proves intrinsic completeness');
     $paths=[];foreach($manifest['files']??[] as $r)if(is_array($r))$paths[]=(string)($r['path']??'');
-    foreach(['lib/CellLiving.php','lib/CellPerceptionAction.php','lib/CellWorldModel.php','living-schema.json','doctor.php'] as $p)pc(in_array($p,$paths,true),'manifest contains '.$p);
+    foreach(['lib/CellLiving.php','lib/CellPerceptionAction.php','lib/CellWorldModel.php','lib/CellEvolutionReadiness.php','lib/CellEvolutionReadinessAdapter.php','lib/.htaccess','living-schema.json','doctor.php'] as $p)pc(in_array($p,$paths,true),'manifest contains '.$p);
+    pc(($manifest['private_diagnostics']['evolution_readiness']['http_exposed']??null)===false,'readiness remains private');
+    pc(($manifest['private_diagnostics']['evolution_readiness']['promotion_authority']??null)===false,'readiness has no promotion authority');
+    pc(strpos((string)file_get_contents($base.'/pkg-ok/lib/.htaccess'),'Require all denied')!==false,'private lib denied over HTTP');
+    foreach(['readiness.php','evolution-readiness.php','cell-evolution-readiness-status.php'] as $p)pc(!is_file($base.'/pkg-ok/'.$p),'no public readiness endpoint '.$p);
     $cfg=require $base.'/pkg-ok/bootstrap.config.php';pc(in_array('perception.query',$cfg['capabilities']??[],true),'new daughter advertises perception query capability');
     $builder->destroy($base.'/pkg-ok');
+
+    @unlink($src.'/CellEvolutionReadinessAdapter.php');
+    $missingReadiness=$builder->build($base.'/pkg-missing-readiness',$prepared,$parent);
+    pc(empty($missingReadiness['ok'])&&($missingReadiness['code']??'')==='EXPANSION_PACKAGE_SOURCE_MISSING'&&($missingReadiness['path']??'')==='CellEvolutionReadinessAdapter.php','missing readiness adapter fails build');
+    pc(copy(__DIR__.'/CellEvolutionReadinessAdapter.php',$src.'/CellEvolutionReadinessAdapter.php'),'restore readiness adapter fixture');
 
     @unlink($src.'/CellWorldModel.php');
     $missingWorld=$builder->build($base.'/pkg-missing-world',$prepared,$parent);
