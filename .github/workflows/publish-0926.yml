@@ -1,0 +1,90 @@
+name: Publish KiCom 0.9.26 mirror
+
+on:
+  push:
+    branches:
+      - work/kicom-0.9.26
+    paths:
+      - .github/workflows/publish-0926.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout verified work branch
+        uses: actions/checkout@v4
+        with:
+          ref: work/kicom-0.9.26
+          fetch-depth: 0
+
+      - name: Verify exact candidate before publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f build/status/0.9.26.json
+          test -f releases/0.9.26/KiCom-0.9.26.zip
+          test -d source/0.9.26
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          st=json.loads(Path('build/status/0.9.26.json').read_text())
+          assert st['status']=='verified_candidate'
+          assert st['version']=='0.9.26'
+          assert st['genome']=='kicom-0.9.26-g25'
+          expected=st['release_sha256']
+          actual=hashlib.sha256(Path('releases/0.9.26/KiCom-0.9.26.zip').read_bytes()).hexdigest()
+          assert actual==expected=='9ddecab969d43b0d634cd91d40ad8192312aeb62aafbbb852edcfee346a6314d'
+          print('candidate verified:',actual)
+          PY
+
+      - name: Preserve candidate outside checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/kicom-0926-publish
+          mkdir -p /tmp/kicom-0926-publish
+          cp -a source/0.9.26 /tmp/kicom-0926-publish/source
+          cp -a releases/0.9.26 /tmp/kicom-0926-publish/release
+          cp build/status/0.9.26.json /tmp/kicom-0926-publish/status.json
+
+      - name: Publish exact candidate to main mirror
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout -B main origin/main
+          rm -rf source/0.9.26 releases/0.9.26
+          mkdir -p source releases/0.9.26 build/status
+          cp -a /tmp/kicom-0926-publish/source source/0.9.26
+          cp -a /tmp/kicom-0926-publish/release/. releases/0.9.26/
+          cp /tmp/kicom-0926-publish/status.json build/status/0.9.26.json
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('channel.json')
+          d=json.loads(p.read_text())
+          rel={
+            'version':'0.9.26',
+            'url':'https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.26/KiCom-0.9.26.zip',
+            'sha256':'9ddecab969d43b0d634cd91d40ad8192312aeb62aafbbb852edcfee346a6314d',
+            'published_at':'2026-09-18T18:38:51.825226+00:00'
+          }
+          rows=[x for x in d.get('releases',[]) if x.get('version')!='0.9.26']
+          d['releases']=[rel]+rows
+          p.write_text(json.dumps(d,indent=2)+'\n')
+          PY
+
+          git config user.name 'kicom-mirror-bot'
+          git config user.email 'kicom-mirror-bot@users.noreply.github.com'
+          git add channel.json source/0.9.26 releases/0.9.26 build/status/0.9.26.json
+          if git diff --cached --quiet; then
+            echo '0.9.26 already published exactly.'
+            exit 0
+          fi
+          git commit -m 'Publish verified KiCom 0.9.26'
+          git push origin HEAD:main
