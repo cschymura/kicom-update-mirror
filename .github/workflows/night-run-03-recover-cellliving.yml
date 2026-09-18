@@ -6,7 +6,7 @@ permissions:
   contents: write
 jobs:
   recover:
-    if: github.event.head_commit.message == 'Add one-shot recovery for accidental CellLiving truncation'
+    if: github.event.head_commit.message == 'Arm one-shot CellLiving recovery'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
