@@ -214,6 +214,66 @@ new="""    if(str_starts_with($path,'assets/'))return in_array(strtolower(pathin
     if(str_starts_with($path,'dev/'))return in_array($path,['dev/index.html','dev/browser.js','dev/dev-client.js','dev/.htaccess'],true);
     return false;"""
 lib=replace_once(lib,old,new,"future dev asset allowlist")
+
+# Canonical memory is persistent under var/ and seed files are not authoritative after initialization.
+# 0.9.26 therefore performs one explicit, revision-preserving release sync once.
+old="""function kicomRecordMemoryRevision(string $name,string $content,string $action): ?string {
+    $name=strtoupper(trim($name)); if(!isset(kicomMemoryResources()[$name])||!kicomEnsureStorage())return null;"""
+new="""function kicomRecordMemoryRevision(string $name,string $content,string $action): ?string {
+    $name=strtoupper(trim($name)); if(!isset(kicomMemoryResources()[$name]))return null;"""
+lib=replace_once(lib,old,new,"memory revision recursion removal")
+
+marker="function kicomEnsureStorage(): bool {"
+sync=r'''function kicomReleaseMemorySync0926(): bool {
+    if(KICOM_VERSION!=='0.9.26')return true;
+    $marker=kicomMemoryStateDir().'/.release-sync-0.9.26.json';
+    if(is_file($marker)){
+        $m=json_decode((string)@file_get_contents($marker),true);
+        if(is_array($m)&&($m['status']??'')==='complete')return true;
+    }
+    foreach(kicomMemoryResources() as $name=>$filename){
+        $seed=kicomMemorySeedDir().'/'.$filename;$raw=@file_get_contents($seed);
+        if(!is_string($raw))return false;
+        $v=kicomValidateMemoryContent((string)$name,$raw);if(($v['status']??'error')==='error')return false;
+        $current=kicomReadMemoryResource((string)$name);if(!is_array($current))return false;
+        $targetSha=hash('sha256',$raw);
+        if(hash_equals((string)$current['sha256'],$targetSha))continue;
+        $w=kicomAtomicMemoryWrite((string)$name,$raw,'release_sync_0.9.26',(string)$current['sha256']);
+        if(empty($w['ok']))return false;
+    }
+    $row=['schema'=>1,'release'=>'0.9.26','status'=>'complete','synced_at'=>gmdate('c'),'policy'=>'revision-preserving canonical-memory release sync'];
+    $json=json_encode($row,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES);if($json===false)return false;
+    $tmp=$marker.'.tmp-'.strtolower(kicomRequestId());
+    if(@file_put_contents($tmp,$json."\n",LOCK_EX)===false)return false;@chmod($tmp,0600);
+    if(!@rename($tmp,$marker)){@unlink($tmp);return false;}@chmod($marker,0600);return true;
+}
+'''
+if marker not in lib: raise SystemExit("ensure storage marker missing")
+lib=lib.replace(marker,sync+marker,1)
+
+old="""    if (is_file($stateFile)) {
+        /* Never silently mix a persistent memory set with seed files from a later package. */
+        foreach ($resources as $filename) if (!is_file(kicomMemoryStateDir().'/'.$filename)) return false;
+        return kicomLivingEnsure();
+    }"""
+new="""    if (is_file($stateFile)) {
+        /* Persistent canonical memory is release-synchronized only through the explicit,
+           revision-preserving 0.9.26 migration below. */
+        foreach ($resources as $filename) if (!is_file(kicomMemoryStateDir().'/'.$filename)) return false;
+        if(!kicomReleaseMemorySync0926())return false;
+        return kicomLivingEnsure();
+    }"""
+lib=replace_once(lib,old,new,"existing canonical memory sync")
+
+old="""    return kicomLivingEnsure();
+}
+function kicomCleanupPending(): void {"""
+new="""    if(!kicomReleaseMemorySync0926())return false;
+    return kicomLivingEnsure();
+}
+function kicomCleanupPending(): void {"""
+lib=replace_once(lib,old,new,"fresh canonical memory sync")
+
 write(out/"lib.php",lib)
 
 # ---- Authority semantics: risk != authority. External targets stay human-authorized.
@@ -257,89 +317,109 @@ if anchor not in idx: raise SystemExit("sqlite KCL anchor missing")
 idx=idx.replace(anchor,diagcase+anchor,1)
 write(out/"index.php",idx)
 
-# ---- Canonical seed memory synchronized to 0.9.26. Runtime var remains authoritative after install.
-mem={
-"project_state.kcl":'''PROJECT kicom
-VERSION "0.9.26"
-STATE active
-FACT canonical=true
-FACT canonical_name="KiCom"
-FACT sqlite_primary=true
-FACT dev_zone="trusted-modules-passkey"
-FACT slack_transport="bounded-redundant"
-FACT mail_transport="bounded-redundant"
-FACT browser_transport="opera-compatible-dev-admin"
-FACT internal_authority="self-authoring-after-verifier"
-FACT external_authority="human-protected"
-FACT legacy_bootstrap_invariant="critical-actions-totp-bound; compatibility-only for 0.9.25 installer"
-RULE "Risk class and authority boundary are separate dimensions."
-RULE "Internal reversible KiCom work is not TOTP-gated solely because it is RED."
-RULE "Production targets, new external recipients, credentials and protected foreign systems remain human-authorized."
-RULE "Verifier, SHA-256, backup, healthcheck, rollback, TLS and trust-root controls remain mandatory."
-END
-''',
-"architecture.kcl":'''ARCHITECTURE kicom
-VERSION "0.9.26"
-LAYER trust="genome+lkg+recovery"
-LAYER runtime="php+sqlite-primary+compatibility-mirror"
-LAYER dev="trusted genome-covered modules + WebAuthn passkey + reusable DEV session"
-LAYER transport="direct-chat + Slack + Mail + GitHub-mirror + browser"
-LAYER authority="internal-self-authoring | protected-external-human"
-RULE "DEV has no production, self-update-install, recovery, auth-admin or secret authority."
-RULE "Slack and Mail are transports/perception surfaces, never authority sources."
-RULE "Opera/browser is a control surface, never an authority source."
-RULE "SQLite migration checksums, verified snapshots and deduplicated imports are invariants."
-END
-''',
-"protocol.kcl":'''PROTOCOL KCL/1
-VERSION "0.9.26"
-AUTH legacy_session_open="FreeOTP fallback transport, not internal policy gate"
-AUTH dev="WebAuthn passkey -> reusable DEV-scoped session"
-RULE "Internal KiCom autonomy does not require human approval merely because technical risk is RED."
-RULE "Human authorization is reserved for protected external systems, credentials, recipients and production targets."
-RULE "Direct update transports converge on the normal self-update verifier."
-RULE "No transport expands authority."
-RULE "Slack, Mail, GitHub and Opera/browser are non-authoritative transports or control surfaces."
-SQLITE diagnostics="SQLITE_DIAGNOSTICS"
-END
-''',
-"decisions.kcl":'''DECISIONS kicom
-VERSION "0.9.26"
-DECISION D031 "Separate technical risk classification from authority boundary."
-DECISION D032 "Make the DEV backend a trusted genome component under modules/; keep DEV credentials incapable of production authority."
-DECISION D033 "Use WebAuthn/passkey for routine DEV entry; FreeOTP remains only a legacy/fallback transport and protected-external mechanism where configured."
-DECISION D034 "Harden SQLite migration checksum verification, snapshot-gated evolution and actual-insert legacy counters."
-DECISION D035 "Preserve Slack, Mail and Opera/browser as redundant non-authoritative paths in acceptance testing."
-END
-''',
-"changelog.kcl":'''CHANGELOG kicom
-VERSION "0.9.26"
-CHANGE "Trusted DEV backend moved into genome-covered modules; incomplete loose drop-in is no longer authoritative."
-CHANGE "Existing /dev/ browser endpoints are bridged to trusted root code without requiring executable PHP under /dev/."
-CHANGE "Passkey DEV sessions are reusable, non-rotating and DEV-only."
-CHANGE "SQLite stored migration checksums are verified on open."
-CHANGE "SQLite legacy event imports count only newly inserted unique events."
-CHANGE "SQLite evolution promotion aborts when the verified pre-snapshot fails."
-CHANGE "SQLite backup uses verified SQLite3 backup with verified VACUUM INTO fallback."
-CHANGE "Added bounded SQLite duplicate/stream diagnostics."
-CHANGE "0.9.26 retains the literal critical-actions-totp-bound genome marker only so the 0.9.25 installer can validate the transition; the 0.9.26 verifier replaces it with explicit authority-boundary invariants."
-CHANGE "Internal self-update after authenticated transport still uses manifest/SHA/genome/backup/health/rollback but is not TOTP-gated solely by RED risk."
-CHANGE "Production/external authority remains protected."
-CHANGE "Slack, Mail and Opera/browser acceptance preserved."
-END
-''',
-"next.kcl":'''NEXT kicom
-VERSION "0.9.26"
-NEXT "Run isolated CI and current-0.9.25 verifier against the complete 0.9.26 package."
-NEXT "Install through the ordinary verified self-update path; do not use loose DEV PHP or rescue reader."
-NEXT "After install verify HELLO, GENOME_STATUS, SQLITE_HEALTH, SQLITE_DIAGNOSTICS and zero drift."
-NEXT "Retest /dev/ passkey, DEV API, extensionless agent bridge and iPhone/Opera JSON behavior."
-NEXT "Probe Slack auth/send boundary and Mail IMAP/SMTP/loopback/inbound update path without exposing secrets."
-NEXT "Confirm canonical runtime memory migrated/synchronized and archive prior state rather than deleting it."
-END
+# ---- Canonical seed memory synchronized to 0.9.26.
+# Start from the valid 0.9.25 resources so all structural/safety sentinels survive.
+p=out/"memory/project_state.kcl"; m=p.read_text()
+m=replace_once(m,'VERSION "0.9.25"','VERSION "0.9.26"',"PROJECT_STATE version")
+m=replace_once(m,'FACT genome_id="kicom-0.9.25-g24"','FACT genome_id="kicom-0.9.26-g25"',"PROJECT_STATE genome")
+m=replace_once(m,'FACT genome_generation=24','FACT genome_generation=25',"PROJECT_STATE generation")
+m=replace_once(m,'FACT autonomy_envelope="freeotp-session:test,staging,workspace,memory,goals"','FACT autonomy_envelope="dev-passkey+bounded-internal-self-authoring; legacy-freeotp-session-fallback"',"PROJECT_STATE autonomy")
+m=replace_once(m,'FACT critical_approval="transaction-bound-freeotp:red,production,kernel"','FACT critical_approval="protected-external-human:production,credentials,external-recipients; FreeOTP remains a legacy implementation where configured"',"PROJECT_STATE authority")
+m=replace_once(m,'FACT session_open_totp_grace="current plus previous 2 FreeOTP counters by default; one-use replay protection; critical actions current-counter only"','FACT session_open_totp_grace="legacy fallback only; current plus previous 2 FreeOTP counters by default with one-use replay protection"',"PROJECT_STATE legacy session")
+needle='FACT sqlite_boundaries="Canonical KCL, Genome, secrets and immutable archive authority stay outside SQLite"'
+extra='''FACT sqlite_boundaries="Canonical KCL, Genome, secrets and immutable archive authority stay outside SQLite"
+FACT dev_zone="trusted genome-covered modules; WebAuthn passkey; reusable DEV-only session"
+FACT slack_transport="bounded redundant transport; never authority; requires configured bot/signing secrets"
+FACT mail_transport="bounded redundant transport; never authority; IMAPS/SMTPS configured separately"
+FACT browser_transport="Opera-compatible DEV/Admin control surface; never authority"
+FACT authority_model="technical risk classification is separate from authority boundary"
+FACT internal_red_totp_gate=false
+FACT production_external_authority="human-protected"
+FACT legacy_bootstrap_invariant="critical-actions-totp-bound is retained only for the 0.9.25 installer transition"
+RULE "Internal reversible KiCom work is not TOTP-gated solely because technical risk is RED."
+RULE "Production targets, credentials, new external recipients and protected foreign systems remain human-authorized."
+RULE "Verifier, SHA-256, backup, healthcheck, rollback, TLS and trust-root controls remain mandatory."'''
+m=replace_once(m,needle,extra,"PROJECT_STATE 0.9.26 facts")
+write(p,m)
+
+p=out/"memory/architecture.kcl"; m=p.read_text()
+m=replace_once(m,'COMPONENT human_authorization_bridge role="FreeOTP TOTP and transaction-bound critical approval"','COMPONENT human_authorization_bridge role="human authorization for protected external authority; FreeOTP retained as legacy/fallback implementation"',"ARCH auth bridge")
+m=replace_once(m,'COMPONENT autonomy_envelope role="TOTP-opened rolling session for bounded non-production work"','COMPONENT autonomy_envelope role="bounded internal work; legacy KCL session transport remains available while routine DEV uses passkey"',"ARCH autonomy")
+m=replace_once(m,'FLOW autonomy_session="FreeOTP -> session_id + rolling one-time token -> bounded KCL operations"','FLOW autonomy_session="legacy FreeOTP session transport -> rolling token -> bounded KCL operations; transport token is not a policy grant"',"ARCH session flow")
+m=replace_once(m,'FLOW critical_action="session -> exact transaction binding -> FreeOTP -> one exact RED/production/kernel action"','FLOW protected_external_action="exact action binding -> human authorization where required -> execute with revalidation"',"ARCH protected action")
+m=replace_once(m,'RULE "Production targets remain allowlisted and require transaction-bound FreeOTP"','RULE "Production targets remain allowlisted and human-authorized; current legacy implementation may use transaction-bound FreeOTP"',"ARCH production")
+m=replace_once(m,'COMPONENT session_totp_grace role="normal autonomy-session opening may accept configured recent past counters; critical approval verification remains current-counter only"','COMPONENT session_totp_grace role="legacy session-opening compatibility; not an internal autonomy policy gate"',"ARCH legacy grace")
+needle='RULE "Canonical KCL, Genome, secrets and immutable archives remain separate."'
+extra='''COMPONENT dev_zone role="trusted genome-covered DEV modules with WebAuthn passkey and reusable DEV-only sessions"
+FLOW dev_entry="WebAuthn passkey -> DEV-scoped session -> fixed capability router"
+COMPONENT slack_transport role="bounded optional transport/perception input; never authority"
+COMPONENT mail_transport role="bounded optional transport with quarantine/verifier path; never authority"
+COMPONENT opera_control_surface role="browser DEV/Admin control surface; never authority"
+RULE "DEV sessions cannot grant production deployment, self-update-install, recovery, auth-admin or secret authority."
+RULE "Technical risk class and authority boundary are separate dimensions."
+RULE "Canonical KCL, Genome, secrets and immutable archives remain separate."'''
+m=replace_once(m,needle,extra,"ARCH 0.9.26 components")
+write(p,m)
+
+p=out/"memory/protocol.kcl"; m=p.read_text()
+m=replace_once(m,'AUTH session_open="?q=AUTH_SESSION_OPEN&code=<6digits>"','AUTH session_open="?q=AUTH_SESSION_OPEN&code=<6digits>; legacy/fallback transport, not internal policy gate"',"PROTOCOL legacy session")
+m=replace_once(m,'RULE "TOTP is current-step only, one-use, 30 seconds, 6 digits"','RULE "Where FreeOTP remains required for a protected external action, it is current-step, one-use, 30 seconds and 6 digits."',"PROTOCOL TOTP scope")
+m=replace_once(m,'RULE "Critical RED, production and kernel TOTP verification remains current-counter only."','RULE "Technical RED classification alone does not imply human authorization; protected production/external authority remains human-gated."',"PROTOCOL risk authority")
+needle='SQLITE status="?q=SQLITE_STATUS"'
+extra='''DEV auth="POST api.php?q=DEV_AUTH; WebAuthn passkey"
+DEV api="POST api.php?q=DEV_API; X-KiCom-Dev-Session + X-KiCom-Dev-Token"
+DEV bridge="GET /dev/agent/ or ?q=DEV_BRIDGE; same fixed DEV capability router"
+RULE "DEV credentials are DEV-only and cannot cross into production, recovery, auth-admin, secrets or self-update-install authority."
+RULE "Slack, Mail, GitHub and Opera/browser are transports/control surfaces and never authority sources."
+SQLITE status="?q=SQLITE_STATUS"'''
+m=replace_once(m,needle,extra,"PROTOCOL DEV transport")
+needle='SQLITE evolution_tick="?q=SQLITE_EVOLUTION_TICK&session_id=...&token=..."'
+extra='''SQLITE evolution_tick="?q=SQLITE_EVOLUTION_TICK&session_id=...&token=..."
+SQLITE diagnostics="?q=SQLITE_DIAGNOSTICS"
+RULE "Stored migration checksums must match compiled migration definitions before the DB opens successfully."
+RULE "Evolution promotion requires a successfully verified pre-snapshot."'''
+m=replace_once(m,needle,extra,"PROTOCOL SQLite hardening")
+write(p,m)
+
+p=out/"memory/decisions.kcl"; m=p.read_text()
+extra='''DECISION D031 status=accepted title="Separate technical risk classification from authority boundary"
+RATIONALE D031 "Risk drives verification depth; authority determines whether a human authorization is required."
+DECISION D032 status=accepted title="Make DEV a trusted genome-covered module set"
+RATIONALE D032 "Loose DEV PHP was removed by the immune guardian; trusted modules preserve integrity while keeping DEV incapable of production authority."
+DECISION D033 status=accepted title="Use WebAuthn passkey for routine DEV entry"
+RATIONALE D033 "Routine development should not require repeated FreeOTP codes; DEV credentials remain strictly scope-limited."
+DECISION D034 status=accepted title="Harden SQLite migration, backup, import and evolution semantics"
+RATIONALE D034 "Persistent operational memory needs checksum verification, actual-insert accounting, verified backup fallback and snapshot-gated promotion."
+DECISION D035 status=accepted title="Preserve Slack, Mail and Opera as redundant non-authoritative paths"
+RATIONALE D035 "Transport diversity improves resilience without letting any transport grant authority."
 '''
-}
-for name,content in mem.items(): write(out/"memory"/name,content)
+m=replace_once(m,'END_DECISIONS kicom',extra+'END_DECISIONS kicom',"DECISIONS 0.9.26")
+write(p,m)
+
+p=out/"memory/changelog.kcl"; m=p.read_text()
+extra='''RELEASE "0.9.26" date="2026-09-18" change="Trusted DEV modules with WebAuthn passkey sessions; risk/authority separation; SQLite checksum, dedupe, snapshot and backup hardening; revision-preserving canonical-memory release sync."
+EVENT "2026-09-18" change="The literal critical-actions-totp-bound genome invariant is retained in 0.9.26 only as bootstrap compatibility for the 0.9.25 installer; the 0.9.26 verifier uses explicit authority-boundary invariants."
+EVENT "2026-09-18" change="Slack, Mail and Opera/browser remain optional redundant transports/control surfaces and never grant authority."
+'''
+m=replace_once(m,'END_CHANGELOG kicom',extra+'END_CHANGELOG kicom',"CHANGELOG 0.9.26")
+write(p,m)
+
+p=out/"memory/next.kcl"; m=p.read_text()
+m=replace_once(m,'CONSTRAINT "RED, production and recovery-kernel trust-boundary crossings require transaction-bound FreeOTP"','CONSTRAINT "Protected external authority crossings remain human-authorized; technical RED classification alone is not an authorization requirement."',"NEXT authority")
+extra='''COMPLETED milestone="0.9.26 trusted DEV/passkey integration and SQLite hardening candidate verified by the 0.9.25 self-update verifier."
+PRIORITY 1 goal="Install verified 0.9.26 through the ordinary self-update path and verify genome g25 with zero drift."
+PRIORITY 1 goal="Retest DEV passkey, DEV API, extensionless agent bridge and iPhone/Opera JSON behavior."
+PRIORITY 1 goal="Verify revision-preserving canonical-memory sync to 0.9.26."
+PRIORITY 2 goal="Restore/provision bounded Slack credentials if Slack transport is desired; never treat Slack as authority."
+PRIORITY 2 goal="Verify Mail IMAP/SMTP loopback and inbound update quarantine/verifier path."
+PRIORITY 2 goal="Inspect SQLite event-stream diagnostics and confirm legacy-import deduplication behavior."
+'''
+m=replace_once(m,'END_NEXT kicom',extra+'END_NEXT kicom',"NEXT 0.9.26")
+write(p,m)
+
+# All six release resources must pass KiCom's own KCL validator after installation;
+# the runtime migration will archive baseline/current revisions before replacement.
+
 
 # ---- Genome: g25, same recovery kernel revision, trusted module components.
 gp=out/"genome/genome.json"; g=json.loads(gp.read_text())
