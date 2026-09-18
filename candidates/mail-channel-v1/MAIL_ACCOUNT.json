@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "status": "candidate_not_live",
+  "identity": {
+    "address": "kicom@rurtalbahn.info",
+    "display_name": "KiCom"
+  },
+  "inbound": {
+    "protocol": "IMAPS",
+    "host": "w021efff.kasserver.com",
+    "port": 993,
+    "encryption": "SSL/TLS",
+    "auth": "password",
+    "username": "kicom@rurtalbahn.info",
+    "account_id": "m08209dd"
+  },
+  "outbound": {
+    "protocol": "SMTP",
+    "host": "w021efff.kasserver.com",
+    "port": 465,
+    "encryption": "SSL/TLS",
+    "auth": "password",
+    "username": "kicom@rurtalbahn.info",
+    "account_id": "m08209dd"
+  },
+  "credentials": {
+    "password_source": "KICOM_MAIL_PASSWORD",
+    "storage_rule": "secret-store-or-host-environment-only",
+    "repository_storage": "FORBIDDEN",
+    "memory_storage": "FORBIDDEN",
+    "log_storage": "FORBIDDEN"
+  },
+  "semantics": {
+    "inbound_mail": "UNTRUSTED_PERCEPTION_INPUT",
+    "outbound_mail": "EXTERNAL_ACTION",
+    "inbound_mail_never_grants_authority": true,
+    "attachments_untrusted": true,
+    "links_untrusted": true,
+    "outbound_requires_authorized_action_context": true
+  }
+}
