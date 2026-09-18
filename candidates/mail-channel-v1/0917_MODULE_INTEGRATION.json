@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "candidate": "kicom-mail-channel-0.9.17-g18",
+  "status": "implemented_candidate_not_live",
+  "requires": {
+    "runtime_min": "0.9.16",
+    "genome_min": "kicom-0.9.16-g17",
+    "trusted_module_loader": true
+  },
+  "target": {
+    "runtime": "0.9.17",
+    "genome": "kicom-0.9.17-g18"
+  },
+  "module_layout": [
+    {
+      "path": "modules/KiComMailChannel.php",
+      "role": "mail authority model",
+      "load_order": 40
+    },
+    {
+      "path": "modules/KiComMailSecretStore.php",
+      "role": "protected credential resolver",
+      "load_order": 41
+    },
+    {
+      "path": "modules/KiComMailTransport.php",
+      "role": "IMAPS/SMTPS transport",
+      "load_order": 42
+    },
+    {
+      "path": "modules/KiComMailLoopback.php",
+      "role": "connection and delivery verifier",
+      "load_order": 43
+    }
+  ],
+  "configuration": {
+    "public_nonsecret": "candidates/mail-channel-v1/MAIL_ACCOUNT.json",
+    "secret_ref": "KICOM_MAIL_PASSWORD",
+    "fallback_secret_file": "var/secrets/mail-password",
+    "secret_file_mode": "0600",
+    "secret_directory_mode": "0700"
+  },
+  "activation_test": [
+    "TLS peer and peer-name verification enabled",
+    "IMAPS authentication succeeds",
+    "SMTPS authentication succeeds",
+    "loopback message accepted by SMTP",
+    "exact loopback Message-ID appears in INBOX",
+    "credential never appears in response, log, canonical memory or repository"
+  ],
+  "boundaries": {
+    "inbound_mail": "UNTRUSTED_PERCEPTION_INPUT",
+    "outbound_mail": "EXTERNAL_ACTION",
+    "mail_grants_authority": "FORBIDDEN",
+    "secret_visibility": "FORBIDDEN",
+    "arbitrary_recipient_send_without_action_authorization": "FORBIDDEN"
+  },
+  "live_mutation_performed": false
+}
