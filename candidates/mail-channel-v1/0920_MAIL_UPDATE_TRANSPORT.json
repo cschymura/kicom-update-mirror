@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "candidate": "kicom-mail-update-transport-0.9.20-g20",
-  "status": "WAITING_FOR_CRITICAL_0920_INSTALL_FREEOTP",
+  "status": "ACTIVE_VERIFIED_PRODUCTION",
   "base": {
     "version": "0.9.18",
     "genome": "kicom-0.9.18-g19"
@@ -37,5 +37,47 @@
     "purpose": "automatic Junk/Spam folder polling",
     "status": "not installed by design; history retained"
   },
-  "production_changed": false
+  "production_changed": true,
+  "install": {
+    "history_id": "20260918095157-b6206571",
+    "from_version": "0.9.18",
+    "to_version": "0.9.20"
+  },
+  "live": {
+    "version": "0.9.20",
+    "genome": "kicom-0.9.20-g20",
+    "healthy": true,
+    "trusted": true,
+    "lkg_ok": true,
+    "drift_count": 0,
+    "unknown_count": 0
+  },
+  "production_validation": {
+    "candidate_listing": {
+      "count": 1,
+      "quarantine_id": "20260918-c17948642ae6e30660979f32-936f3d",
+      "filename": "KiCom-0.9.18-Quarantine-Test.zip",
+      "bytes": 307,
+      "sha256": "c17948642ae6e30660979f324e6fc83cffb46f18ba1f5267233610d77c21b386",
+      "trust": "UNTRUSTED",
+      "verifier_required": true
+    },
+    "invalid_package_rejection": {
+      "http_status": 422,
+      "local_zip_entries": [
+        "README.txt"
+      ],
+      "manifest_present": false,
+      "expected_verifier_reason": "MANIFEST_MISSING",
+      "installed": false,
+      "staged": false,
+      "pending_version": "",
+      "live_version_after_test": "0.9.20"
+    }
+  },
+  "notes": [
+    "The negative production test proves that mail transport cannot bypass the existing update verifier.",
+    "A real future KiCom release received by mail will be re-hashed, genome/manifest/syntax verified and risk-classified before staging or installation.",
+    "GREEN auto-install requires exact version and SHA corroboration from a configured feed; otherwise normal approval remains required."
+  ]
 }
