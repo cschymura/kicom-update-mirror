@@ -1,37 +1,62 @@
-# KiCom mail activation checkpoint — 2026-09-18 09:07 CEST
+# KiCom mail activation checkpoint — 2026-09-18
 
-Status: PAUSED_AT_EXTERNAL_TRANSPORT_TOOL_FAILURE
+Status: WAITING_FOR_FRESH_OTP_AFTER_TRANSPORT_ERROR_BODY_LOSS
 
-## Live baseline
-- Expected live: KiCom 0.9.15 / g16.
-- A prior isolated 0.9.16 server build was started from the exact live source.
-- Build id observed before transport loss: `bf91ba0bfc9c7b08d285`.
-- First bootstrap patch (loader call) succeeded.
-- Second large patch (trusted module loader body) was committed through the transaction buffer successfully.
-- Session token was subsequently lost/invalidated during a follow-up request; do not assume the old session is reusable.
+## Live baseline reverified through TinyFish
+- Live KiCom: 0.9.15 / genome g16.
+- Canonical PROJECT_STATE reports genome healthy/trusted, LKG OK, drift=0, unknown=0.
+- Exact trusted source manifest re-read successfully.
+- Exact live lib.php SHA-256 remains `9e4616c95839d0bdc133bd0c347244e82c9703f3bb29018b7fa6b61efa997b14`.
+- UPDATE_STATUS: no pending version, pull+push enabled, primary feed + GitHub mirror configured.
+- No production mutation performed in this attempt.
 
 ## Mail candidate
-- Mail identity: kicom@rurtalbahn.info
+- Identity: kicom@rurtalbahn.info
 - IMAPS: w021efff.kasserver.com:993 SSL/TLS
 - SMTPS: w021efff.kasserver.com:465 SSL/TLS
 - Secret ref: KICOM_MAIL_PASSWORD
-- Secret must never be written to GitHub, canonical memory, logs, or chat.
-- Runtime transport, secret store, loopback verifier and CI are implemented and green on candidate/expansion-cell-v1.
+- Runtime transport, secret store, loopback verifier and CI are implemented on candidate/expansion-cell-v1.
+- No mailbox password is stored in GitHub, canonical memory, logs or chat.
 
-## Resume sequence
-1. Re-open a fresh KiCom autonomy session with a fresh OTP only when the HTTP transport is reachable.
-2. Re-read BOOTSTRAP/GENOME_STATUS and confirm 0.9.15/g16 live healthy/trusted/drift=0.
-3. Do not trust or continue an orphaned build unless the session-bound status can be read safely; otherwise start a fresh isolated build from exact live source.
-4. Apply 0.9.16 trusted-module-bootstrap patches with transaction buffering for long replacements.
-5. Prepare/finalize 0.9.16; pass normal verifier; install only through the existing self-update path with LKG snapshot/healthcheck/rollback.
-6. Verify live 0.9.16/g17 healthy/trusted/drift=0.
-7. Build 0.9.17/g18 with genome-bound mail modules and modules.json.
-8. Provision mailbox password only at the protected secret boundary.
-9. Run IMAPS+SMTPS probe and exact Message-ID loopback.
-10. Record successful mail evidence without credential material.
+## 0.9.16 build attempt
+A fresh isolated build was created from the exact live 0.9.15 source.
+
+Build id:
+`4cf5bd6924046a51ebfd`
+
+Successfully applied inside the isolated build:
+1. trusted-module-loader invocation after living.php
+2. trusted-module-loader implementation via inert transaction buffer
+
+The build is non-executable and production remains unchanged.
+
+## Why the session was lost
+After the transaction-buffer commit, an intentional optimistic-concurrency conflict request was used only to learn the resulting lib.php SHA. KiCom returned HTTP 422 with the rotated next token in its KCL body. TinyFish fetch_content reports 4xx as an error and does not expose the response body, so the rolling token became unavailable.
+
+This is a transport/client behavior mismatch, not a KiCom runtime failure.
+
+## Corrected resume strategy
+Do NOT intentionally create 4xx responses through TinyFish.
+
+On the next fresh autonomy session:
+1. reverify BOOTSTRAP + exact live source manifest
+2. start a fresh isolated 0.9.16 build (do not rely on the session-bound orphaned build)
+3. apply small patches directly
+4. apply long build patches through AUTONOMY_COMPACT_BATCH, because successful batch responses include each resulting sha256
+5. carry the returned sha256 forward for the next exact-base patch
+6. release_prepare -> finalize through the normal verifier
+7. prepare exact protected install binding
+8. request one fresh current-counter FreeOTP only for the critical install execute
+9. verify live 0.9.16/g17 healthy/trusted/LKG, drift=0, unknown=0
+10. continue to the mail-module activation path
+11. provision mailbox password only through a protected server-side secret input
+12. run IMAPS + SMTPS auth probe and exact Message-ID loopback
+13. record only non-secret success evidence
 
 ## Safety
-- No OTP retained here.
+- No OTP value retained here.
+- No session/token retained here.
 - No mailbox password retained here.
-- No trust/TLS/verifier weakening.
+- No verifier, TLS, trust or authorization boundary weakened.
 - No manual ZIP shuttle.
+- No live production change occurred during the failed attempt.
