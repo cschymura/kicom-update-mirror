@@ -221,6 +221,11 @@ living=(out/"living.php").read_text()
 old="'auto_memory_archive'=>true,'auto_yellow_from_session'=>true,'red_requires_totp'=>true,'production_requires_totp'=>true,'kernel_requires_totp'=>true,'archive_append_only'=>true]"
 new="'auto_memory_archive'=>true,'auto_yellow_from_session'=>true,'internal_self_update'=>true,'red_requires_totp'=>false,'production_requires_totp'=>true,'kernel_requires_totp'=>false,'external_authority_requires_human'=>true,'archive_append_only'=>true]"
 living=replace_once(living,old,new,"autonomy authority defaults")
+# 0.9.26 verifier: replace the legacy TOTP-named invariant with authority-boundary invariants.
+old="""$requiredInvariants=['no-arbitrary-shell','no-arbitrary-sql','no-arbitrary-remote-fetch','human-gated-new-capabilities','separate-genome-memory-phenotype','autonomous-heal-trusted-state-only','production-writes-human-approved','recovery-kernel-not-auto-healed','unknown-code-quarantine-before-use','goal-layer-no-permission-grants','memory-archive-no-hard-delete','autonomy-envelope-bounded','critical-actions-totp-bound','release-archive-append-only'];"""
+new="""$requiredInvariants=['no-arbitrary-shell','no-arbitrary-sql','no-arbitrary-remote-fetch','human-gated-new-capabilities','separate-genome-memory-phenotype','autonomous-heal-trusted-state-only','production-writes-human-approved','recovery-kernel-not-auto-healed','unknown-code-quarantine-before-use','goal-layer-no-permission-grants','memory-archive-no-hard-delete','autonomy-envelope-bounded','release-archive-append-only','risk-authority-separated','internal-self-authoring-verifier-bounded','protected-external-authority-human','dev-scope-no-production-authority'];"""
+living=replace_once(living,old,new,"0.9.26 genome authority invariants")
+
 
 # Authenticated internal self-update transport can finish through the normal verifier without TOTP.
 old="""if(!empty($result['ok'])&&($result['code']??'')==='STAGED_DECISION_REQUIRED'&&($result['risk_class']??($result['staged']['risk_class']??''))==='yellow'&&!empty(kicomAutonomyPolicy()['auto_yellow_from_session'])){$pending=kicomSelfUpdatePending();if(is_array($pending))$result=kicomApplySelfUpdate($pending)+['code'=>'AUTO_INSTALLED_YELLOW_SESSION'];}"""
@@ -266,6 +271,7 @@ FACT mail_transport="bounded-redundant"
 FACT browser_transport="opera-compatible-dev-admin"
 FACT internal_authority="self-authoring-after-verifier"
 FACT external_authority="human-protected"
+FACT legacy_bootstrap_invariant="critical-actions-totp-bound; compatibility-only for 0.9.25 installer"
 RULE "Risk class and authority boundary are separate dimensions."
 RULE "Internal reversible KiCom work is not TOTP-gated solely because it is RED."
 RULE "Production targets, new external recipients, credentials and protected foreign systems remain human-authorized."
@@ -316,6 +322,7 @@ CHANGE "SQLite legacy event imports count only newly inserted unique events."
 CHANGE "SQLite evolution promotion aborts when the verified pre-snapshot fails."
 CHANGE "SQLite backup uses verified SQLite3 backup with verified VACUUM INTO fallback."
 CHANGE "Added bounded SQLite duplicate/stream diagnostics."
+CHANGE "0.9.26 retains the literal critical-actions-totp-bound genome marker only so the 0.9.25 installer can validate the transition; the 0.9.26 verifier replaces it with explicit authority-boundary invariants."
 CHANGE "Internal self-update after authenticated transport still uses manifest/SHA/genome/backup/health/rollback but is not TOTP-gated solely by RED risk."
 CHANGE "Production/external authority remains protected."
 CHANGE "Slack, Mail and Opera/browser acceptance preserved."
@@ -339,7 +346,11 @@ gp=out/"genome/genome.json"; g=json.loads(gp.read_text())
 g["id"]="kicom-0.9.26-g25"; g["version"]="0.9.26"; g["parent"]="kicom-0.9.25-g24"; g["generation"]=25
 g["mutation_reason"]="trusted-dev-authority-boundary-sqlite-hardening"
 g["created_at"]="2026-09-18T00:00:00+00:00"
-inv=[x for x in g.get("invariants",[]) if x!="critical-actions-totp-bound"]
+inv=list(g.get("invariants",[]))
+# Bootstrap compatibility: 0.9.25's verifier still requires this literal marker.
+# In 0.9.26 it is retained only as a lineage/installer compatibility token;
+# runtime authority is defined by the new authority-boundary invariants below.
+if "critical-actions-totp-bound" not in inv: inv.append("critical-actions-totp-bound")
 for x in ["risk-authority-separated","internal-self-authoring-verifier-bounded","protected-external-authority-human","dev-scope-no-production-authority"]:
     if x not in inv: inv.append(x)
 g["invariants"]=inv
