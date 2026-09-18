@@ -1,0 +1,45 @@
+PROJECT kicom
+VERSION "0.9.25"
+STATE active
+FACT canonical_name="KiCom"
+FACT purpose="Persistent self-extending AI work environment and controlled HTTPS/KCL gateway"
+FACT protocol="KCL/1"
+FACT mode="living-architecture-with-bounded-autonomy"
+FACT genome_id="kicom-0.9.25-g24"
+FACT genome_generation=24
+FACT direct_shell=false
+FACT arbitrary_remote_fetch=false
+FACT production_write="allowlisted-human-approved"
+FACT autonomy_envelope="freeotp-session:test,staging,workspace,memory,goals"
+FACT critical_approval="transaction-bound-freeotp:red,production,kernel"
+FACT github_role="optional-mirror-not-authority"
+FACT first_party_targets="sandbox,kicomarchive,updatefeed"
+FACT release_archive="append-only-install+update+source+hashes+metadata"
+FACT read_lease="trusted-source-only, ttl600, max_uses64, nonrotating"
+FACT compact_get_batch="up to 16 exact patch operations, one session rotation"
+FACT release_prepare="server-side semver and genome-lineage preparation"
+FACT canonical_memory_via="?q=BOOTSTRAP"
+MILESTONE "Goal Layer and append-only ChatGPT memory archive" status=passed version="0.9.5"
+MILESTONE "Autonomy Envelope and Human Authorization Bridge" status=implemented version="0.9.6"
+MILESTONE "Fast transport" status=implemented version="0.9.8"
+MILESTONE "Low-roundtrip control plane" status=implemented version="0.9.9"
+MILESTONE "Transaction buffer and resilient bound approvals" status=implemented version="0.9.10"
+MILESTONE "Adaptive transport sizing" status=implemented version="0.9.11"
+FACT session_open_totp_grace="current plus previous 2 FreeOTP counters by default; one-use replay protection; critical actions current-counter only"
+MILESTONE "Session TOTP grace" status=implemented version="0.9.12"
+FACT chat_update_transport="first-class direct ChatGPT transport; server-side build or direct ZIP transfer"
+FACT chat_update_modes="SERVER_SIDE_BUILD,CHUNKED_DIRECT,RAW_POST_DIRECT"
+FACT chat_update_dependency="no Slack, mail or GitHub required"
+FACT chat_update_verifier="same self-update manifest/SHA/PHP/genome/lineage/risk/backup/healthcheck path"
+FACT chat_update_max_zip_bytes=8388608
+FACT canonical_memory_max_resource_bytes=32768
+RULE "Transport capability should be broad and simple; authority is enforced at the actual protected action boundary."
+RULE "A newer verified pending update supersedes older pending metadata by archiving it rather than silently deleting history."
+FACT operational_memory="SQLite-primary protected var/db/kicom.sqlite"
+FACT sqlite_mode="WAL, foreign_keys ON, busy_timeout 5000, synchronous NORMAL"
+FACT sqlite_compatibility="legacy JSON/JSONL retained as dual-write and rebuild mirrors"
+FACT sqlite_healing="quick_check, integrity_check, snapshots, quarantine, restore and mirror rebuild"
+FACT sqlite_evolution="shadow DB, measured fitness, integrity gate, transactional promotion, snapshots"
+FACT sqlite_boundaries="Canonical KCL, Genome, secrets and immutable archive authority stay outside SQLite"
+RULE "SQLite is primary operational memory, not the sole root of trust."
+END_PROJECT kicom
