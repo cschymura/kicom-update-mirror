@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "product": "kicom",
+  "version": "0.9.25",
+  "release_sha256": "31a836b1fd95eba1493a64f5b9525e6ef8d005a77132fb2ed4d904bf50b125f6",
+  "captured_from": "trusted live source manifest",
+  "runtime_state_removed": true,
+  "policy": "immutable release-derived install/update source snapshot",
+  "github_role": "optional external mirror/fallback transport only; KiCom remains authority"
+}
