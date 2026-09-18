@@ -1,0 +1,8 @@
+DECISIONS kicom
+VERSION "0.9.26"
+DECISION D031 "Separate technical risk classification from authority boundary."
+DECISION D032 "Make the DEV backend a trusted genome component under modules/; keep DEV credentials incapable of production authority."
+DECISION D033 "Use WebAuthn/passkey for routine DEV entry; FreeOTP remains only a legacy/fallback transport and protected-external mechanism where configured."
+DECISION D034 "Harden SQLite migration checksum verification, snapshot-gated evolution and actual-insert legacy counters."
+DECISION D035 "Preserve Slack, Mail and Opera/browser as redundant non-authoritative paths in acceptance testing."
+END

@@ -1,0 +1,9 @@
+NEXT kicom
+VERSION "0.9.26"
+NEXT "Run isolated CI and current-0.9.25 verifier against the complete 0.9.26 package."
+NEXT "Install through the ordinary verified self-update path; do not use loose DEV PHP or rescue reader."
+NEXT "After install verify HELLO, GENOME_STATUS, SQLITE_HEALTH, SQLITE_DIAGNOSTICS and zero drift."
+NEXT "Retest /dev/ passkey, DEV API, extensionless agent bridge and iPhone/Opera JSON behavior."
+NEXT "Probe Slack auth/send boundary and Mail IMAP/SMTP/loopback/inbound update path without exposing secrets."
+NEXT "Confirm canonical runtime memory migrated/synchronized and archive prior state rather than deleting it."
+END

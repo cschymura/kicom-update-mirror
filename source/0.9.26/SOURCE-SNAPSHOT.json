@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "version": "0.9.26",
+  "source_version": "0.9.25",
+  "genome": "kicom-0.9.26-g25",
+  "release_file": "releases/0.9.26/KiCom-0.9.26.zip",
+  "release_sha256": "9ddecab969d43b0d634cd91d40ad8192312aeb62aafbbb852edcfee346a6314d",
+  "built_at": "2026-09-18T18:38:51.825226+00:00",
+  "branch": "work/kicom-0.9.26",
+  "dev_backend": "trusted-modules",
+  "sqlite_hardening": true,
+  "authority_model": "risk-separated-from-authority"
+}

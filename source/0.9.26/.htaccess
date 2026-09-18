@@ -1,0 +1,32 @@
+Options -Indexes
+ServerSignature Off
+
+<IfModule mod_headers.c>
+  Header always set X-Robots-Tag "noindex, nofollow, noarchive, nosnippet, noimageindex"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Cache-Control "no-store, private, max-age=0"
+  Header always unset X-Powered-By
+  Header always unset ETag
+</IfModule>
+FileETag None
+
+# Internal implementation/package metadata is never meant to be fetched directly.
+<FilesMatch "^(lib\.php|living\.php|README\.md|MANIFEST\.sha256)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# KiCom 0.9.26 trusted DEV backend bridge.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^dev/dev-auth\.php$ api.php?q=DEV_AUTH [L,QSA]
+  RewriteRule ^dev/dev-api\.php$ api.php?q=DEV_API [L,QSA]
+  RewriteRule ^dev/dev-bridge\.php$ index.php?q=DEV_BRIDGE [L,QSA]
+  RewriteRule ^dev/agent/?$ index.php?q=DEV_BRIDGE [L,QSA]
+</IfModule>

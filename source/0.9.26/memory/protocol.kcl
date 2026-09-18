@@ -1,0 +1,11 @@
+PROTOCOL KCL/1
+VERSION "0.9.26"
+AUTH legacy_session_open="FreeOTP fallback transport, not internal policy gate"
+AUTH dev="WebAuthn passkey -> reusable DEV-scoped session"
+RULE "Internal KiCom autonomy does not require human approval merely because technical risk is RED."
+RULE "Human authorization is reserved for protected external systems, credentials, recipients and production targets."
+RULE "Direct update transports converge on the normal self-update verifier."
+RULE "No transport expands authority."
+RULE "Slack, Mail, GitHub and Opera/browser are non-authoritative transports or control surfaces."
+SQLITE diagnostics="SQLITE_DIAGNOSTICS"
+END
