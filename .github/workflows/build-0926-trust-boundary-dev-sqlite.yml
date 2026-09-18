@@ -1,0 +1,62 @@
+name: Build KiCom 0.9.26
+
+on:
+  push:
+    branches:
+      - work/kicom-0.9.26
+    paths:
+      - tools/build_0926_trust_boundary_dev_sqlite.py
+      - .github/workflows/build-0926-trust-boundary-dev-sqlite.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: work/kicom-0.9.26
+
+      - name: Fetch reviewed DEV prototype
+        run: git fetch origin candidate/dev-zone-v1:candidate/dev-zone-v1 --force
+
+      - name: Install PHP test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y php-cli php-sqlite3 php-zip
+
+      - name: Build and verify 0.9.26
+        run: |
+          rm -rf /tmp/kicom-0926-source /tmp/kicom-0926
+          mkdir -p /tmp/kicom-0926
+          python3 tools/build_0926_trust_boundary_dev_sqlite.py \
+            source/0.9.25 \
+            /tmp/kicom-0926/KiCom-0.9.26.zip \
+            /tmp/kicom-0926-source \
+            /tmp/kicom-0926/status.json
+
+      - name: Publish branch artifacts
+        run: |
+          rm -rf source/0.9.26 releases/0.9.26
+          mkdir -p source/0.9.26 releases/0.9.26 build
+          cp -a /tmp/kicom-0926-source/. source/0.9.26/
+          cp /tmp/kicom-0926/KiCom-0.9.26.zip releases/0.9.26/
+          cp /tmp/kicom-0926/status.json build/0.9.26-status.json
+          sha256sum releases/0.9.26/KiCom-0.9.26.zip > releases/0.9.26/SHA256SUMS.txt
+
+      - name: Commit verified artifacts
+        run: |
+          git config user.name "KiCom Build"
+          git config user.email "kicom-build@users.noreply.github.com"
+          git add source/0.9.26 releases/0.9.26 build/0.9.26-status.json
+          if git diff --cached --quiet; then
+            echo "No artifact changes"
+          else
+            git commit -m "build: verified KiCom 0.9.26 artifacts"
+            git push origin HEAD:work/kicom-0.9.26
+          fi
