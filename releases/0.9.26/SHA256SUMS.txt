@@ -1,0 +1,1 @@
+9ddecab969d43b0d634cd91d40ad8192312aeb62aafbbb852edcfee346a6314d  releases/0.9.26/KiCom-0.9.26.zip

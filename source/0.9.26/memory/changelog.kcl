@@ -1,0 +1,15 @@
+CHANGELOG kicom
+VERSION "0.9.26"
+CHANGE "Trusted DEV backend moved into genome-covered modules; incomplete loose drop-in is no longer authoritative."
+CHANGE "Existing /dev/ browser endpoints are bridged to trusted root code without requiring executable PHP under /dev/."
+CHANGE "Passkey DEV sessions are reusable, non-rotating and DEV-only."
+CHANGE "SQLite stored migration checksums are verified on open."
+CHANGE "SQLite legacy event imports count only newly inserted unique events."
+CHANGE "SQLite evolution promotion aborts when the verified pre-snapshot fails."
+CHANGE "SQLite backup uses verified SQLite3 backup with verified VACUUM INTO fallback."
+CHANGE "Added bounded SQLite duplicate/stream diagnostics."
+CHANGE "0.9.26 retains the literal critical-actions-totp-bound genome marker only so the 0.9.25 installer can validate the transition; the 0.9.26 verifier replaces it with explicit authority-boundary invariants."
+CHANGE "Internal self-update after authenticated transport still uses manifest/SHA/genome/backup/health/rollback but is not TOTP-gated solely by RED risk."
+CHANGE "Production/external authority remains protected."
+CHANGE "Slack, Mail and Opera/browser acceptance preserved."
+END

@@ -3,6 +3,12 @@
   "product": "kicom",
   "releases": [
     {
+      "version": "0.9.26",
+      "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.26/KiCom-0.9.26.zip",
+      "sha256": "9ddecab969d43b0d634cd91d40ad8192312aeb62aafbbb852edcfee346a6314d",
+      "published_at": "2026-09-18T18:38:51.825226+00:00"
+    },
+    {
       "version": "0.9.12",
       "url": "https://raw.githubusercontent.com/cschymura/kicom-update-mirror/main/releases/0.9.12/KiCom-0.9.12-Session-TOTP-Grace.zip",
       "sha256": "a027bff93992e0ad0ab4a815f0b0319620110d659b554d502a1b3fdb3fadbfe6",

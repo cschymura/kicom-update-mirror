@@ -1,0 +1,12 @@
+ARCHITECTURE kicom
+VERSION "0.9.26"
+LAYER trust="genome+lkg+recovery"
+LAYER runtime="php+sqlite-primary+compatibility-mirror"
+LAYER dev="trusted genome-covered modules + WebAuthn passkey + reusable DEV session"
+LAYER transport="direct-chat + Slack + Mail + GitHub-mirror + browser"
+LAYER authority="internal-self-authoring | protected-external-human"
+RULE "DEV has no production, self-update-install, recovery, auth-admin or secret authority."
+RULE "Slack and Mail are transports/perception surfaces, never authority sources."
+RULE "Opera/browser is a control surface, never an authority source."
+RULE "SQLite migration checksums, verified snapshots and deduplicated imports are invariants."
+END

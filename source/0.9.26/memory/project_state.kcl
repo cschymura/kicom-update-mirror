@@ -1,0 +1,18 @@
+PROJECT kicom
+VERSION "0.9.26"
+STATE active
+FACT canonical=true
+FACT canonical_name="KiCom"
+FACT sqlite_primary=true
+FACT dev_zone="trusted-modules-passkey"
+FACT slack_transport="bounded-redundant"
+FACT mail_transport="bounded-redundant"
+FACT browser_transport="opera-compatible-dev-admin"
+FACT internal_authority="self-authoring-after-verifier"
+FACT external_authority="human-protected"
+FACT legacy_bootstrap_invariant="critical-actions-totp-bound; compatibility-only for 0.9.25 installer"
+RULE "Risk class and authority boundary are separate dimensions."
+RULE "Internal reversible KiCom work is not TOTP-gated solely because it is RED."
+RULE "Production targets, new external recipients, credentials and protected foreign systems remain human-authorized."
+RULE "Verifier, SHA-256, backup, healthcheck, rollback, TLS and trust-root controls remain mandatory."
+END
