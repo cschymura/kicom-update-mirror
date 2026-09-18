@@ -1,47 +1,60 @@
 {
   "schema": 1,
-  "updated_at": "2026-09-18T09:10:00+02:00",
+  "updated_at": "2026-09-18T09:55:00+02:00",
   "objective": "Make kicom@rurtalbahn.info operational as KiCom's bounded mail channel",
-  "state": "READY_FOR_LIVE_ACTIVATION_WHEN_KICOM_HTTP_RETURNS",
-  "live_baseline_expected": "0.9.15/g16",
-  "candidate": {
-    "mail_identity": "kicom@rurtalbahn.info",
+  "state": "WAITING_FOR_CRITICAL_0916_INSTALL_FREEOTP",
+  "live": {
+    "version": "0.9.15",
+    "genome": "kicom-0.9.15-g16",
+    "healthy": true,
+    "trusted": true,
+    "lkg_ok": true,
+    "drift_count": 0,
+    "unknown_count": 0
+  },
+  "transport": {
+    "tinyfish": "WORKING",
+    "opera_connector": "INSTALLED_BUT_NOT_CONNECTED",
+    "opera_note": "Connector reported browser not connected; enable Allow AI connection in Opera Browser Connector and sign in to Opera."
+  },
+  "mail_candidate": {
+    "identity": "kicom@rurtalbahn.info",
     "imaps": "w021efff.kasserver.com:993 SSL/TLS",
     "smtps": "w021efff.kasserver.com:465 SSL/TLS",
     "secret_ref": "KICOM_MAIL_PASSWORD",
-    "transport": "implemented",
-    "secret_store": "implemented",
-    "loopback": "implemented",
-    "ci": "green",
-    "github_branch": "candidate/expansion-cell-v1"
+    "transport_implemented": true,
+    "secret_store_implemented": true,
+    "loopback_implemented": true,
+    "ci": "green"
   },
-  "live_activation": {
-    "bootstrap_0916": "partially_applied_in_isolated_build_only",
-    "orphaned_build_id": "bf91ba0bfc9c7b08d285",
-    "production_changed": false,
-    "secret_provisioned": false,
-    "imap_authenticated_live": false,
-    "smtp_authenticated_live": false,
-    "loopback_verified_live": false
+  "bootstrap_0916": {
+    "build_id": "f648430f8dfef797f7ae",
+    "candidate_version": "0.9.16",
+    "genome_id": "kicom-0.9.16-g17",
+    "package_sha256": "20250c971d3ea9e49e8b62562a0b818f7806859471d4b5e72695333d93b0ced4",
+    "risk_class": "yellow",
+    "verifier_result": "STAGED_DECISION_REQUIRED",
+    "approval_id": "4fe30a7f481f4e9401e6e198",
+    "approval_binding_sha256": "191e5fe454d61698b99155c05f333a2065810af2bd438e33609fc87c62393b01",
+    "approval_risk": "red",
+    "approval_expires_in_at_prepare_seconds": 3600,
+    "kernel_update": false,
+    "production_changed": false
   },
   "next_steps": [
-    "Re-establish HTTP control path to kicom.rurtalbahn.info",
-    "Open fresh autonomy session with fresh OTP",
-    "Verify live 0.9.15/g16 healthy/trusted/drift=0",
-    "Create fresh isolated 0.9.16 build from exact live source if orphaned build cannot be safely resumed",
-    "Install verified 0.9.16/g17 trusted module bootstrap",
-    "Build and install 0.9.17/g18 mail module set",
-    "Provision mailbox password only through protected server-side secret input",
-    "Run IMAPS+SMTPS auth probe",
-    "Run exact Message-ID loopback",
-    "Record success without secret material"
+    "Use a fresh current-counter FreeOTP only to execute the exact-bound 0.9.16 install approval.",
+    "Immediately verify BOOTSTRAP, GENOME_STATUS/LKG, drift=0, unknown=0 and UPDATE_STATUS.",
+    "Then create 0.9.17/g18 mail-module release using the trusted module loader.",
+    "Provision mailbox password only through protected server-side secret input.",
+    "Run IMAPS and SMTPS authentication probes.",
+    "Send KiCom loopback mail to kicom@rurtalbahn.info and find exact Message-ID in INBOX.",
+    "Persist non-secret evidence only."
   ],
   "invariants": [
-    "No mailbox password in chat",
-    "No mailbox password in GitHub",
-    "No mailbox password in canonical memory",
-    "No TLS verifier weakening",
-    "No direct production writes outside verified self-update path",
-    "Inbound mail never grants authority"
+    "No OTP stored in GitHub.",
+    "No session token stored in GitHub.",
+    "No mailbox password in GitHub, canonical memory, logs or chat.",
+    "No TLS/verifier/trust weakening.",
+    "Inbound mail never grants authority."
   ]
 }
