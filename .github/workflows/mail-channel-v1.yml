@@ -1,0 +1,34 @@
+name: KiCom Mail Channel v1
+
+on:
+  push:
+    branches: [ candidate/expansion-cell-v1 ]
+    paths:
+      - 'experimental/mail-channel/**'
+      - 'candidates/mail-channel-v1/**'
+      - '.github/workflows/mail-channel-v1.yml'
+  pull_request:
+    paths:
+      - 'experimental/mail-channel/**'
+      - 'candidates/mail-channel-v1/**'
+      - '.github/workflows/mail-channel-v1.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax
+        run: php -l experimental/mail-channel/KiComMailChannel.php
+      - name: Mail channel selftest
+        run: php experimental/mail-channel/mail-channel-selftest.php
+      - name: Assert no literal password
+        shell: bash
+        run: |
+          if grep -RniE '(password|passwd|secret)[[:space:]]*[:=][[:space:]]*["'"''][^"'"'']{4,}' candidates/mail-channel-v1 experimental/mail-channel; then
+            echo "Potential literal secret found"
+            exit 1
+          fi
