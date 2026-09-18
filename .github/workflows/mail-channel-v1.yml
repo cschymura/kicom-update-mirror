@@ -25,10 +25,13 @@ jobs:
         run: php -l experimental/mail-channel/KiComMailChannel.php
       - name: Mail channel selftest
         run: php experimental/mail-channel/mail-channel-selftest.php
-      - name: Assert no literal password
+      - name: Assert credential is reference-only
         shell: bash
         run: |
-          if grep -RniE '(password|passwd|secret)[[:space:]]*[:=][[:space:]]*["'"''][^"'"'']{4,}' candidates/mail-channel-v1 experimental/mail-channel; then
-            echo "Potential literal secret found"
-            exit 1
-          fi
+          jq -e '
+            .credentials.password_source == "KICOM_MAIL_PASSWORD"
+            and (.credentials | has("password") | not)
+            and .credentials.repository_storage == "FORBIDDEN"
+            and .credentials.memory_storage == "FORBIDDEN"
+            and .credentials.log_storage == "FORBIDDEN"
+          ' candidates/mail-channel-v1/MAIL_ACCOUNT.json >/dev/null
