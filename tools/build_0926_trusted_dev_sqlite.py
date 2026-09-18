@@ -321,7 +321,7 @@ write(out/"index.php",idx)
 # Start from the valid 0.9.25 resources so all structural/safety sentinels survive.
 p=out/"memory/project_state.kcl"; m=p.read_text()
 m=replace_once(m,'VERSION "0.9.25"','VERSION "0.9.26"',"PROJECT_STATE version")
-m=replace_once(m,'FACT genome_id="kicom-0.9.25-g24"','FACT genome_id="kicom-0.9.26-g25"',"PROJECT_STATE genome")
+m=replace_once(m,'FACT genome_id="kicom-0.9.25-g24"','FACT genome_id="kicom-0.9.26-g25r2"',"PROJECT_STATE genome")
 m=replace_once(m,'FACT genome_generation=24','FACT genome_generation=25',"PROJECT_STATE generation")
 m=replace_once(m,'FACT autonomy_envelope="freeotp-session:test,staging,workspace,memory,goals"','FACT autonomy_envelope="dev-passkey+bounded-internal-self-authoring; legacy-freeotp-session-fallback"',"PROJECT_STATE autonomy")
 m=replace_once(m,'FACT critical_approval="transaction-bound-freeotp:red,production,kernel"','FACT critical_approval="protected-external-human:production,credentials,external-recipients; FreeOTP remains a legacy implementation where configured"',"PROJECT_STATE authority")
@@ -423,8 +423,8 @@ write(p,m)
 
 # ---- Genome: g25, same recovery kernel revision, trusted module components.
 gp=out/"genome/genome.json"; g=json.loads(gp.read_text())
-g["id"]="kicom-0.9.26-g25"; g["version"]="0.9.26"; g["parent"]="kicom-0.9.25-g24"; g["generation"]=25
-g["mutation_reason"]="trusted-dev-authority-boundary-sqlite-hardening"
+g["id"]="kicom-0.9.26-g25r2"; g["version"]="0.9.26"; g["parent"]="kicom-0.9.25-g24"; g["generation"]=25
+g["mutation_reason"]="trusted-dev-authority-boundary-sqlite-hardening-memory-sync-r2"
 g["created_at"]="2026-09-18T00:00:00+00:00"
 inv=list(g.get("invariants",[]))
 # Bootstrap compatibility: 0.9.25's verifier still requires this literal marker.
