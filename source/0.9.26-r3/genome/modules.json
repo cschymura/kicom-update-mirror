@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "modules": [
+    {
+      "path": "modules/dev/PasskeyBridge.php",
+      "enabled": true
+    },
+    {
+      "path": "modules/dev/DevSession.php",
+      "enabled": true
+    },
+    {
+      "path": "modules/dev/DevAuthAdapter.php",
+      "enabled": true
+    },
+    {
+      "path": "modules/dev/DevAuthFlow.php",
+      "enabled": true
+    },
+    {
+      "path": "modules/dev/DevRouter.php",
+      "enabled": true
+    },
+    {
+      "path": "modules/dev/DevHttpAdapter.php",
+      "enabled": true
+    },
+    {
+      "path": "modules/dev/DevKiComBindings.php",
+      "enabled": true
+    },
+    {
+      "path": "modules/dev/DevDiagnostics.php",
+      "enabled": true
+    },
+    {
+      "path": "modules/dev/DevEndpoint.php",
+      "enabled": true
+    }
+  ]
+}
