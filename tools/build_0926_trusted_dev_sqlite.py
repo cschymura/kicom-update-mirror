@@ -218,8 +218,8 @@ write(out/"lib.php",lib)
 
 # ---- Authority semantics: risk != authority. External targets stay human-authorized.
 living=(out/"living.php").read_text()
-old="'auto_archive_ingest'=>true,'red_requires_totp'=>true,'production_requires_totp'=>true,'kernel_requires_totp'=>true]"
-new="'auto_archive_ingest'=>true,'internal_self_update'=>true,'red_requires_totp'=>false,'production_requires_totp'=>true,'kernel_requires_totp'=>false,'external_authority_requires_human'=>true]"
+old="'auto_memory_archive'=>true,'auto_yellow_from_session'=>true,'red_requires_totp'=>true,'production_requires_totp'=>true,'kernel_requires_totp'=>true,'archive_append_only'=>true]"
+new="'auto_memory_archive'=>true,'auto_yellow_from_session'=>true,'internal_self_update'=>true,'red_requires_totp'=>false,'production_requires_totp'=>true,'kernel_requires_totp'=>false,'external_authority_requires_human'=>true,'archive_append_only'=>true]"
 living=replace_once(living,old,new,"autonomy authority defaults")
 
 # Authenticated internal self-update transport can finish through the normal verifier without TOTP.
