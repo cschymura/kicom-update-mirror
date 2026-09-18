@@ -187,8 +187,8 @@ old="""function kicomSqliteBackupFile(string $dest): bool {if(!class_exists('SQL
 new="""function kicomSqliteBackupFile(string $dest): bool {if(!is_file(kicomSqliteFile()))return false;@unlink($dest);if(class_exists('SQLite3')){try{$src=new SQLite3(kicomSqliteFile(),SQLITE3_OPEN_READONLY);$dst=new SQLite3($dest,SQLITE3_OPEN_READWRITE|SQLITE3_OPEN_CREATE);$ok=$src->backup($dst);$src->close();$dst->close();if($ok&&is_file($dest)&&!empty(kicomSqliteVerifyFile($dest,true)['ok'])){@chmod($dest,0600);return true;}@unlink($dest);}catch(Throwable $e){@unlink($dest);}}$db=kicomSqliteDb();if($db){try{$quoted=str_replace("'","''",$dest);$db->exec("VACUUM INTO '".$quoted."'");if(is_file($dest)&&!empty(kicomSqliteVerifyFile($dest,true)['ok'])){@chmod($dest,0600);return true;}}catch(Throwable $e){@unlink($dest);}}return false;}"""
 lib=replace_once(lib,old,new,"sqlite backup fallback")
 
-old="""$pre=kicomSqliteSnapshot('evolution-pre-'.$id);$spec['phase']='promote';$now=time();$db->beginTransaction();"""
-new="""$pre=kicomSqliteSnapshot('evolution-pre-'.$id);if(empty($pre['ok'])){$q=$db->prepare('UPDATE evolution_experiments SET status=?,health=? WHERE id=?');$q->execute(['rejected','pre_snapshot_failed',$id]);return ['ok'=>false,'code'=>'SQLITE_EVOLUTION_PRE_SNAPSHOT_FAILED','experiment_id'=>$id];}$spec['phase']='promote';$now=time();$db->beginTransaction();"""
+old="""$pre=null;if($promote)$pre=kicomSqliteSnapshot('pre-evolution-'.$id);if($promote){$db->beginTransaction();"""
+new="""$pre=null;if($promote){$pre=kicomSqliteSnapshot('pre-evolution-'.$id);if(empty($pre['ok']))$promote=false;}if($promote){$db->beginTransaction();"""
 lib=replace_once(lib,old,new,"evolution pre snapshot gate")
 
 # Add bounded diagnostics for the historical ~65k-event investigation.
