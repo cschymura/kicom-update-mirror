@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "component": "evolution-readiness-diagnostic",
+  "status": "candidate",
+  "source_files": [
+    "CellEvolutionReadiness.php",
+    "cell-evolution-readiness-status.php"
+  ],
+  "deployment": {
+    "evaluator_destination": "lib/CellEvolutionReadiness.php",
+    "adapter_destination": "lib/cell-evolution-readiness-status.php",
+    "public_web_endpoint": false,
+    "managed_by_lkg": true,
+    "promotion_authority": false
+  },
+  "invariants": [
+    "diagnostic-only",
+    "no-promotion",
+    "no-authority-change",
+    "no-external-probe",
+    "no-healing",
+    "no-public-anonymous-endpoint",
+    "fail-closed-on-insufficient-or-failed-evidence"
+  ],
+  "activation_gate": "Package integration may copy these files only under lib/. A network-visible readiness endpoint requires a separately reviewed authenticated/federation-authorized protocol design. Executable evolution promotion remains deferred."
+}
