@@ -1,12 +1,12 @@
 {
     "schema": 1,
-    "id": "kicom-0.9.26-g25",
+    "id": "kicom-0.9.26-g25r2",
     "version": "0.9.26",
     "parent": "kicom-0.9.25-g24",
     "generation": 25,
     "created_at": "2026-09-18T00:00:00+00:00",
     "kernel_revision": 1,
-    "mutation_reason": "trusted-dev-authority-boundary-sqlite-hardening",
+    "mutation_reason": "trusted-dev-authority-boundary-sqlite-hardening-memory-sync-r2",
     "invariants": [
         "no-arbitrary-shell",
         "no-arbitrary-sql",
