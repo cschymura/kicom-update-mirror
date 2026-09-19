@@ -20,7 +20,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: pdo_sqlite, sqlite3
+          extensions: pdo_sqlite, sqlite3, sodium
           coverage: none
       - name: Check exact archived release and communication source
         shell: bash
@@ -48,6 +48,8 @@ jobs:
           php -l development/0.9.27/membrane/test-event-receipt.php
           php -l development/0.9.27/membrane/KiComMembraneReconciliationJournal.php
           php -l development/0.9.27/membrane/test-reconciliation-journal.php
+          php -l development/0.9.27/membrane/KiComMembraneStagingAttestation.php
+          php -l development/0.9.27/membrane/test-staging-attestation.php
           bash -n development/0.9.27/membrane/test-os-bypass-transport.sh
       - name: Test passive shadow and legacy R3 communication contract
         shell: bash
@@ -62,6 +64,7 @@ jobs:
           php development/0.9.27/membrane/test-mpim-ingress.php
           php development/0.9.27/membrane/test-event-receipt.php
           php development/0.9.27/membrane/test-reconciliation-journal.php
+          php development/0.9.27/membrane/test-staging-attestation.php
       - name: Compare real isolated R3 HTTP communication with passive observer loaded
         shell: bash
         run: |
