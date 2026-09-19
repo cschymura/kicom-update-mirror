@@ -1,0 +1,41 @@
+name: KiCom membrane communication checks
+on:
+  push:
+    branches: [work/kicom-0.9.27-pam]
+    paths:
+      - 'development/0.9.27/membrane/**'
+      - 'source/0.9.26-r3/**'
+      - '.github/workflows/test-0927-membrane.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  membrane:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite, sqlite3
+          coverage: none
+      - name: Check exact archived release and communication source
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f  releases/0.9.26/KiCom-0.9.26-R3.zip' | sha256sum -c -
+          (cd source/0.9.26-r3 && sha256sum --status -c MANIFEST.sha256)
+          php -l development/0.9.27/membrane/KiComMembraneShadow.php
+          php -l development/0.9.27/membrane/test-shadow.php
+          php -l development/0.9.27/membrane/test-r3-transport.php
+      - name: Test passive shadow and legacy R3 communication contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/kicom-pam-r3-runtime
+          cp -a source/0.9.26-r3 /tmp/kicom-pam-r3-runtime
+          php development/0.9.27/membrane/test-shadow.php
+          php development/0.9.27/membrane/test-r3-transport.php /tmp/kicom-pam-r3-runtime
