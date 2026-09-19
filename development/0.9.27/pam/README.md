@@ -4,10 +4,14 @@ Status: isolated development module and CI only. Live KiCom stays on 0.9.25 unti
 
 ## Modules
 
-- KiComPam.php: sourced append-only observations with TTL; stable idempotency, internal-only work leases, append-only outcomes, persistent checkpoints. Accepts an existing PDO SQLite connection; creates only new pam_* tables. No network, execution, genome mutation or permission grants.
+- KiComPam.php: sourced append-only observations with TTL; stable idempotency, internal-only work leases, append-only outcomes, persistent checkpoints. Expired leases enter NEEDS_RECONCILIATION and cannot be retried until the actual target state has been checked and an evidence-hashed resolution is recorded. Accepts an existing PDO SQLite connection; creates only new pam_* tables. No network, execution, genome mutation or permission grants.
 - KiComPamKclAdapter.php: accepts raw responses from four exact read-only endpoints (HELLO, GENOME_STATUS, SQLITE_STATUS, UPDATE_STATUS), maps observations, creates a semantic checkpoint that ignores ephemeral request IDs, and queues only internal release-identity review for a RED pending update. It never queues or executes a production installation.
-- test.php and test-kcl.php: isolated SQLite tests.
+- test.php, test-kcl.php and test-persistence.php: isolated SQLite, strict KCL parser, WAL crash/restart, integrity and snapshot recovery tests (latest full CI result: 32 + 15 + 13 checks).
 - status/latest-ci.txt: most recently persisted CI outcome; its trigger SHA must match the tested code, not merely show a previous success.
+
+## Unpublished schema revision
+
+PAM development schema is now v2 to represent NEEDS_RECONCILIATION. Existing v1 prototype databases are deliberately rejected rather than silently or destructively rewritten; an explicit backed-up and tested v1-to-v2 migration must be developed if such persisted prototype data are found. This does not migrate the existing KiCom operational-memory schema.
 
 ## Integration gates — not yet completed
 
@@ -23,5 +27,6 @@ Run in an isolated development environment with PHP 8.2+ and PDO SQLite:
     php -l development/0.9.27/pam/KiComPamKclAdapter.php
     php development/0.9.27/pam/test.php
     php development/0.9.27/pam/test-kcl.php
+    php development/0.9.27/pam/test-persistence.php
 
 Privacy: store evidence fingerprints, not credentials, OTPs or raw remote content. Preserve history instead of hard-deleting observations and action outcomes.
