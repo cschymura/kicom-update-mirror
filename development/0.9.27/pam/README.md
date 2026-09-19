@@ -9,7 +9,10 @@ Status: isolated development module and CI only. Live KiCom stays on 0.9.25 unti
 - test.php, test-kcl.php and test-persistence.php: isolated SQLite, strict KCL parser, WAL crash/restart, integrity and snapshot recovery tests (latest full CI result: 32 + 15 + 13 checks).
 - KiComPamReleaseProof.php: exact, read-only identity verification of the existing trusted pending metadata and the actual stored ZIP bytes; rejects same-version but different hashes, filename inconsistencies, tampering and symlinks. Does not stage, install or authorize an update.
 - KiComPamReadOnlyCycle.php: first bounded observe -> internal read-only action -> evidence-hashed result loop, with explicit health gates, stable SHA-bound action identity and no external action executor. A cached observation never grants authority.
-- status/latest-ci.txt: most recently persisted PAM unit/KCL/persistence CI outcome; its trigger SHA must match the tested code.
+- KiComPamSnapshotOrder.php and KiComPamRecoveryGate.php: fail-closed read-only snapshot-order and recovery preflight; independently verify native KiCom snapshot ID, metadata, file SHA-256 and full SQLite integrity. Legacy same-second random-suffix snapshots are deliberately treated as ambiguous; these modules do not restore any database and have NOT replaced KiCom's native production recovery.
+- test-snapshot-order.php: eleven isolated regression tests for time ordering, same-second ambiguity, duplicate/invalid manifest data and missing integrity evidence. Current total: 32 core + 15 KCL + 13 persistence + 11 snapshot-order tests.
+- Research and tool-selection agreement: development/0.9.27/RESEARCH-AND-TOOLS-POLICY.md; official/upstream, university, authority and primary OSS sources have priority. Research and connected plugins never change action authorization.
+- status/latest-ci.txt: most recently persisted PAM unit/KCL/persistence/snapshot-order CI outcome; its trigger SHA must match the tested code.
 - test-r3-runtime.php and status/r3-runtime-ci.txt: separate CI verifies the exact R3 ZIP and manifest, then boots an isolated R3 runtime with pre-upgrade canonical-memory seeds, uses its actual SQLite PDO, extends it with PAM v2, exercises the pending-package proof against two different 0.9.26 ZIP files and executes the first bounded read-only PAM cycle. The unchanged native KiCom SQLite health/snapshot is verified. These are disposable CI fixtures, not a production installation, live backup, or evidence of which ZIP KiCom has currently staged.
 
 ## Explicit non-capabilities
@@ -28,6 +31,7 @@ PAM development schema is now v2 to represent NEEDS_RECONCILIATION. Existing v1 
 4. Scheduled development loop: load latest checkpoint; capture fresh read-only evidence; create or find an idempotent internal task; claim atomically; independently re-check authorization at the real execution boundary; act via existing KiCom tools; record an evidence-hashed result; re-observe and checkpoint. An expired lease permits reconciliation, not blind replay of uncertain side effects.
 5. Protected external actions remain blocked until the existing human-approval and exact target/version/package-SHA checks pass; PAM memory is never an authority source.
 6. Only after verified promotion: check backup, health, full SQLite integrity, genome trust/LKG, drift and unknown counts, then update canonical memory.
+7. Before any recovery-core change, test the snapshot-order guard in the isolated R3 runtime and review how a same-second ambiguity should stop or defer recovery without destroying the last known good state. The existing R3 kicomSqliteLatestSnapshot() still sorts random-suffixed, second-resolution filenames and is not yet fixed.
 
 Run in an isolated development environment with PHP 8.2+ and PDO SQLite:
     php -l development/0.9.27/pam/KiComPam.php
@@ -35,6 +39,7 @@ Run in an isolated development environment with PHP 8.2+ and PDO SQLite:
     php development/0.9.27/pam/test.php
     php development/0.9.27/pam/test-kcl.php
     php development/0.9.27/pam/test-persistence.php
+    php development/0.9.27/pam/test-snapshot-order.php
     # R3 integration is run by .github/workflows/test-0927-pam-r3.yml on a disposable runtime clone
 
 Privacy: store evidence fingerprints, not credentials, OTPs or raw remote content. Preserve history instead of hard-deleting observations and action outcomes.
