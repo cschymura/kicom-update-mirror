@@ -67,8 +67,7 @@ jobs:
           mkdir -p /tmp/kicom-pam-r3-runtime/var/project_memory
           cp source/0.9.25/memory/*.kcl /tmp/kicom-pam-r3-runtime/var/project_memory/
           cp source/0.9.26-r3/var/.htaccess /tmp/kicom-pam-r3-runtime/var/.htaccess
-          php development/0.9.27/pam/test-r3-callers.php /tmp/kicom-pam-r3-runtime
-          php -d display_errors=1 development/0.9.27/pam/test-r3-runtime.php /tmp/kicom-pam-r3-runtime "$(pwd)/releases/0.9.26/KiCom-0.9.26-R3.zip" "$(pwd)/releases/0.9.26/KiCom-0.9.26.zip" 2>&1 | tee /tmp/pam-r3-runtime-test-log.txt
+          { php development/0.9.27/pam/test-r3-callers.php /tmp/kicom-pam-r3-runtime && php -d display_errors=1 development/0.9.27/pam/test-r3-runtime.php /tmp/kicom-pam-r3-runtime "$(pwd)/releases/0.9.26/KiCom-0.9.26-R3.zip" "$(pwd)/releases/0.9.26/KiCom-0.9.26.zip"; } 2>&1 | tee /tmp/pam-r3-runtime-test-log.txt
       - name: Preserve isolated compatibility result (conflict-safe)
         if: always()
         shell: bash
@@ -85,6 +84,7 @@ jobs:
           if [ "$PREFLIGHT_RESULT" = success ] && [ "$TEST_RESULT" = success ]; then result=success; fi
           printf 'CI_RESULT=%s\nRUN_ID=%s\nTRIGGER_SHA=%s\nTESTED_SHA=%s\nPREFLIGHT_RESULT=%s\nTEST_STEP_RESULT=%s\nR3_ZIP_SHA256=6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f\n' "$result" "$GITHUB_RUN_ID" "$GITHUB_SHA" "$tested_sha" "$PREFLIGHT_RESULT" "$TEST_RESULT" > "$report"
           if [ -s /tmp/pam-r3-runtime-test-log.txt ]; then
+            grep -E '^PAM_R3_(CALLER_INVENTORY|RUNTIME_TESTS)_PASSED=' /tmp/pam-r3-runtime-test-log.txt >> "$report" || true
             tail -n 55 /tmp/pam-r3-runtime-test-log.txt >> "$report"
           fi
           git config user.name 'github-actions[bot]'
