@@ -1,13 +1,35 @@
-CI_RESULT=failure
-RUN_ID=35436617988
-TRIGGER_SHA=b3f836a1fa79f70730f3b23b622fb1b2842528de
-PASS Unknown until observed
-PASS Fresh sourced observation
-PASS Observation TTL and original evidence preserved
-PASS Observation cannot create authority state
-PASS Evidence checksum required
-PASS External action never claimable from internal queue
-PASS Idempotent action insertion
-PASS Idempotency collision refuses changed action
-PASS First owner claims internal work
-PASS Concurrent owner cannot duplicate claim
+CI_RESULT=success
+RUN_ID=35436632679
+TRIGGER_SHA=8087019b157056ed42218bcafb9ef1a7f5d58ed6
+PASS Protected action cannot be unblocked by reconciliation
+PASS Reconciliation cannot create an authority state
+PASS Evidence-backed confirmation of non-execution permits an internal retry
+PASS The same expired lease cannot be reconciled twice
+PASS Verified safe retry obtains a fresh lease
+PASS Current owner records its audited result
+PASS Completed action cannot be finalized twice
+PASS Immutable expiry, reconciliation and outcome events preserved
+PASS Completed action cannot be claimed again
+PASS A second internal task can be claimed
+PASS Second expired lease also quarantined
+PASS Confirmed previous completion is recorded without re-execution
+PASS Confirmed prior completion never reruns
+PASS Idempotent durable checkpoint
+PASS Checkpoint collision fails closed
+PASS Latest checkpoint available for next run
+PASS Original KiCom tables untouched
+PASS Schema version persisted
+PAM_TESTS_PASSED=32
+PASS Healthy fixed-endpoint KCL mapped to observations
+PASS RED protected action recognized
+PASS Protected install remains denied by PAM
+PASS Release review is internal work, not production execution
+PASS Adapter does not enqueue a production installation
+PASS Transient request IDs do not invalidate semantic state
+PASS Next scheduled run can read latest checkpoint
+PASS Same release review is idempotent
+PASS Real health degradation is recorded
+PASS Error response never interpreted as healthy
+PASS Ambiguous duplicate fact rejected
+PASS Unapproved endpoint evidence rejected
+PAM_KCL_TESTS_PASSED=12
