@@ -11,6 +11,7 @@ on:
       - 'development/0.9.27/pam/KiComPamReadOnlyCycle.php'
       - 'development/0.9.27/pam/KiComPamSnapshotOrder.php'
       - 'development/0.9.27/pam/KiComPamRecoveryGate.php'
+      - 'development/0.9.27/pam/KiComPamSnapshotSequencer.php'
       - 'source/0.9.26-r3/**'
       - '.github/workflows/test-0927-pam-r3.yml'
   workflow_dispatch:
@@ -49,6 +50,7 @@ jobs:
           php -l development/0.9.27/pam/KiComPamReadOnlyCycle.php
           php -l development/0.9.27/pam/KiComPamSnapshotOrder.php
           php -l development/0.9.27/pam/KiComPamRecoveryGate.php
+          php -l development/0.9.27/pam/KiComPamSnapshotSequencer.php
           php -l development/0.9.27/pam/test-r3-runtime.php
       - name: Test isolated R3 runtime and native snapshot
         id: integration
