@@ -46,6 +46,17 @@ seqOk(!$broken['ok']&&$broken['code']==='SNAPSHOT_NATIVE_CREATE_FAILED'
 $native=$writer(); // Simulated crash after native write, before journal publication.
 seqOk($seq->inspect()['code']==='UNSEQUENCED_NATIVE_SNAPSHOT',
     'Unjournaled snapshot from interrupted write is quarantined, never silently ordered');
+$beforeLegacy = count(glob($root.'/snapshot-*.json') ?: []);
+$writerCalled = false;
+$refused = $seq->create(static function () use (&$writerCalled):array {
+    $writerCalled = true;
+    throw new RuntimeException('Must not invoke writer on legacy/orphan inventory');
+});
+seqOk(!$refused['ok'] && $refused['code']==='SNAPSHOT_LEGACY_INVENTORY_REQUIRES_REVIEW'
+    && !$writerCalled
+    && count(glob($root.'/snapshot-*.json') ?: []) === $beforeLegacy,
+    'Orphan detected before writer invocation and existing backups remain intact');
+
 // Recreate a clean separate ledger fixture; leave crashed state intact for auditing.
 $other=sys_get_temp_dir().'/kicom-pam-sequence-fresh-'.bin2hex(random_bytes(6));
 mkdir($other,0700);
@@ -74,4 +85,22 @@ seqOk($clean->inspect()['code']==='SEQUENCE_LEDGER_UNTRUSTED',
     'Damaged append-only sequence entry fails closed');
 file_put_contents($entry,$entryRaw);
 seqOk($clean->inspect()['ok'],'Restoring exact ledger bytes restores verification');
+$legacy = sys_get_temp_dir().'/kicom-pam-sequence-legacy-'.bin2hex(random_bytes(6));
+mkdir($legacy,0700);
+$oldId=gmdate('YmdHis').'-cccccccccc';
+file_put_contents($legacy.'/snapshot-'.$oldId.'.json',
+    json_encode(['id'=>$oldId,'sha256'=>str_repeat('b',64)],JSON_THROW_ON_ERROR));
+file_put_contents($legacy.'/snapshot-'.$oldId.'.sqlite','intact-legacy-backup');
+$legacySeq=new KiComPamSnapshotSequencer($legacy);
+$legacyCalled=false;
+$legacyResult=$legacySeq->create(static function () use (&$legacyCalled):array {
+    $legacyCalled=true;
+    return ['ok'=>false];
+});
+seqOk(!$legacyResult['ok'] && $legacyResult['code']==='SNAPSHOT_LEGACY_INVENTORY_REQUIRES_REVIEW'
+    && !$legacyCalled,
+    'Unsequenced pre-existing legacy backup blocks new sequence before native writer');
+seqOk(file_get_contents($legacy.'/snapshot-'.$oldId.'.sqlite')==='intact-legacy-backup',
+    'Fail-closed legacy inventory preserves exact pre-existing backup bytes');
+
 echo "PAM_SEQUENCER_TESTS_PASSED=$n\n";
