@@ -28,6 +28,7 @@ require_once $root . '/lib.php';
 require_once __DIR__ . '/KiComPam.php';
 require_once __DIR__ . '/KiComPamKclAdapter.php';
 require_once __DIR__ . '/KiComPamReleaseProof.php';
+require_once __DIR__ . '/KiComPamReadOnlyCycle.php';
 $checks = 0;
 function runtimeOk(bool $value, string $message): void {
     global $checks;
@@ -137,6 +138,44 @@ symlink($oldZip, $oldStored);
 runtimeOk((KiComPamReleaseProof::inspectR3()['code'] ?? '') === 'STORED_PACKAGE_UNAVAILABLE',
     'Symlink leaving the managed package directory is rejected');
 unlink($oldStored);
+
+// Simulated read-only 0.9.25 KCL observations; the underlying file/SQLite
+// operations still run entirely in the previously verified isolated R3 clone.
+$cycleResponses = [
+    'HELLO' => "KCL/1\nOK hello\nFACT version=\"0.9.25\"\nEND\n",
+    'GENOME_STATUS' => "KCL/1\nOK living_status\nFACT version=\"0.9.25\"\nFACT healthy=true\nFACT trusted=true\nFACT lkg_ok=true\nFACT drift_count=0\nFACT unknown_count=0\nEND\n",
+    'SQLITE_STATUS' => "KCL/1\nOK sqlite_status\nFACT primary=true\nFACT quick_check=\"ok\"\nFACT journal_mode=\"wal\"\nEND\n",
+    'UPDATE_STATUS' => "KCL/1\nOK update_status\nFACT pending_version=\"0.9.26\"\nFACT pending_risk=\"red\"\nFACT pending_source=\"pull:mirror\"\nEND\n",
+];
+$cycle = new KiComPamReadOnlyCycle($pam, new KiComPamKclAdapter($pam));
+$writePending($r3Sha, basename($r3Stored));
+$firstCycle = $cycle->run('cycle-r3-1', $cycleResponses);
+runtimeOk(($firstCycle['code'] ?? '') === 'READ_ONLY_R3_IDENTITY_CONFIRMED'
+    && ($firstCycle['pending_sha256'] ?? '') === $r3Sha,
+    'Fixed KCL observation and exact pending bytes complete an internal read-only cycle');
+runtimeOk(($firstCycle['human_approval_granted'] ?? null) === false
+    && ($firstCycle['installation_permitted'] ?? null) === false,
+    'PAM cycle cannot grant production installation authority');
+runtimeOk($pam->perceive('KiCom:0.9.25', 'pending-r3-identity')['state'] === 'AVAILABLE',
+    'Confirmed release identity is stored as expiring evidence, not as authority');
+$againCycle = $cycle->run('cycle-r3-2', $cycleResponses);
+runtimeOk(($againCycle['code'] ?? '') === 'PROOF_ALREADY_CHECKED_OR_UNCERTAIN',
+    'Same-version and same-hash review is idempotent across separate runs');
+$degraded = $cycleResponses;
+$degraded['GENOME_STATUS'] = str_replace('FACT healthy=true', 'FACT healthy=false', $degraded['GENOME_STATUS']);
+runtimeOk(($cycle->run('cycle-r3-degraded', $degraded)['code'] ?? '') === 'HEALTH_UNVERIFIED',
+    'Unhealthy genome prevents any further internal review action');
+$wrongVersion = $cycleResponses;
+$wrongVersion['HELLO'] = str_replace('0.9.25', '0.9.26', $wrongVersion['HELLO']);
+runtimeOk(($cycle->run('cycle-r3-version', $wrongVersion)['code'] ?? '') === 'NO_SUPPORTED_RED_RELEASE_REVIEW',
+    'Version drift is not treated as permission to reuse an old checkpoint');
+$writePending($oldSha, basename($oldStored));
+$wrong = $cycle->run('cycle-r3-different', $cycleResponses);
+runtimeOk(($wrong['code'] ?? '') === 'PENDING_IDENTITY_UNVERIFIED'
+    && ($wrong['detail'] ?? '') === 'STORED_PACKAGE_UNAVAILABLE',
+    'Changed or missing pending ZIP is not accepted through the previous successful review');
+runtimeOk($pam->perceive('KiCom:0.9.25', 'pending-r3-identity')['state'] === 'DEGRADED',
+    'Contradictory current evidence supersedes earlier positive perception');
 unlink(kicomSelfUpdatePendingFile());
 runtimeOk((KiComPamReleaseProof::inspectR3()['code'] ?? '') === 'NO_PENDING_PACKAGE',
     'Release diagnostics do not leave a staged package behind');
