@@ -99,6 +99,6 @@ $check($inspect($raw,$headers,$secret,$team,$channel,$already,$now),
 $failing=static function(string $id):bool{throw new RuntimeException('dedup backend down');};
 $check($inspect($raw,$headers,$secret,$team,$channel,$failing,$now),
     'SLACK_DEDUPLICATION_UNAVAILABLE','Unreachable dedup backend never fail-opens admission');
-mpimOk($readCount===2,
+mpimOk($readCount===1,
     'Invalid and unauthenticated events never consult replay store; only valid cases do');
 echo "MEMBRANE_MPIM_INGRESS_TESTS_PASSED=$checks\n";
