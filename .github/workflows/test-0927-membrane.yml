@@ -41,6 +41,8 @@ jobs:
           php -l development/0.9.27/membrane/test-cross-uid-transport.php
           php -l development/0.9.27/membrane/KiComMembraneSlackBridgeEvidence.php
           php -l development/0.9.27/membrane/test-slack-bridge.php
+          php -l development/0.9.27/membrane/KiComMembraneSlackMpimIngress.php
+          php -l development/0.9.27/membrane/test-mpim-ingress.php
           bash -n development/0.9.27/membrane/test-os-bypass-transport.sh
       - name: Test passive shadow and legacy R3 communication contract
         shell: bash
@@ -52,6 +54,7 @@ jobs:
           php development/0.9.27/membrane/test-r3-transport.php /tmp/kicom-pam-r3-runtime
           php development/0.9.27/membrane/test-transparent-tap.php
           php development/0.9.27/membrane/test-slack-bridge.php
+          php development/0.9.27/membrane/test-mpim-ingress.php
       - name: Compare real isolated R3 HTTP communication with passive observer loaded
         shell: bash
         run: |
