@@ -31,6 +31,7 @@ require_once __DIR__ . '/KiComPamReleaseProof.php';
 require_once __DIR__ . '/KiComPamReadOnlyCycle.php';
 require_once __DIR__ . '/KiComPamSnapshotOrder.php';
 require_once __DIR__ . '/KiComPamRecoveryGate.php';
+require_once __DIR__ . '/KiComPamSnapshotSequencer.php';
 $checks = 0;
 function runtimeOk(bool $value, string $message): void {
     global $checks;
@@ -296,5 +297,45 @@ runtimeOk((int)$db->query('SELECT COUNT(*) FROM pam_actions')->fetchColumn() ===
     'No pending release creates no action and no new installation authority');
 runtimeOk($pam->latestCheckpoint()['run_key'] === 'r3-installed-no-pending',
     'Installed R3 state is persisted as next-run checkpoint');
+
+
+// In a disposable, initially empty journal directory, test ordering of two
+// real R3-produced SQLite snapshots. Publication copy is intentionally kept
+// separate from the native production-style snapshot folder; this does not
+// activate the sequencer in the native recovery kernel.
+$seqDir = $root . '/var/pam-sequence-compatibility';
+if (!mkdir($seqDir, 0700, true)) {
+    throw new RuntimeException('Failed to prepare isolated sequencer fixture');
+}
+$seqRuntime = new KiComPamSnapshotSequencer($seqDir);
+$nativeThroughFixture = static function () use ($seqDir): array {
+    $native = kicomSqliteSnapshot('isolated-sequence-compatibility');
+    if (empty($native['ok'])) return $native;
+    $id = (string)$native['id'];
+    foreach (['.sqlite', '.json'] as $ext) {
+        $sourceFile = kicomSqliteSnapshotDir() . '/snapshot-' . $id . $ext;
+        $target = $seqDir . '/snapshot-' . $id . $ext;
+        if (!copy($sourceFile, $target)) {
+            throw new RuntimeException('Failed to copy exact native snapshot to test journal');
+        }
+    }
+    return $native;
+};
+$seqOne = $seqRuntime->create($nativeThroughFixture);
+$seqTwo = $seqRuntime->create($nativeThroughFixture);
+runtimeOk(!empty($seqOne['ok']) && !empty($seqTwo['ok'])
+    && $seqOne['sequence'] === 1 && $seqTwo['sequence'] === 2,
+    'Two real R3 SQLite snapshots receive lock-serialized independent sequence numbers');
+$seqVerified = $seqRuntime->inspect();
+runtimeOk(!empty($seqVerified['ok']) && $seqVerified['snapshot_id'] === $seqTwo['snapshot_id']
+    && $seqVerified['sequence'] === 2 && !$seqVerified['restore_permitted'],
+    'R3-native snapshot bytes and metadata validate ordered read-only candidate without restore authority');
+$legacyOrphan = $seqDir . '/snapshot-' . $snapshot['id'] . '.json';
+copy(kicomSqliteSnapshotDir() . '/snapshot-' . $snapshot['id'] . '.json', $legacyOrphan);
+runtimeOk($seqRuntime->inspect()['code'] === 'UNSEQUENCED_NATIVE_SNAPSHOT',
+    'Legacy unsequenced R3 metadata cannot be silently adopted into the monotonic journal');
+unlink($legacyOrphan);
+runtimeOk($seqRuntime->inspect()['snapshot_id'] === $seqTwo['snapshot_id'],
+    'Removing only isolated orphan fixture restores verified sequence selection');
 
 echo "PAM_R3_RUNTIME_TESTS_PASSED=$checks\n";
