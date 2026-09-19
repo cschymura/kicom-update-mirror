@@ -50,7 +50,9 @@ jobs:
           php -l development/0.9.27/membrane/test-reconciliation-journal.php
           php -l development/0.9.27/membrane/KiComMembraneStagingAttestation.php
           php -l development/0.9.27/membrane/test-staging-attestation.php
+          php -l development/0.9.27/membrane/fixture-os-attestation.php
           bash -n development/0.9.27/membrane/test-os-bypass-transport.sh
+          bash -n development/0.9.27/membrane/test-os-pinned-attester.sh
       - name: Test passive shadow and legacy R3 communication contract
         shell: bash
         run: |
@@ -116,3 +118,4 @@ jobs:
           set -euo pipefail
           bash development/0.9.27/membrane/test-os-boundary.sh
           bash development/0.9.27/membrane/test-os-bypass-transport.sh
+          bash development/0.9.27/membrane/test-os-pinned-attester.sh
