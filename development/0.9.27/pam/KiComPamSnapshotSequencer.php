@@ -32,6 +32,12 @@ final class KiComPamSnapshotSequencer
         }
     }
 
+    /** Return only the canonical directory identity; never expose arbitrary path access. */
+    public function snapshotRoot(): string
+    {
+        return $this->root;
+    }
+
     private function rows(): array
     {
         $files = glob($this->journal . '/entry-*.json');
