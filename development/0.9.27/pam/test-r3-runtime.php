@@ -33,6 +33,7 @@ require_once __DIR__ . '/KiComPamSnapshotOrder.php';
 require_once __DIR__ . '/KiComPamRecoveryGate.php';
 require_once __DIR__ . '/KiComPamSnapshotSequencer.php';
 require_once __DIR__ . '/KiComPamRecoveryPreflight.php';
+require_once __DIR__ . '/KiComPamHighWaterVerifier.php';
 $checks = 0;
 function runtimeOk(bool $value, string $message): void {
     global $checks;
@@ -339,9 +340,53 @@ unlink($legacyOrphan);
 runtimeOk($seqRuntime->inspect()['snapshot_id'] === $seqTwo['snapshot_id'],
     'Removing only isolated orphan fixture restores verified sequence selection');
 
+// Compare an externally retained high-water claim with an actual R3-generated
+// SQLite snapshot sequence. Test claim lives outside the sequence directory;
+// it does not pretend that the production independent signer exists.
+$testAnchor = [
+    'sequence' => $seqTwo['sequence'],
+    'snapshot_id' => $seqTwo['snapshot_id'],
+    'snapshot_sha256' => $seqTwo['snapshot_sha256'],
+    'entry_sha256' => hash_file('sha256', $seqDir . '/pam-sequence/entry-0000000002.json')
+];
+$highWater = static fn(?array $a): array =>
+    KiComPamHighWaterVerifier::inspect($seqRuntime, $seqDir, $a);
+runtimeOk($highWater(null)['code'] === 'INDEPENDENT_HIGH_WATER_ANCHOR_MISSING',
+    'Real R3 snapshot sequence without independent high-water claim is not recovery eligible');
+$highMatch = $highWater($testAnchor);
+runtimeOk(!empty($highMatch['ok']) && $highMatch['snapshot_id'] === $seqTwo['snapshot_id']
+    && !$highMatch['restore_permitted'] && !$highMatch['automatic_recovery_permitted']
+    && !$highMatch['independent_anchor_authenticated_here'],
+    'Real R3 backup matches external test claim but never self-authenticates or authorizes restoration');
+$tailPaths = [
+    $seqDir . '/pam-sequence/entry-0000000002.json',
+    $seqDir . '/snapshot-' . $seqTwo['snapshot_id'] . '.json',
+    $seqDir . '/snapshot-' . $seqTwo['snapshot_id'] . '.sqlite'
+];
+$originalTail = array_map(static fn(string $p): string => (string)file_get_contents($p), $tailPaths);
+foreach ($tailPaths as $p) {
+    unlink($p);
+}
+runtimeOk(!empty($seqRuntime->inspect()['ok'])
+    && $seqRuntime->inspect()['sequence'] === 1
+    && $highWater($testAnchor)['code'] === 'HIGH_WATER_ROLLBACK_OR_DIVERGENCE',
+    'High-water claim detects truncation of a locally self-consistent native R3 journal and backup');
+foreach ($tailPaths as $i => $p) {
+    file_put_contents($p, $originalTail[$i], LOCK_EX);
+}
+runtimeOk(!empty($highWater($testAnchor)['ok']),
+    'Exact native R3 snapshot and ledger bytes recover prior identity without rewriting the anchor');
+
+
 
 // Pre-quarantine recovery preflight must never convert an unanchored local
 // journal or same-second legacy snapshot into automatic restore authority.
+$originalDbPath = kicomSqliteFile();
+$nativeStateBefore = [];
+foreach (['', '-wal'] as $suffix) {
+    $candidate = $originalDbPath . $suffix;
+    $nativeStateBefore[$suffix] = is_file($candidate) ? hash_file('sha256', $candidate) : null;
+}
 $quarantineBefore = glob(kicomSqliteQuarantineDir() . '/*') ?: [];
 $eventsBefore = (int)$db->query('SELECT COUNT(*) FROM events')->fetchColumn();
 $legacyPreflight = KiComPamRecoveryPreflight::inspect();
@@ -368,5 +413,13 @@ runtimeOk(!$unanchored['ok']
 runtimeOk((int)$db->query('SELECT COUNT(*) FROM events')->fetchColumn() === $eventsBefore
     && (glob(kicomSqliteQuarantineDir() . '/*') ?: []) === $quarantineBefore,
     'Read-only preflight leaves R3 DB events and quarantine untouched');
+$nativeStateAfter = [];
+foreach (['', '-wal'] as $suffix) {
+    $candidate = $originalDbPath . $suffix;
+    $nativeStateAfter[$suffix] = is_file($candidate) ? hash_file('sha256', $candidate) : null;
+}
+runtimeOk($nativeStateBefore === $nativeStateAfter,
+    'Blocked recovery preflight preserves exact original SQLite database and WAL bytes');
+
 
 echo "PAM_R3_RUNTIME_TESTS_PASSED=$checks\n";
