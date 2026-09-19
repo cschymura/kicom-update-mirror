@@ -87,6 +87,19 @@ final class KiComPamSnapshotSequencer
         }
         try {
             $rows = $this->rows();
+            // A new sequence must not be started on top of legacy files, a
+            // previous interrupted native write or an out-of-band writer.
+            // Reject BEFORE executing the new native writer.
+            $metaInventory = glob($this->root . '/snapshot-*.json');
+            $backupInventory = glob($this->root . '/snapshot-*.sqlite');
+            if (!is_array($metaInventory) || !is_array($backupInventory)
+                || count($metaInventory) !== count($rows)
+                || count($backupInventory) !== count($rows)) {
+                return ['ok' => false, 'code' => 'SNAPSHOT_LEGACY_INVENTORY_REQUIRES_REVIEW'];
+            }
+            if ($rows !== [] && empty($this->inspect()['ok'])) {
+                return ['ok' => false, 'code' => 'SNAPSHOT_PRIOR_SEQUENCE_UNVERIFIED'];
+            }
             $native = $trustedWriter();
             if (!is_array($native) || empty($native['ok'])
                 || !is_string($native['id'] ?? null)
@@ -125,6 +138,16 @@ final class KiComPamSnapshotSequencer
                     return ['ok' => false, 'code' => 'SNAPSHOT_ALREADY_SEQUENCED'];
                 }
             }
+            // The trusted writer may have created another backup outside this
+            // lock, or crashed after publishing a second manifest. Never
+            // append a seemingly clean ledger entry in that condition.
+            $postMetas = glob($this->root . '/snapshot-*.json');
+            $postBackups = glob($this->root . '/snapshot-*.sqlite');
+            if (!is_array($postMetas) || !is_array($postBackups)
+                || count($postMetas) !== count($rows) + 1
+                || count($postBackups) !== count($rows) + 1) {
+                return ['ok' => false, 'code' => 'SNAPSHOT_NATIVE_INVENTORY_DIVERGED'];
+            }
             $number = count($rows) + 1;
             $previousFile = $number > 1
                 ? $this->journal . '/entry-' . sprintf('%010d', $number - 1) . '.json'
@@ -146,8 +169,12 @@ final class KiComPamSnapshotSequencer
             }
             try {
                 if (fwrite($handle, $encoded) !== strlen($encoded)
-                    || !fflush($handle)) {
-                    throw new RuntimeException('Sequence entry write incomplete');
+                    || !fflush($handle)
+                    || !function_exists('fsync')
+                    || !fsync($handle)) {
+                    // A failed write is deliberately left as an invalid
+                    // partial entry and cannot be silently replayed.
+                    throw new RuntimeException('Sequence entry durable write unverified');
                 }
             } finally {
                 fclose($handle);
