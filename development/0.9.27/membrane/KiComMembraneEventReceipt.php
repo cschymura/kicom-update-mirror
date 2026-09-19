@@ -50,13 +50,19 @@ final class KiComMembraneEventReceipt
             || !preg_match('/^[a-f0-9]{64}$/D', $rawHash)) {
             return self::state('INVALID_RECEIPT_IDENTITY');
         }
+        $locked = false;
         try {
+            // BEGIN IMMEDIATE is issued directly to SQLite. PDO::commit()
+            // only tracks PDO::beginTransaction(); use SQL COMMIT/ROLLBACK
+            // for this explicit SQLite transaction instead.
             $this->db->exec('BEGIN IMMEDIATE');
+            $locked = true;
             $select=$this->db->prepare('SELECT raw_hash, state FROM receipts WHERE event_hash = ?');
             $select->execute([$eventHash]);
             $row=$select->fetch(PDO::FETCH_ASSOC);
             if (is_array($row)) {
-                $this->db->commit();
+                $this->db->exec('COMMIT');
+                $locked = false;
                 if (!hash_equals($row['raw_hash'], $rawHash)) {
                     return self::state('EVENT_ID_HASH_COLLISION');
                 }
@@ -66,11 +72,14 @@ final class KiComMembraneEventReceipt
                 (event_hash, raw_hash, state)
                 VALUES (?, ?, "NEEDS_RECONCILIATION")');
             $insert->execute([$eventHash,$rawHash]);
-            $this->db->commit();
+            $this->db->exec('COMMIT');
+                $locked = false;
             // Even a new reservation is NOT an external dispatch permit.
             return self::state('NEW_DURABLE_RECEIPT');
         } catch (Throwable $e) {
-            if ($this->db->inTransaction()) $this->db->rollBack();
+            if ($locked) {
+                try { $this->db->exec('ROLLBACK'); } catch (Throwable $ignored) {}
+            }
             return self::state('RECEIPT_DATABASE_UNAVAILABLE');
         }
     }
