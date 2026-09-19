@@ -7,7 +7,8 @@ Status: isolated development module and CI only. Live KiCom stays on 0.9.25 unti
 - KiComPam.php: sourced append-only observations with TTL; stable idempotency, internal-only work leases, append-only outcomes, persistent checkpoints. Expired leases enter NEEDS_RECONCILIATION and cannot be retried until the actual target state has been checked and an evidence-hashed resolution is recorded. Accepts an existing PDO SQLite connection; creates only new pam_* tables. No network, execution, genome mutation or permission grants.
 - KiComPamKclAdapter.php: accepts raw responses from four exact read-only endpoints (HELLO, GENOME_STATUS, SQLITE_STATUS, UPDATE_STATUS), maps observations, creates a semantic checkpoint that ignores ephemeral request IDs, and queues only internal release-identity review for a RED pending update. It never queues or executes a production installation.
 - test.php, test-kcl.php and test-persistence.php: isolated SQLite, strict KCL parser, WAL crash/restart, integrity and snapshot recovery tests (latest full CI result: 32 + 15 + 13 checks).
-- status/latest-ci.txt: most recently persisted CI outcome; its trigger SHA must match the tested code, not merely show a previous success.
+- status/latest-ci.txt: most recently persisted PAM unit/KCL/persistence CI outcome; its trigger SHA must match the tested code.
+- test-r3-runtime.php and status/r3-runtime-ci.txt: separate CI verifies the exact R3 ZIP and manifest, then boots an isolated R3 runtime with a pre-upgrade canonical-memory seed, uses its actual SQLite PDO, extends it with PAM v2 and verifies the unchanged KiCom native health and SHA-verified snapshot restore. This is not a production installation or live backup.
 
 ## Unpublished schema revision
 
@@ -16,7 +17,7 @@ PAM development schema is now v2 to represent NEEDS_RECONCILIATION. Existing v1 
 ## Integration gates — not yet completed
 
 1. Verify the exact SHA-256 of the pending KiCom release after feed refresh. Version equality alone does not establish release identity. Use the normal verifier and protected RED production authorization, including pre-write backup, post-write health and rollback.
-2. Re-test PAM on an isolated copy of the actual 0.9.26 runtime, including migration, WAL/concurrency and backup/restore. Local unit tests are not evidence of production compatibility.
+2. DONE (isolated): PAM v2 has passed the exact 0.9.26-R3 source manifest/ZIP check and integration on R3's native SQLite connection and native snapshot. Still required: test the real deployment environment, existing live SQLite data compatibility, and any actual migration/backup before production use. A test against an isolated copy is not a live migration.
 3. Pin all new executable files and module definitions to the verified 0.9.27 genome manifest before promotion. Use the existing internal allowlisted execution boundary; never offer arbitrary filesystem, SQL, shell or remote URL capabilities.
 4. Scheduled development loop: load latest checkpoint; capture fresh read-only evidence; create or find an idempotent internal task; claim atomically; independently re-check authorization at the real execution boundary; act via existing KiCom tools; record an evidence-hashed result; re-observe and checkpoint. An expired lease permits reconciliation, not blind replay of uncertain side effects.
 5. Protected external actions remain blocked until the existing human-approval and exact target/version/package-SHA checks pass; PAM memory is never an authority source.
@@ -28,5 +29,6 @@ Run in an isolated development environment with PHP 8.2+ and PDO SQLite:
     php development/0.9.27/pam/test.php
     php development/0.9.27/pam/test-kcl.php
     php development/0.9.27/pam/test-persistence.php
+    # R3 integration is run by .github/workflows/test-0927-pam-r3.yml on a disposable runtime clone
 
 Privacy: store evidence fingerprints, not credentials, OTPs or raw remote content. Preserve history instead of hard-deleting observations and action outcomes.
