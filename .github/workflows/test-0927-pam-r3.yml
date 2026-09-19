@@ -12,6 +12,8 @@ on:
       - 'development/0.9.27/pam/KiComPamSnapshotOrder.php'
       - 'development/0.9.27/pam/KiComPamRecoveryGate.php'
       - 'development/0.9.27/pam/KiComPamSnapshotSequencer.php'
+      - 'development/0.9.27/pam/KiComPamRecoveryPreflight.php'
+      - 'development/0.9.27/pam/test-r3-callers.php'
       - 'source/0.9.26-r3/**'
       - '.github/workflows/test-0927-pam-r3.yml'
   workflow_dispatch:
@@ -51,6 +53,8 @@ jobs:
           php -l development/0.9.27/pam/KiComPamSnapshotOrder.php
           php -l development/0.9.27/pam/KiComPamRecoveryGate.php
           php -l development/0.9.27/pam/KiComPamSnapshotSequencer.php
+          php -l development/0.9.27/pam/KiComPamRecoveryPreflight.php
+          php -l development/0.9.27/pam/test-r3-callers.php
           php -l development/0.9.27/pam/test-r3-runtime.php
       - name: Test isolated R3 runtime and native snapshot
         id: integration
@@ -63,6 +67,7 @@ jobs:
           mkdir -p /tmp/kicom-pam-r3-runtime/var/project_memory
           cp source/0.9.25/memory/*.kcl /tmp/kicom-pam-r3-runtime/var/project_memory/
           cp source/0.9.26-r3/var/.htaccess /tmp/kicom-pam-r3-runtime/var/.htaccess
+          php development/0.9.27/pam/test-r3-callers.php /tmp/kicom-pam-r3-runtime
           php -d display_errors=1 development/0.9.27/pam/test-r3-runtime.php /tmp/kicom-pam-r3-runtime "$(pwd)/releases/0.9.26/KiCom-0.9.26-R3.zip" "$(pwd)/releases/0.9.26/KiCom-0.9.26.zip" 2>&1 | tee /tmp/pam-r3-runtime-test-log.txt
       - name: Preserve isolated compatibility result (conflict-safe)
         if: always()
