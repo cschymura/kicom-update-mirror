@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: work/kicom-0.9.27-pam
+          ref: ${{ github.sha }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
@@ -40,7 +40,7 @@ jobs:
           php -l development/0.9.27/pam/test-kcl.php
           php -l development/0.9.27/pam/test-persistence.php
           { php development/0.9.27/pam/test.php && php development/0.9.27/pam/test-kcl.php && php development/0.9.27/pam/test-persistence.php; } | tee /tmp/pam-test-log.txt
-      - name: Persist CI result without touching live KiCom
+      - name: Persist isolated PAM outcome (conflict-safe)
         if: always()
         shell: bash
         env:
@@ -49,12 +49,39 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          mkdir -p development/0.9.27/pam/status
-          printf 'CI_RESULT=%s\nRUN_ID=%s\nTRIGGER_SHA=%s\n' "$TEST_RESULT" "$GITHUB_RUN_ID" "$GITHUB_SHA" > development/0.9.27/pam/status/latest-ci.txt
+          tested_sha="$(git rev-parse HEAD)"
+          report="/tmp/pam-unit-$GITHUB_RUN_ID.txt"
+          printf 'CI_RESULT=%s\nRUN_ID=%s\nTRIGGER_SHA=%s\nTESTED_SHA=%s\n' "$TEST_RESULT" "$GITHUB_RUN_ID" "$GITHUB_SHA" "$tested_sha" > "$report"
           if [ -s /tmp/pam-test-log.txt ]; then
-            tail -n 32 /tmp/pam-test-log.txt >> development/0.9.27/pam/status/latest-ci.txt
+            tail -n 65 /tmp/pam-test-log.txt >> "$report"
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add development/0.9.27/pam/status/latest-ci.txt
-          git diff --cached --quiet || (git commit -m 'Record isolated PAM CI outcome [skip ci]' && git push origin HEAD:work/kicom-0.9.27-pam)
+          branch=work/kicom-0.9.27-pam
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "$branch"
+            git checkout -B "$branch" "origin/$branch"
+            dir=development/0.9.27/pam/status
+            mkdir -p "$dir"
+            historical="$dir/unit-run-$GITHUB_RUN_ID.txt"
+            latest="$dir/latest-ci.txt"
+            if [ -f "$historical" ]; then
+              cmp -s "$historical" "$report" || { echo 'Immutable unit report collision'; exit 1; }
+              echo 'Verified unit report already persisted'
+              exit 0
+            fi
+            cp "$report" "$historical"
+            previous="$(sed -n 's/^RUN_ID=//p' "$latest" 2>/dev/null | head -n 1 || true)"
+            if ! [[ "$previous" =~ ^[0-9]+$ ]] || [ "$GITHUB_RUN_ID" -ge "$previous" ]; then
+              cp "$report" "$latest"
+            fi
+            git add "$historical" "$latest"
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m "Preserve immutable PAM unit CI run $GITHUB_RUN_ID [skip ci]"
+            if git push origin "HEAD:$branch"; then
+              echo "Persisted PAM unit CI report on attempt $attempt"
+              exit 0
+            fi
+          done
+          echo 'PAM unit report persistence failed after bounded fast-forward retries' >&2
+          exit 1
