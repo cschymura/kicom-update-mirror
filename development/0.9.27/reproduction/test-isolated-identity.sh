@@ -4,8 +4,8 @@ set -euo pipefail
 # production credentials, allocate an external host, or grant deployment.
 # Run AFTER test-os-boundary.sh; the mother remains untouched throughout.
 root="/tmp/kicom-membrane-os-$GITHUB_RUN_ID"
-test -d "$root/interior" && test -f "$root/policy/identity"
-before="$(sha256sum "$root/interior/state" "$root/policy/identity" "$root/recovery/anchor")"
+sudo test -d "$root/interior" && sudo test -f "$root/policy/identity"
+before="$(sudo sha256sum "$root/interior/state" "$root/policy/identity" "$root/recovery/anchor")"
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin kicom_daughter_ci
 sudo install -d -m 0700 -o kicom_daughter_ci -g kicom_daughter_ci "$root/daughter"
 # Each identity is generated while running AS its respective separate UID;
@@ -17,7 +17,7 @@ sudo -u kicom_inner_ci php -r '
   if(file_put_contents($file,$private,LOCK_EX)!==strlen($private))exit(2);
   chmod($file,0400);
   echo base64_encode(sodium_crypto_sign_publickey($kp)),"\n";
-' "$root/interior/mother-private.key" > "$root/mother-public.key"
+' "$root/interior/mother-private.key" | sudo tee "$root/mother-public.key" >/dev/null
 sudo -u kicom_daughter_ci php -r '
   $kp=sodium_crypto_sign_keypair();
   $private=sodium_crypto_sign_secretkey($kp);
@@ -25,7 +25,7 @@ sudo -u kicom_daughter_ci php -r '
   if(file_put_contents($file,$private,LOCK_EX)!==strlen($private))exit(2);
   chmod($file,0400);
   echo base64_encode(sodium_crypto_sign_publickey($kp)),"\n";
-' "$root/daughter/daughter-private.key" > "$root/daughter-public.key"
+' "$root/daughter/daughter-private.key" | sudo tee "$root/daughter-public.key" >/dev/null
 sudo chmod 0444 "$root/mother-public.key" "$root/daughter-public.key"
 if cmp -s "$root/mother-public.key" "$root/daughter-public.key"; then
   echo "FAIL daughter reused mother's signing identity" >&2; exit 1
@@ -51,7 +51,7 @@ if sudo -u kicom_daughter_ci sh -c 'printf takeover > "$1"' sh "$root/interior/s
   echo 'FAIL daughter modified mother persistent state' >&2; exit 1
 fi
 echo "PASS daughter cannot alter mother\u0027s persistent state"
-after="$(sha256sum "$root/interior/state" "$root/policy/identity" "$root/recovery/anchor")"
+after="$(sudo sha256sum "$root/interior/state" "$root/policy/identity" "$root/recovery/anchor")"
 test "$before" = "$after"
 echo 'PASS identity genesis left protected mother state, policy and recovery bytes unchanged'
 test "$(sudo stat -c '%U:%a' "$root/daughter/daughter-private.key")" = "kicom_daughter_ci:400"
