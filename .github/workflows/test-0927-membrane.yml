@@ -32,6 +32,7 @@ jobs:
           php -l development/0.9.27/membrane/test-shadow.php
           php -l development/0.9.27/membrane/test-r3-transport.php
           php -l development/0.9.27/membrane/test-local-wire.php
+          php -l development/0.9.27/membrane/test-post-wire.php
       - name: Test passive shadow and legacy R3 communication contract
         shell: bash
         run: |
@@ -66,6 +67,7 @@ jobs:
             sleep 1
           done
           php development/0.9.27/membrane/test-local-wire.php http://127.0.0.1:18727 http://127.0.0.1:18728
+          php development/0.9.27/membrane/test-post-wire.php http://127.0.0.1:18727 http://127.0.0.1:18728
       - name: Prove independent OS-enforced inner and membrane principals on isolated runner
         shell: bash
         run: |
