@@ -32,6 +32,7 @@ require_once __DIR__ . '/KiComPamReadOnlyCycle.php';
 require_once __DIR__ . '/KiComPamSnapshotOrder.php';
 require_once __DIR__ . '/KiComPamRecoveryGate.php';
 require_once __DIR__ . '/KiComPamSnapshotSequencer.php';
+require_once __DIR__ . '/KiComPamRecoveryPreflight.php';
 $checks = 0;
 function runtimeOk(bool $value, string $message): void {
     global $checks;
@@ -337,5 +338,35 @@ runtimeOk($seqRuntime->inspect()['code'] === 'UNSEQUENCED_NATIVE_SNAPSHOT',
 unlink($legacyOrphan);
 runtimeOk($seqRuntime->inspect()['snapshot_id'] === $seqTwo['snapshot_id'],
     'Removing only isolated orphan fixture restores verified sequence selection');
+
+
+// Pre-quarantine recovery preflight must never convert an unanchored local
+// journal or same-second legacy snapshot into automatic restore authority.
+$quarantineBefore = glob(kicomSqliteQuarantineDir() . '/*') ?: [];
+$eventsBefore = (int)$db->query('SELECT COUNT(*) FROM events')->fetchColumn();
+$legacyPreflight = KiComPamRecoveryPreflight::inspect();
+runtimeOk(($legacyPreflight['inspection_only'] ?? false) === true
+    && ($legacyPreflight['restore_permitted'] ?? true) === false
+    && ($legacyPreflight['automatic_recovery_permitted'] ?? true) === false,
+    'Legacy R3 recovery preflight never grants automatic DB replacement');
+runtimeOk($legacyPreflight['code'] === 'LEGACY_SNAPSHOT_ORDER_AMBIGUOUS'
+    || $legacyPreflight['code'] === 'LEGACY_CANDIDATE_REQUIRES_REVIEW'
+    || $legacyPreflight['code'] === 'LEGACY_SNAPSHOT_VERIFICATION_FAILED',
+    'Legacy backup selection surfaces unresolved ordering or review rather than assuming safety');
+// The temporary sequencer wraps a native writer but the previously produced
+// R3 files are NOT journaled: mixing them must stop before any quarantine.
+$nativeSequencer = new KiComPamSnapshotSequencer(kicomSqliteSnapshotDir());
+$nativeSequence = $nativeSequencer->create(
+    static fn(): array => kicomSqliteSnapshot('pam-sequence-preflight-only'));
+runtimeOk(!empty($nativeSequence['ok']) && $nativeSequence['sequence'] === 1,
+    'Fresh native writer can publish first isolated sequence ledger entry');
+$unanchored = KiComPamRecoveryPreflight::inspect();
+runtimeOk(!$unanchored['ok']
+    && $unanchored['code'] === 'SEQUENCE_UNSEQUENCED_NATIVE_SNAPSHOT'
+    && !$unanchored['automatic_recovery_permitted'],
+    'Mixed legacy and sequenced native snapshots fail closed prior to recovery');
+runtimeOk((int)$db->query('SELECT COUNT(*) FROM events')->fetchColumn() === $eventsBefore
+    && (glob(kicomSqliteQuarantineDir() . '/*') ?: []) === $quarantineBefore,
+    'Read-only preflight leaves R3 DB events and quarantine untouched');
 
 echo "PAM_R3_RUNTIME_TESTS_PASSED=$checks\n";
