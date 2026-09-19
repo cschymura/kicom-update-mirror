@@ -35,6 +35,7 @@ require_once __DIR__ . '/KiComPamSnapshotSequencer.php';
 require_once __DIR__ . '/KiComPamRecoveryPreflight.php';
 require_once __DIR__ . '/KiComPamHighWaterVerifier.php';
 require_once __DIR__ . '/KiComPamOriginalInventory.php';
+require_once __DIR__ . '/KiComPamRecoveryDecision.php';
 $checks = 0;
 function runtimeOk(bool $value, string $message): void {
     global $checks;
@@ -421,6 +422,42 @@ $unanchored = KiComPamRecoveryPreflight::inspect();
 $originalTriadAfter = KiComPamOriginalInventory::capture();
 runtimeOk(KiComPamOriginalInventory::unchanged($originalTriad,$originalTriadAfter)['ok'],
     'Blocked read-only R3 preflight does not alter original DB/WAL/SHM inventory');
+
+$nativeReview = KiComPamRecoveryDecision::review($unanchored, $originalTriad,
+    $originalTriadAfter, $highMatch, []);
+runtimeOk($nativeReview['code'] === 'BLOCKED_CANDIDATE_UNVERIFIED'
+    && $nativeReview['stage'] === 'CANDIDATE' && !$nativeReview['restore_permitted'],
+    'Actual mixed legacy/native R3 inventory aborts at candidate validation');
+$realCandidate = [
+    'ok' => true, 'code' => 'SEQUENCED_CANDIDATE_REQUIRES_ANCHOR',
+    'snapshot_id' => $seqTwo['snapshot_id'],
+    'snapshot_sha256' => $seqTwo['snapshot_sha256'],
+    'restore_permitted' => false, 'automatic_recovery_permitted' => false
+];
+$noAnchor = KiComPamRecoveryDecision::review($realCandidate, $originalTriad,
+    $originalTriadAfter, $highMatch, []);
+runtimeOk($noAnchor['code'] === 'BLOCKED_ANCHOR_NOT_INDEPENDENTLY_AUTHENTICATED'
+    && !$noAnchor['automatic_recovery_permitted'],
+    'Valid native R3 snapshot and intact originals never replace independent anchor authentication');
+$changedOriginal = $originalTriadAfter;
+$changedOriginal['files']['wal'] = [
+    'present' => true, 'bytes' => 3, 'sha256' => hash('sha256', 'mutated-wal')
+];
+$changedDecision = KiComPamRecoveryDecision::review($realCandidate, $originalTriad,
+    $changedOriginal, $highMatch, []);
+runtimeOk($changedDecision['code'] === 'BLOCKED_ORIGINAL_CHANGED_WAL'
+    && !$changedDecision['restore_permitted'],
+    'Native R3 decision detects a changed WAL observation before anchor review');
+$humanClaimed = $highMatch;
+$humanClaimed['independent_anchor_authenticated_here'] = true;
+$claimedDecision = KiComPamRecoveryDecision::review($realCandidate, $originalTriad,
+    $originalTriadAfter, $humanClaimed,
+    ['quiesced'=>true,'originals_preserved'=>true,'originals_independently_verified'=>true]);
+runtimeOk($claimedDecision['code'] === 'REVIEW_REQUIRED_AT_PROTECTED_RECOVERY_BOUNDARY'
+    && !$claimedDecision['restore_permitted']
+    && !$claimedDecision['automatic_recovery_permitted'],
+    'Even caller-claimed full R3 evidence remains a review state, never a restore grant');
+
 runtimeOk(!$unanchored['ok']
     && $unanchored['code'] === 'SEQUENCE_UNSEQUENCED_NATIVE_SNAPSHOT'
     && !$unanchored['automatic_recovery_permitted'],
