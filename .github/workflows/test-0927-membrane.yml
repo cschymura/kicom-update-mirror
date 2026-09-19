@@ -55,6 +55,7 @@ jobs:
           php -l development/0.9.27/reproduction/KiComReproductionBlueprint.php
           php -l development/0.9.27/reproduction/test-blueprint.php
           bash -n development/0.9.27/reproduction/test-isolated-identity.sh
+          bash -n development/0.9.27/reproduction/test-daughter-runtime.sh
           bash -n development/0.9.27/membrane/test-os-bypass-transport.sh
           bash -n development/0.9.27/membrane/test-os-pinned-attester.sh
       - name: Test passive shadow and legacy R3 communication contract
@@ -125,3 +126,4 @@ jobs:
           bash development/0.9.27/membrane/test-os-bypass-transport.sh
           bash development/0.9.27/membrane/test-os-pinned-attester.sh
           bash development/0.9.27/reproduction/test-isolated-identity.sh
+          bash development/0.9.27/reproduction/test-daughter-runtime.sh
