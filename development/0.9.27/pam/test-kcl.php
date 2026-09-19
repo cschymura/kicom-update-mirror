@@ -51,13 +51,13 @@ mustReject(fn() => $adapter->capture('night-4', $responses), 'Ambiguous duplicat
 $responses['UPDATE_STATUS'] = "KCL/1\nOK update_status\nFACT pending_version=\"0.9.26\"\nEND\n";
 
 unset($responses['ARBITRARY_URL']);
-$responses['UPDATE_STATUS'] = "KCL/1\nOK hello\nFACT pending_version=\\"0.9.26\\"\nEND\n";
+$responses['UPDATE_STATUS'] = "KCL/1\nOK hello\nFACT pending_version=\"0.9.26\"\nEND\n";
 mustReject(fn() => $adapter->capture('night-5', $responses),
     'Successful response from the wrong endpoint is rejected');
-$responses['UPDATE_STATUS'] = "KCL/1\nOK update_status\nFACT pending_version=\\"0.9.26\\"\n";
+$responses['UPDATE_STATUS'] = "KCL/1\nOK update_status\nFACT pending_version=\"0.9.26\"\n";
 mustReject(fn() => $adapter->capture('night-5', $responses),
     'Truncated response lacking final terminator is rejected');
-$responses['UPDATE_STATUS'] = "KCL/1\nOK update_status\nFACT pending_version=\\"0.9.26\\"\nEND\nEXTRA";
+$responses['UPDATE_STATUS'] = "KCL/1\nOK update_status\nFACT pending_version=\"0.9.26\"\nEND\nEXTRA";
 mustReject(fn() => $adapter->capture('night-5', $responses),
     'Trailing content after the final terminator is rejected');
 $responses['ARBITRARY_URL'] = "KCL/1\nOK hello\nEND\n";
