@@ -45,7 +45,7 @@ inventoryOk(str_contains($lib,"kicomSqliteRecover('automatic-health')")
     && str_contains($index,"kicomSqliteRecover('manual')"),
     'Automatic and manual recovery callers found');
 inventoryOk(str_contains($lib,'$snap=kicomSqliteLatestSnapshot();kicomSqliteDb(true);$stamp=')
-    && str_contains($lib,"@rename($s,kicomSqliteQuarantineDir()"),
+    && str_contains($lib,'@rename($s,kicomSqliteQuarantineDir()'),
     'Native R3 recovery still performs candidate selection before quarantine');
 inventoryOk(str_contains($lib,'rsort($a,SORT_STRING);return $a;')
     && str_contains($lib,"gmdate('YmdHis').'-'.substr(hash('sha256',uniqid('',true)),0,10)"),
