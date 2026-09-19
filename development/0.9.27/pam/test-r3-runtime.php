@@ -276,4 +276,25 @@ runtimeOk((KiComPamRecoveryGate::inspect()['code'] ?? '') === 'SNAPSHOT_VERIFICA
     'Recovery preflight rejects a corrupt newest candidate rather than silently picking an older backup');
 file_put_contents($cycleMetaFile, $originalJson, LOCK_EX);
 
+
+// Live post-install transition is modeled only in the disposable clone.
+// No pending update means no release review or protected action is enqueued.
+$postInstall = [
+    'HELLO' => "KCL/1\nOK hello\nFACT version=\"0.9.26\"\nEND\n",
+    'GENOME_STATUS' => "KCL/1\nOK living_status\nFACT version=\"0.9.26\"\nFACT genome_id=\"kicom-0.9.26-g25r3\"\nFACT healthy=true\nFACT trusted=true\nFACT lkg_ok=true\nFACT drift_count=0\nFACT unknown_count=0\nEND\n",
+    'SQLITE_STATUS' => "KCL/1\nOK sqlite_status\nFACT primary=true\nFACT quick_check=\"ok\"\nFACT journal_mode=\"wal\"\nEND\n",
+    'UPDATE_STATUS' => "KCL/1\nOK update_status\nFACT pending_version=\"\"\nFACT pending_risk=\"\"\nFACT pending_source=\"\"\nEND\n",
+];
+$preActionCount = (int)$db->query('SELECT COUNT(*) FROM pam_actions')->fetchColumn();
+$postCycle = $cycle->run('r3-installed-no-pending', $postInstall);
+runtimeOk($postCycle['code'] === 'NO_SUPPORTED_RED_RELEASE_REVIEW'
+    && !empty($pam->perceive('KiCom:0.9.26','genome-integrity')['state'])
+    && $pam->perceive('KiCom:0.9.26','genome-integrity')['state'] === 'AVAILABLE',
+    'First post-install observation accepts exact healthy g25r3 without invoking old release proof');
+runtimeOk((int)$db->query('SELECT COUNT(*) FROM pam_actions')->fetchColumn() === $preActionCount
+    && $pam->perceive('KiCom:0.9.26','production-install')['state'] === 'UNKNOWN',
+    'No pending release creates no action and no new installation authority');
+runtimeOk($pam->latestCheckpoint()['run_key'] === 'r3-installed-no-pending',
+    'Installed R3 state is persisted as next-run checkpoint');
+
 echo "PAM_R3_RUNTIME_TESTS_PASSED=$checks\n";
