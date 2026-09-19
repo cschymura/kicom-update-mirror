@@ -5,7 +5,6 @@ $root=$argv[1]??'';
 if (!preg_match('~^/tmp/kicom-membrane-os-[0-9]+$~D',$root)) {
     throw new RuntimeException('Only disposable Linux staging run permitted');
 }
-$native='/tmp/kicom-daughter-native-genome-'.basename($root,'.none').'.kcl';
 // The root basename contains the fixed test prefix; derive only from run id.
 $run=substr($root,strlen('/tmp/kicom-membrane-os-'));
 $native='/tmp/kicom-daughter-native-genome-'.$run.'.kcl';
