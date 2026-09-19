@@ -85,6 +85,13 @@ seqOk($clean->inspect()['code']==='SEQUENCE_LEDGER_UNTRUSTED',
     'Damaged append-only sequence entry fails closed');
 file_put_contents($entry,$entryRaw);
 seqOk($clean->inspect()['ok'],'Restoring exact ledger bytes restores verification');
+$orphanBytes = $other.'/snapshot-'.gmdate('YmdHis').'-eeeeeeeeee.sqlite';
+file_put_contents($orphanBytes,'bytes-without-any-manifest');
+seqOk($clean->inspect()['code']==='UNSEQUENCED_NATIVE_SNAPSHOT',
+    'A standalone unregistered SQLite backup with no JSON manifest blocks sequence selection');
+unlink($orphanBytes);
+seqOk($clean->inspect()['ok'], 'Exact registered backup inventory verifies after orphan bytes are removed');
+
 $legacy = sys_get_temp_dir().'/kicom-pam-sequence-legacy-'.bin2hex(random_bytes(6));
 mkdir($legacy,0700);
 $oldId=gmdate('YmdHis').'-cccccccccc';
