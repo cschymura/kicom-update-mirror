@@ -34,6 +34,7 @@ require_once __DIR__ . '/KiComPamRecoveryGate.php';
 require_once __DIR__ . '/KiComPamSnapshotSequencer.php';
 require_once __DIR__ . '/KiComPamRecoveryPreflight.php';
 require_once __DIR__ . '/KiComPamHighWaterVerifier.php';
+require_once __DIR__ . '/KiComPamOriginalInventory.php';
 $checks = 0;
 function runtimeOk(bool $value, string $message): void {
     global $checks;
@@ -411,7 +412,15 @@ foreach (['', '-wal'] as $suffix) {
     $candidate = $originalDbPath . $suffix;
     $nativeStateBefore[$suffix] = is_file($candidate) ? hash_file('sha256', $candidate) : null;
 }
+$originalTriad = KiComPamOriginalInventory::capture();
+runtimeOk(!empty($originalTriad['ok'])
+    && array_keys($originalTriad['files']) === ['db','wal','shm']
+    && !$originalTriad['restore_permitted'],
+    'Real isolated native R3 DB/WAL/SHM can be inventoried without granting restore authority');
 $unanchored = KiComPamRecoveryPreflight::inspect();
+$originalTriadAfter = KiComPamOriginalInventory::capture();
+runtimeOk(KiComPamOriginalInventory::unchanged($originalTriad,$originalTriadAfter)['ok'],
+    'Blocked read-only R3 preflight does not alter original DB/WAL/SHM inventory');
 runtimeOk(!$unanchored['ok']
     && $unanchored['code'] === 'SEQUENCE_UNSEQUENCED_NATIVE_SNAPSHOT'
     && !$unanchored['automatic_recovery_permitted'],
