@@ -29,6 +29,7 @@ require_once __DIR__ . '/KiComPam.php';
 require_once __DIR__ . '/KiComPamKclAdapter.php';
 require_once __DIR__ . '/KiComPamReleaseProof.php';
 require_once __DIR__ . '/KiComPamReadOnlyCycle.php';
+require_once __DIR__ . '/KiComPamSnapshotOrder.php';
 $checks = 0;
 function runtimeOk(bool $value, string $message): void {
     global $checks;
@@ -203,5 +204,38 @@ runtimeOk((int)$cycleCopy->query("SELECT COUNT(*) FROM pam_action_events WHERE s
     && (int)$cycleCopy->query("SELECT COUNT(*) FROM pam_actions WHERE boundary='protected-external'")->fetchColumn() === 0,
     'Snapshot preserves one audited result and no protected external installation task');
 
+
+
+// Snapshot order is a separate safety property from integrity. Verify that
+// the existing native R3 manifests and files can be checked without trusting
+// the random suffix of a same-second snapshot ID.
+$firstMeta = json_decode((string)file_get_contents(
+    kicomSqliteSnapshotDir() . '/snapshot-' . $snapshot['id'] . '.json'),
+    true, 512, JSON_THROW_ON_ERROR);
+$nativeVerify = static function (array $metadata): bool {
+    $name = $metadata['file_name'] ?? '';
+    if (!is_string($name)
+        || $name !== 'snapshot-' . ($metadata['id'] ?? '') . '.sqlite') {
+        return false;
+    }
+    $file = kicomSqliteSnapshotDir() . '/' . $name;
+    return is_file($file) && !is_link($file)
+        && hash_file('sha256', $file) === ($metadata['sha256'] ?? '')
+        && !empty(kicomSqliteVerifyFile($file, true)['ok']);
+};
+$orderResult = KiComPamSnapshotOrder::select([$firstMeta, $cycleMeta], $nativeVerify);
+$sameSecond = $firstMeta['created_at'] === $cycleMeta['created_at'];
+runtimeOk($sameSecond
+    ? (!$orderResult['ok'] && $orderResult['code'] === 'SNAPSHOT_ORDER_AMBIGUOUS')
+    : ($orderResult['ok'] && $orderResult['snapshot']['id'] === $cycleMeta['id']),
+    'Native snapshot selection respects timestamp order or rejects same-second ambiguity');
+$badManifest = $cycleMeta;
+$badManifest['sha256'] = str_repeat('0', 64);
+runtimeOk((KiComPamSnapshotOrder::select([$firstMeta, $badManifest], $nativeVerify)['code'] ?? '')
+    === 'SNAPSHOT_VERIFICATION_FAILED',
+    'A valid older native backup never conceals failed integrity of newer metadata');
+runtimeOk((KiComPamSnapshotOrder::select([$cycleMeta], $nativeVerify)['snapshot']['id'] ?? '')
+    === $cycleSnapshot['id'],
+    'An explicitly identified and verified native snapshot remains selectable');
 
 echo "PAM_R3_RUNTIME_TESTS_PASSED=$checks\n";
