@@ -42,6 +42,15 @@ $older=$claim($a);$anchor=$claim($b);
 $inspect=static fn(?array $a):array=>KiComPamHighWaterVerifier::inspect($seq,$root,$a);
 highOk($inspect(null)['code']==='INDEPENDENT_HIGH_WATER_ANCHOR_MISSING',
     'Missing independent claim fails closed even with intact local journal');
+$otherRoot = sys_get_temp_dir().'/kicom-highwater-crossroot-'.bin2hex(random_bytes(6));
+mkdir($otherRoot,0700);
+$unrelatedSequencer = new KiComPamSnapshotSequencer($otherRoot);
+highOk(KiComPamHighWaterVerifier::inspect($unrelatedSequencer, $root, $anchor)['code']
+    === 'SNAPSHOT_SEQUENCER_ROOT_MISMATCH',
+    'Sequencer from an unrelated snapshot directory cannot validate the expected snapshot root');
+highOk($seq->snapshotRoot() === realpath($root),
+    'Sequencer exposes exactly its canonical protected snapshot root identity');
+
 $valid=$inspect($anchor);
 highOk($valid['ok'] && $valid['sequence']===2
     && $valid['snapshot_id']===$b['snapshot_id'],
