@@ -1,6 +1,6 @@
-CI_RESULT=failure
-RUN_ID=35437230933
-TRIGGER_SHA=193b6e80a7ed822f471083a954ca774a1c0f58ca
+CI_RESULT=success
+RUN_ID=35437264101
+TRIGGER_SHA=1c0ab46c2520148134647b1b5b7213d11428b914
 R3_ZIP_SHA256=6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f
 PASS Actual R3 storage and canonical-memory initialization succeeds
 PASS Actual R3 SQLite PDO is reachable
@@ -30,9 +30,9 @@ PASS PAM cycle cannot grant production installation authority
 PASS Confirmed release identity is stored as expiring evidence, not as authority
 PASS Same-version and same-hash review is idempotent across separate runs
 PASS Unhealthy genome prevents any further internal review action
-
-Fatal error: Uncaught RuntimeException: FAIL Version drift is not treated as permission to reuse an old checkpoint in /home/runner/work/kicom-update-mirror/kicom-update-mirror/development/0.9.27/pam/test-r3-runtime.php:37
-Stack trace:
-#0 /home/runner/work/kicom-update-mirror/kicom-update-mirror/development/0.9.27/pam/test-r3-runtime.php(170): runtimeOk()
-#1 {main}
-  thrown in /home/runner/work/kicom-update-mirror/kicom-update-mirror/development/0.9.27/pam/test-r3-runtime.php on line 37
+PASS Runtime/genome version disagreement fails health preflight before reuse
+PASS Changed or missing pending ZIP is not accepted through the previous successful review
+PASS Contradictory current evidence supersedes earlier positive perception
+PASS Release diagnostics do not leave a staged package behind
+PASS Pending identity inspection does not modify KiCom SQLite health
+PAM_R3_RUNTIME_TESTS_PASSED=33
