@@ -50,7 +50,7 @@ echo 'PASS daughter cannot change independent recovery root'
 if sudo -u kicom_daughter_ci sh -c 'printf takeover > "$1"' sh "$root/interior/state" 2>/dev/null; then
   echo 'FAIL daughter modified mother persistent state' >&2; exit 1
 fi
-echo 'PASS daughter cannot alter mother's persistent state'
+echo "PASS daughter cannot alter mother\u0027s persistent state"
 after="$(sha256sum "$root/interior/state" "$root/policy/identity" "$root/recovery/anchor")"
 test "$before" = "$after"
 echo 'PASS identity genesis left protected mother state, policy and recovery bytes unchanged'
