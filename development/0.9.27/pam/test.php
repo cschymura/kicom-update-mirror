@@ -59,19 +59,41 @@ try {
     ok($pam->claimInternal($internal, $lease1, 5), 'First owner claims internal work');
     ok(!$other->claimInternal($internal, $lease2, 5), 'Concurrent owner cannot duplicate claim');
     $now += 6;
-    ok($other->claimInternal($internal, $lease2, 5), 'Expired lease may be recovered');
-    ok(!$pam->finish($internal, $lease1, 'SUCCEEDED', $sha), 'Old lease owner cannot record result');
-    ok($other->finish($internal, $lease2, 'SUCCEEDED', $otherSha), 'Current lease owner records audited result');
-    ok(!$other->finish($internal, $lease2, 'SUCCEEDED', $otherSha), 'Completed action cannot be finalized twice');
-    ok((int) $db->query('SELECT COUNT(*) FROM pam_action_events')->fetchColumn() === 1, 'One immutable outcome event');
+    ok(!$other->claimInternal($internal, $lease2, 5), 'Expired lease is quarantined instead of blindly reclaimed');
+    ok($db->query('SELECT state FROM pam_actions WHERE id=' . $internal)->fetchColumn() === 'NEEDS_RECONCILIATION',
+        'Uncertain outcome is explicitly represented');
+    ok(!$pam->finish($internal, $lease1, 'SUCCEEDED', $sha), 'Expired lease owner cannot record result');
+    ok(!$other->claimInternal($internal, $lease2, 5), 'Repeated claims cannot bypass uncertainty');
+    ok(!$other->reconcileInternal($external, $sha, 'READY'), 'Protected action cannot be unblocked by reconciliation');
+    rejects(fn() => $other->reconcileInternal($internal, $sha, 'AUTHORIZED'),
+        'Reconciliation cannot create an authority state');
+    ok($other->reconcileInternal($internal, $sha, 'READY'),
+        'Evidence-backed confirmation of non-execution permits an internal retry');
+    ok(!$other->reconcileInternal($internal, $sha, 'READY'),
+        'The same expired lease cannot be reconciled twice');
+    ok($other->claimInternal($internal, $lease2, 5), 'Verified safe retry obtains a fresh lease');
+    ok($other->finish($internal, $lease2, 'SUCCEEDED', $otherSha),
+        'Current owner records its audited result');
+    ok(!$other->finish($internal, $lease2, 'SUCCEEDED', $otherSha),
+        'Completed action cannot be finalized twice');
+    ok((int) $db->query('SELECT COUNT(*) FROM pam_action_events')->fetchColumn() === 3,
+        'Immutable expiry, reconciliation and outcome events preserved');
     ok(!$pam->claimInternal($internal, $lease1), 'Completed action cannot be claimed again');
+
+    $uncertain = $pam->queue('dev-pam-uncertain', 'Inspect previous result', $sha, 'internal');
+    ok($pam->claimInternal($uncertain, $lease1, 5), 'A second internal task can be claimed');
+    $now += 6;
+    ok(!$other->claimInternal($uncertain, $lease2, 5), 'Second expired lease also quarantined');
+    ok($other->reconcileInternal($uncertain, $otherSha, 'SUCCEEDED'),
+        'Confirmed previous completion is recorded without re-execution');
+    ok(!$pam->claimInternal($uncertain, $lease1), 'Confirmed prior completion never reruns');
 
     $checkpoint = $pam->checkpoint('night-run-1', $otherSha, 'Verified read-only baseline');
     ok($checkpoint === $pam->checkpoint('night-run-1', $otherSha, 'Verified read-only baseline'), 'Idempotent durable checkpoint');
     rejects(fn() => $pam->checkpoint('night-run-1', $sha, 'Altered checkpoint'), 'Checkpoint collision fails closed');
     ok($pam->latestCheckpoint()['state_sha256'] === $otherSha, 'Latest checkpoint available for next run');
     ok($db->query('SELECT value FROM existing_kicom_table')->fetchColumn() === 'preserve-me', 'Original KiCom tables untouched');
-    ok((int) $db->query('SELECT version FROM pam_schema')->fetchColumn() === 1, 'Schema version persisted');
+    ok((int) $db->query('SELECT version FROM pam_schema')->fetchColumn() === 2, 'Schema version persisted');
     echo "PAM_TESTS_PASSED=$checks\n";
 } finally {
     $db = null;
