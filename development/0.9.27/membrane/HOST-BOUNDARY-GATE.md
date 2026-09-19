@@ -13,6 +13,26 @@ Recovery-Kerns. Diese Informationen wurden nicht aus einem freigegebenen,
 lesenden Host-/Admin-Diagnosepfad bestätigt. Es wurden weder Zugangsdaten
 ausprobiert noch ein PHP-Informationsskript im produktiven Webroot angelegt.
 
+## Recherche zum möglichen Hostingmodell – kein kontospezifischer Nachweis
+
+Die offizielle ALL-INKL-Domain-Konfigurationsanleitung erläutert für den
+dort beschriebenen CGI/FPM-Betrieb: PHP-Skripte werden unter dem jeweiligen
+FTP-Benutzer ausgeführt:
+https://all-inkl.com/wichtig/anleitungen/kas/domain/edit-settings/settings-overview_503.html
+
+Wenn KiCom-Innenraum und eine dort ebenfalls liegende Policy über denselben
+FTP-/PHP-Laufzeit-Benutzer erreichbar/beschreibbar sind, sind getrennte
+Unterordner, chmod oder bloß unterschiedliche FTP-Logins KEIN Nachweis einer
+unabhängigen Membran. Ebenso kann ein Managed-Hosting-Konto anders
+konfiguriert sein; aus der allgemeinen Herstellerdokumentation folgt
+NICHT die tatsächlich verwendete UID, die Rechte oder der Tarif von KiCom.
+
+Konsequenz: erst über bereits vorhandene autorisierte Host-Diagnostik prüfen,
+welche getrennten PHP-Pools/Accounts/Principals tatsächlich möglich sind.
+Wenn die nötige Prozess-/Dateisystem-/Egress-Trennung nicht angeboten wird,
+die reale Membran in einem separat administrierten Host-/Sidecar-Bereich
+planen, ohne die bestehenden Kommunikationswege vorher umzuleiten.
+
 Die GitHub-Actions-Tests mit getrennten Linux-Benutzern sind ein Labor-
 Nachweis, keine Messung des Produktivhosts. Das KiCom-Archiv, die lokale
 Recovery-Funktion und das GitHub-Repository sind NICHT von sich aus ein
