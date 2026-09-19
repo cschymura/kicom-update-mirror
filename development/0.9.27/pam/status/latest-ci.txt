@@ -1,6 +1,6 @@
 CI_RESULT=success
-RUN_ID=35436802876
-TRIGGER_SHA=ef3fb100047c90ca1ae0f1132f48d27ecd111617
+RUN_ID=35436921858
+TRIGGER_SHA=7c267764d164ff7fc35bee58bf54abf2891dffbc
 PASS Schema version persisted
 PAM_TESTS_PASSED=32
 PASS Healthy fixed-endpoint KCL mapped to observations
