@@ -1,0 +1,72 @@
+name: KiCom 0.9.27 PAM compatibility with R3
+
+on:
+  push:
+    branches: [work/kicom-0.9.27-pam]
+    paths:
+      - 'development/0.9.27/pam/test-r3-runtime.php'
+      - 'development/0.9.27/pam/KiComPam.php'
+      - 'development/0.9.27/pam/KiComPamKclAdapter.php'
+      - 'source/0.9.26-r3/**'
+      - '.github/workflows/test-0927-pam-r3.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: kicom-0927-pam-r3-compatibility
+  cancel-in-progress: false
+
+jobs:
+  r3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/kicom-0.9.27-pam
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite, sqlite3
+          coverage: none
+      - name: Verify immutable R3 package and source manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f  releases/0.9.26/KiCom-0.9.26-R3.zip' | sha256sum -c -
+          (cd source/0.9.26-r3 && sha256sum --status -c MANIFEST.sha256)
+          php -l development/0.9.27/pam/KiComPam.php
+          php -l development/0.9.27/pam/KiComPamKclAdapter.php
+          php -l development/0.9.27/pam/test-r3-runtime.php
+      - name: Test isolated R3 runtime and native snapshot
+        id: integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/kicom-pam-r3-runtime
+          cp -a source/0.9.26-r3 /tmp/kicom-pam-r3-runtime
+          rm -rf /tmp/kicom-pam-r3-runtime/var
+          mkdir -p /tmp/kicom-pam-r3-runtime/var/project_memory
+          cp source/0.9.25/memory/*.kcl /tmp/kicom-pam-r3-runtime/var/project_memory/
+          cp source/0.9.26-r3/var/.htaccess /tmp/kicom-pam-r3-runtime/var/.htaccess
+          php -d display_errors=1 development/0.9.27/pam/test-r3-runtime.php /tmp/kicom-pam-r3-runtime | tee /tmp/pam-r3-runtime-test-log.txt
+      - name: Preserve isolated compatibility result
+        if: always()
+        shell: bash
+        env:
+          TEST_RESULT: ${{ steps.integration.outcome }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p development/0.9.27/pam/status
+          printf 'CI_RESULT=%s\nRUN_ID=%s\nTRIGGER_SHA=%s\nR3_ZIP_SHA256=6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f\n' "$TEST_RESULT" "$GITHUB_RUN_ID" "$GITHUB_SHA" > development/0.9.27/pam/status/r3-runtime-ci.txt
+          if [ -s /tmp/pam-r3-runtime-test-log.txt ]; then
+            tail -n 36 /tmp/pam-r3-runtime-test-log.txt >> development/0.9.27/pam/status/r3-runtime-ci.txt
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add development/0.9.27/pam/status/r3-runtime-ci.txt
+          git diff --cached --quiet || (git commit -m 'Record isolated R3 PAM compatibility CI outcome [skip ci]' && git push origin HEAD:work/kicom-0.9.27-pam)
