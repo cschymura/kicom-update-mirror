@@ -39,7 +39,9 @@ jobs:
           php -l development/0.9.27/pam/KiComPamKclAdapter.php
           php -l development/0.9.27/pam/test-kcl.php
           php -l development/0.9.27/pam/test-persistence.php
-          { php development/0.9.27/pam/test.php && php development/0.9.27/pam/test-kcl.php && php development/0.9.27/pam/test-persistence.php; } | tee /tmp/pam-test-log.txt
+          php -l development/0.9.27/pam/KiComPamSnapshotOrder.php
+          php -l development/0.9.27/pam/test-snapshot-order.php
+          { php development/0.9.27/pam/test.php && php development/0.9.27/pam/test-kcl.php && php development/0.9.27/pam/test-persistence.php && php development/0.9.27/pam/test-snapshot-order.php; } | tee /tmp/pam-test-log.txt
       - name: Persist isolated PAM outcome (conflict-safe)
         if: always()
         shell: bash
