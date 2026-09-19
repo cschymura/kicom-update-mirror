@@ -167,8 +167,8 @@ runtimeOk(($cycle->run('cycle-r3-degraded', $degraded)['code'] ?? '') === 'HEALT
     'Unhealthy genome prevents any further internal review action');
 $wrongVersion = $cycleResponses;
 $wrongVersion['HELLO'] = str_replace('0.9.25', '0.9.26', $wrongVersion['HELLO']);
-runtimeOk(($cycle->run('cycle-r3-version', $wrongVersion)['code'] ?? '') === 'NO_SUPPORTED_RED_RELEASE_REVIEW',
-    'Version drift is not treated as permission to reuse an old checkpoint');
+runtimeOk(($cycle->run('cycle-r3-version', $wrongVersion)['code'] ?? '') === 'HEALTH_UNVERIFIED',
+    'Runtime/genome version disagreement fails health preflight before reuse');
 $writePending($oldSha, basename($oldStored));
 $wrong = $cycle->run('cycle-r3-different', $cycleResponses);
 runtimeOk(($wrong['code'] ?? '') === 'PENDING_IDENTITY_UNVERIFIED'
