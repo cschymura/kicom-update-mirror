@@ -184,10 +184,17 @@ runtimeOk(!empty(kicomSqliteHealth(true)['ok']),
 $cycleSnapshot = kicomSqliteSnapshot('pam-readonly-cycle-completed');
 runtimeOk(!empty($cycleSnapshot['ok']), 'Native KiCom snapshot remains available after completed PAM cycle');
 $verifiedCycleSnapshot = kicomSqliteLatestSnapshot();
-runtimeOk(is_array($verifiedCycleSnapshot)
-    && ($verifiedCycleSnapshot['sha256'] ?? '') === ($cycleSnapshot['sha256'] ?? null),
-    'Native snapshot metadata binds the latest PAM-cycle database');
-$cycleCopy = new PDO('sqlite:' . $verifiedCycleSnapshot['full'], null, null,
+runtimeOk(is_array($verifiedCycleSnapshot),
+    'Native snapshot selection still returns a verified snapshot');
+$cycleMetaFile = kicomSqliteSnapshotDir() . '/snapshot-' . $cycleSnapshot['id'] . '.json';
+$cycleMeta = json_decode((string) file_get_contents($cycleMetaFile), true, 512, JSON_THROW_ON_ERROR);
+$cycleFile = kicomSqliteSnapshotDir() . '/' . basename((string) ($cycleMeta['file_name'] ?? ''));
+runtimeOk(($cycleMeta['id'] ?? '') === $cycleSnapshot['id']
+    && ($cycleMeta['sha256'] ?? '') === $cycleSnapshot['sha256']
+    && hash_file('sha256', $cycleFile) === $cycleSnapshot['sha256']
+    && !empty(kicomSqliteVerifyFile($cycleFile, true)['ok']),
+    'Exact PAM-cycle snapshot is independently verified by immutable ID and SHA');
+$cycleCopy = new PDO('sqlite:' . $cycleFile, null, null,
     [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 runtimeOk($cycleCopy->query('PRAGMA integrity_check')->fetchColumn() === 'ok'
     && (int)$cycleCopy->query("SELECT COUNT(*) FROM pam_actions WHERE idempotency_key LIKE 'readonly-r3-identity:%' AND state='SUCCEEDED'")->fetchColumn() === 1,
