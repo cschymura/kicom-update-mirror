@@ -1,0 +1,29 @@
+# KiCom 0.9.27 — Recovery caller inventory and pre-quarantine preflight — 2026-09-19
+
+## Verified live baseline (read only)
+- BOOTSTRAP 0.9.26; GENOME_STATUS genome_id=kicom-0.9.26-g25r3, healthy=true, trusted=true, lkg_ok=true, drift_count=0, unknown_count=0.
+- SQLITE_STATUS: primary=true, journal_mode=wal, quick_check=ok, schema_version=1. No live full integrity or restore test was performed.
+- UPDATE_STATUS: no pending release. The 0.9.26 installation is complete, do not re-run its install workflow.
+- PROJECT_STATE/NEXT still contain older release/genome priorities; do not silently replace them without the actual authorized revision-preserving server-memory path.
+
+## Completed development changes in work/kicom-0.9.27-pam
+1. Exact R3 caller inventory, anchored to SHA-verified source/0.9.26-r3/lib.php and index.php: kicomSqliteSnapshot() called before and after SQLite evolution, by automatic daily maintenance and the manual SQLite snapshot KCL action. kicomSqliteRecover() called from automatic maintenance on unhealthy SQLite and from manual SQLite heal. kicomSqliteLatestSnapshot() also consumed by the native status and maintenance paths. All native snapshot creators must participate in one trusted lock and complete a durable ledger publication before an authoritative sequence could be used.
+2. test-r3-callers.php records 10 static call-graph checks to detect new direct writers or recovery entry points. The first CI attempt failed due to PHP variable interpolation inside the fixture, corrected by literal matching. The corrected CI result is successful; failed run remains in GitHub history.
+3. KiComPamRecoveryPreflight.php is a **read-only development-only** pre-quarantine guard. With no journal it calls the existing verified legacy recovery guard; ambiguous ordering stops, and even a uniquely identified legacy snapshot requires independent review. With a local journal it uses sequencer inspection; mixed unsequenced native snapshots fail closed and an independently unanchored journal cannot grant automatic restoration. Every outcome explicitly reports restore_permitted=false and automatic_recovery_permitted=false.
+4. test-r3-runtime.php adds five disposable native-R3 integration checks: legacy guard no auto-recovery; legacy ordering unresolved/review; native snapshot under journal; mixed old/new backups rejected; DB event count and native quarantine remain unchanged by preflight. The preflight is NOT yet wired into actual kicomSqliteRecover() and therefore does not protect a live restore.
+5. Both R3 test commands are now collected in the immutable CI evidence; the source inventory count is stored alongside the integration-test count, with errors preserved.
+6. README.md updated to distinguish completed independent preflight tests from the outstanding production runtime wiring and independently trusted journal high-water anchor.
+
+## Verified CI evidence
+- Isolated PAM/SQLite unit CI: development/0.9.27/pam/status/latest-ci.txt; CI_RESULT=success, RUN_ID=35439173698, TRIGGER_SHA=TESTED_SHA=517a9173ecb880d4c47192acdb749c903365591b; 32 core + 22 KCL + 13 persistence + 11 legacy snapshot order + 12 sequencer = 90 checks.
+- R3 native runtime and caller inventory CI: development/0.9.27/pam/status/r3-runtime-ci.txt; CI_RESULT=success, RUN_ID=35439202572, TRIGGER_SHA=TESTED_SHA=0167bbf4ef7632792d356dce02448eadf34d286e; exact R3 ZIP SHA-256 6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f; 10 source caller inventory + 56 isolated runtime integration = 66 checks.
+- Total independently recorded successful checks: 156. CI evidence is for development and disposable SQLite/R3 clones, **not** proof of production recovery safety or deployment.
+
+## Critical remaining integration and safety work
+- The native 0.9.26 R3 kicomSqliteRecover() still selects with lexicographically sorted second-resolution/random-suffixed IDs, then quarantines the existing DB/WAL/SHM. The new read-only preflight DOES NOT interrupt this native function yet. Any production claim that automatic recovery is safe due to the new guard would be false.
+- A future 0.9.27 reviewed runtime integration must unify all four native snapshot-writing call sites (pre/post-evolution, daily automatic, manual) under a trusted lock and address all recovery entry points. It must perform independent preflight BEFORE any quarantine/move/copy, require an independently maintained and protected high-water anchor to reject journal truncation, provide explicit legacy/orphan reconciliation, and preserve the existing LKG/backup/rollback paths.
+- Missing independently verified recovery candidate must never be interpreted as permission to rebuild the database with legacy mirrors; keep original files intact until the exact safe recovery policy is approved and tested. Do not conflate source-code preflight with a transactional database recovery guarantee.
+- PAM 0.9.27 modules remain uninstalled development files. No new genome manifest, authorized DEV session, live SQLite schema migration, live backup/rollback, production install, TOTP or credential use in this cycle.
+
+## Next run
+Review this checkpoint, live canonical state and both latest CI reports/trigger hashes. Prefer the next isolated engineering increment: high-water-anchor contract and fail-closed recovery state-machine tests including same-second legacy collisions, journal truncation, native unsequenced files and recovery failure with untouched original DB/WAL. Only subsequently plan a reviewed, manifest-bound KiCom 0.9.27 package. Continue source research using primary official/academic/upstream open-source material under development/0.9.27/RESEARCH-AND-TOOLS-POLICY.md. No user FreeOTP request for internal development; real production or protected authority crossings remain separately authorized.
