@@ -392,13 +392,17 @@ runtimeOk($legacyPreflight['code'] === 'LEGACY_SNAPSHOT_ORDER_AMBIGUOUS'
     || $legacyPreflight['code'] === 'LEGACY_CANDIDATE_REQUIRES_REVIEW'
     || $legacyPreflight['code'] === 'LEGACY_SNAPSHOT_VERIFICATION_FAILED',
     'Legacy backup selection surfaces unresolved ordering or review rather than assuming safety');
-// The temporary sequencer wraps a native writer but the previously produced
-// R3 files are NOT journaled: mixing them must stop before any quarantine.
+// The temporary sequencer refuses to call the native writer when the
+// R3 inventory contains legacy backups. Merely constructing the DEV ledger
+// produces no native DB backup and must never authorize quarantine.
 $nativeSequencer = new KiComPamSnapshotSequencer(kicomSqliteSnapshotDir());
+$nativeManifestCountBefore = count(glob(kicomSqliteSnapshotDir() . '/snapshot-*.json') ?: []);
 $nativeSequence = $nativeSequencer->create(
     static fn(): array => kicomSqliteSnapshot('pam-sequence-preflight-only'));
-runtimeOk(!empty($nativeSequence['ok']) && $nativeSequence['sequence'] === 1,
-    'Fresh native writer can publish first isolated sequence ledger entry');
+runtimeOk(empty($nativeSequence['ok'])
+    && $nativeSequence['code'] === 'SNAPSHOT_LEGACY_INVENTORY_REQUIRES_REVIEW'
+    && count(glob(kicomSqliteSnapshotDir() . '/snapshot-*.json') ?: []) === $nativeManifestCountBefore,
+    'Sequencer rejects legacy native inventory BEFORE invoking a new backup writer');
 // Native snapshot creation itself legitimately checkpoints WAL/DB. Capture the
 // exact baseline only AFTER the snapshot writer finishes and BEFORE preflight.
 $originalDbPath = kicomSqliteFile();
