@@ -1,3 +1,35 @@
-CI_RESULT=failure
-RUN_ID=35436718112
-TRIGGER_SHA=450103b826e3f06623c9d1f9a4ca7abfe26e097c
+CI_RESULT=success
+RUN_ID=35436741499
+TRIGGER_SHA=922b14067c3f09c034b4c0a17060e4359dd850ae
+PASS Schema version persisted
+PAM_TESTS_PASSED=32
+PASS Healthy fixed-endpoint KCL mapped to observations
+PASS RED protected action recognized
+PASS Protected install remains denied by PAM
+PASS Release review is internal work, not production execution
+PASS Adapter does not enqueue a production installation
+PASS Transient request IDs do not invalidate semantic state
+PASS Next scheduled run can read latest checkpoint
+PASS Same release review is idempotent
+PASS Real health degradation is recorded
+PASS Error response never interpreted as healthy
+PASS Ambiguous duplicate fact rejected
+PASS Successful response from the wrong endpoint is rejected
+PASS Truncated response lacking final terminator is rejected
+PASS Trailing content after the final terminator is rejected
+PASS Unapproved endpoint evidence rejected
+PAM_KCL_TESTS_PASSED=15
+PASS Work was leased before simulated crash
+PASS Reopened WAL database quarantines expired work
+PASS Uncertain action persisted across a process restart
+PASS Last checkpoint retained after restart
+PASS SQLite WAL database integrity check passes
+PASS SQLite snapshot integrity check passes
+PASS Snapshot preserves the latest checkpoint
+PASS Snapshot preserves uncertain work without replaying it
+PASS Snapshot preserves the pre-existing KiCom table
+PASS Snapshot preserves the immutable lease-expiry audit event
+PASS Restored snapshot does not auto-replay uncertain work
+PASS Prior prototype schema requires an explicit reviewed migration
+PASS Unsupported schema detection leaves existing data intact
+PAM_PERSISTENCE_TESTS_PASSED=13
