@@ -37,6 +37,9 @@ jobs:
           php -l development/0.9.27/membrane/test-transparent-tap.php
           php -l development/0.9.27/membrane/fixture-loopback.php
           php -l development/0.9.27/membrane/test-loopback-wire.php
+          php -l development/0.9.27/membrane/fixture-isolated-transport.php
+          php -l development/0.9.27/membrane/test-cross-uid-transport.php
+          bash -n development/0.9.27/membrane/test-os-bypass-transport.sh
       - name: Test passive shadow and legacy R3 communication contract
         shell: bash
         run: |
@@ -96,3 +99,4 @@ jobs:
         run: |
           set -euo pipefail
           bash development/0.9.27/membrane/test-os-boundary.sh
+          bash development/0.9.27/membrane/test-os-bypass-transport.sh
