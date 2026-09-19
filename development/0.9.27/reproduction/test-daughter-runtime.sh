@@ -57,6 +57,19 @@ grep -q '^KCL/1' /tmp/kicom-daughter-hello.txt
 grep -q '^OK hello' /tmp/kicom-daughter-hello.txt
 echo 'PASS daughter retains baseline KCL-facing protocol locally (HTTP fixture only)'
 
+# Read the ACTUAL native R3 genome response, not a made-up daughter genome.
+# A 503 may be legitimate if the new private state lacks original production
+# trust anchors; it remains a fail-closed development qualification result.
+genome_report="/tmp/kicom-daughter-native-genome-$GITHUB_RUN_ID.kcl"
+genome_http="$(curl --silent --max-time 5 --output "$genome_report" --write-out '%{http_code}' \
+  'http://127.0.0.1:18734/index.php?q=GENOME_STATUS')"
+test "$genome_http" = 200 || test "$genome_http" = 503 || {
+  echo "FAIL native daughter Genome read returned HTTP $genome_http" >&2; exit 1;
+}
+grep -q '^KCL/1' "$genome_report"
+grep -q '^FACT genome_id="kicom-0.9.26-g25r3"' "$genome_report"
+echo 'PASS native daughter still reports inherited R3 release genome, NOT a unique child identity'
+
 sudo -u kicom_daughter_ci test -d "$code/var/project_memory"
 sudo -u kicom_daughter_ci test -f "$code/var/project_memory/project_state.kcl"
 sudo -u kicom_daughter_ci test -r "$code/var/project_memory/project_state.kcl"
@@ -82,4 +95,4 @@ echo 'PASS mutual key isolation survives local daughter runtime initialization'
 sudo test -f "$root/interior/state"
 test "$(sudo -u kicom_inner_ci cat "$root/interior/state")" = 'mutable-inner-state'
 echo 'PASS mother mutable runtime state remains intact during daughter boot'
-echo 'KICOM_REPRODUCTION_RUNTIME_TESTS_PASSED=8'
+echo 'KICOM_REPRODUCTION_RUNTIME_TESTS_PASSED=9'
