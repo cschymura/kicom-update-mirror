@@ -71,6 +71,11 @@ $fileBytes=file_get_contents($file);
 unlink($entry);unlink($meta);unlink($file);
 highOk($seq->inspect()['ok'] && $seq->inspect()['sequence']===1,
     'Local append-only-looking journal can be truncated with matching last files');
+$forgedLocal = $inspect($older);
+highOk(!empty($forgedLocal['ok'])
+    && $forgedLocal['independent_anchor_authenticated_here'] === false
+    && $forgedLocal['restore_permitted'] === false,
+    'A forged or rolled-back local high-water claim can match a truncated journal but never authenticates or grants restore rights');
 highOk($inspect($anchor)['code']==='HIGH_WATER_ROLLBACK_OR_DIVERGENCE',
     'Previously trusted external high-water claim detects complete local truncation');
 file_put_contents($entry,$entryBytes);file_put_contents($meta,$metaBytes);file_put_contents($file,$fileBytes);
