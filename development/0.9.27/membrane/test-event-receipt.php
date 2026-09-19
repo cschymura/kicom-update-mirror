@@ -69,7 +69,7 @@ $lockedId=hash('sha256','event-during-write-lock');
 $blocked=$reopen->reserve($lockedId,$raw);
 receiptOk(codeIs($blocked,'RECEIPT_DATABASE_UNAVAILABLE'),
     'Concurrent writer lock fails closed rather than accepting an uncommitted event');
-$lock->rollBack();
+$lock->exec('ROLLBACK');
 receiptOk(codeIs($reopen->inspect($lockedId),'RECEIPT_NOT_FOUND'),
     'Failed locked reservation never partially inserts an event');
 receiptOk(codeIs($reopen->reserve($lockedId,$raw),'NEW_DURABLE_RECEIPT'),
