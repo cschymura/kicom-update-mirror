@@ -81,6 +81,9 @@ final class KiComPamSnapshotSequencer
      */
     public function create(callable $trustedWriter): array
     {
+        if (is_link($this->lockFile)) {
+            throw new RuntimeException('Untrusted snapshot lock path');
+        }
         $lock = @fopen($this->lockFile, 'c');
         if ($lock === false || !flock($lock, LOCK_EX)) {
             throw new RuntimeException('Snapshot sequence lock unavailable');
@@ -199,10 +202,12 @@ final class KiComPamSnapshotSequencer
         try {
             $rows = $this->rows();
             $files = glob($this->root . '/snapshot-*.json');
-            if (!is_array($files) || count($files) > 10000) {
+            $backups = glob($this->root . '/snapshot-*.sqlite');
+            if (!is_array($files) || !is_array($backups)
+                || count($files) > 10000 || count($backups) > 10000) {
                 return ['ok' => false, 'code' => 'NATIVE_SNAPSHOT_INVENTORY_INVALID'];
             }
-            if (count($files) !== count($rows)) {
+            if (count($files) !== count($rows) || count($backups) !== count($rows)) {
                 return ['ok' => false, 'code' => 'UNSEQUENCED_NATIVE_SNAPSHOT'];
             }
             foreach ($rows as $row) {
