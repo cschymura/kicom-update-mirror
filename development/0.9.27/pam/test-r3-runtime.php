@@ -381,12 +381,6 @@ runtimeOk(!empty($highWater($testAnchor)['ok']),
 
 // Pre-quarantine recovery preflight must never convert an unanchored local
 // journal or same-second legacy snapshot into automatic restore authority.
-$originalDbPath = kicomSqliteFile();
-$nativeStateBefore = [];
-foreach (['', '-wal'] as $suffix) {
-    $candidate = $originalDbPath . $suffix;
-    $nativeStateBefore[$suffix] = is_file($candidate) ? hash_file('sha256', $candidate) : null;
-}
 $quarantineBefore = glob(kicomSqliteQuarantineDir() . '/*') ?: [];
 $eventsBefore = (int)$db->query('SELECT COUNT(*) FROM events')->fetchColumn();
 $legacyPreflight = KiComPamRecoveryPreflight::inspect();
@@ -405,6 +399,14 @@ $nativeSequence = $nativeSequencer->create(
     static fn(): array => kicomSqliteSnapshot('pam-sequence-preflight-only'));
 runtimeOk(!empty($nativeSequence['ok']) && $nativeSequence['sequence'] === 1,
     'Fresh native writer can publish first isolated sequence ledger entry');
+// Native snapshot creation itself legitimately checkpoints WAL/DB. Capture the
+// exact baseline only AFTER the snapshot writer finishes and BEFORE preflight.
+$originalDbPath = kicomSqliteFile();
+$nativeStateBefore = [];
+foreach (['', '-wal'] as $suffix) {
+    $candidate = $originalDbPath . $suffix;
+    $nativeStateBefore[$suffix] = is_file($candidate) ? hash_file('sha256', $candidate) : null;
+}
 $unanchored = KiComPamRecoveryPreflight::inspect();
 runtimeOk(!$unanchored['ok']
     && $unanchored['code'] === 'SEQUENCE_UNSEQUENCED_NATIVE_SNAPSHOT'
