@@ -33,6 +33,8 @@ jobs:
           php -l development/0.9.27/membrane/test-r3-transport.php
           php -l development/0.9.27/membrane/test-local-wire.php
           php -l development/0.9.27/membrane/test-post-wire.php
+          php -l development/0.9.27/membrane/KiComMembraneTransparentTap.php
+          php -l development/0.9.27/membrane/test-transparent-tap.php
       - name: Test passive shadow and legacy R3 communication contract
         shell: bash
         run: |
@@ -41,6 +43,7 @@ jobs:
           cp -a source/0.9.26-r3 /tmp/kicom-pam-r3-runtime
           php development/0.9.27/membrane/test-shadow.php
           php development/0.9.27/membrane/test-r3-transport.php /tmp/kicom-pam-r3-runtime
+          php development/0.9.27/membrane/test-transparent-tap.php
       - name: Compare real isolated R3 HTTP communication with passive observer loaded
         shell: bash
         run: |
