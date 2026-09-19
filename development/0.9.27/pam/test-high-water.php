@@ -59,8 +59,8 @@ highOk($inspect($forged)['code']==='HIGH_WATER_ENTRY_HASH_MISMATCH',
     'Hash of exact final ledger entry is bound to supplied high-water claim');
 $extra=$root.'/snapshot-'.gmdate('YmdHis').'-ffffffffff.sqlite';
 file_put_contents($extra,'unregistered');
-highOk($inspect($anchor)['code']==='SNAPSHOT_INVENTORY_INCOMPLETE',
-    'Orphan snapshot bytes without metadata invalidate complete recovery inventory');
+highOk($inspect($anchor)['code']==='LOCAL_SEQUENCE_UNSEQUENCED_NATIVE_SNAPSHOT',
+    'Orphan snapshot bytes without metadata are rejected at the earliest local sequence check');
 unlink($extra);
 $entry=$root.'/pam-sequence/entry-0000000002.json';
 $meta=$root.'/snapshot-'.$b['snapshot_id'].'.json';
