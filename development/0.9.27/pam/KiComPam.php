@@ -56,7 +56,7 @@ final class KiComPam
         try {
             $this->db->exec('CREATE TABLE IF NOT EXISTS pam_schema (version INTEGER NOT NULL)');
             $rows = $this->db->query('SELECT version FROM pam_schema')->fetchAll(PDO::FETCH_COLUMN);
-            if (count($rows) > 1 || (count($rows) === 1 && (int) $rows[0] !== 1)) {
+            if (count($rows) > 1 || (count($rows) === 1 && (int) $rows[0] !== 2)) {
                 throw new RuntimeException('Unknown PAM schema version');
             }
             $this->db->exec('CREATE TABLE IF NOT EXISTS pam_observations (
@@ -75,7 +75,7 @@ final class KiComPam
                 state TEXT NOT NULL DEFAULT "READY", created_at INTEGER NOT NULL,
                 claimed_at INTEGER, lease_until INTEGER, lease_sha256 TEXT,
                 CHECK(boundary IN ("internal","protected-external")),
-                CHECK(state IN ("READY","LEASED","SUCCEEDED","FAILED","BLOCKED"))
+                CHECK(state IN ("READY","LEASED","NEEDS_RECONCILIATION","SUCCEEDED","FAILED","BLOCKED"))
             )');
             $this->db->exec('CREATE INDEX IF NOT EXISTS pam_actions_queue
                 ON pam_actions(state, created_at, id)');
@@ -91,7 +91,7 @@ final class KiComPam
                 created_at INTEGER NOT NULL
             )');
             if ($rows === []) {
-                $this->db->exec('INSERT INTO pam_schema(version) VALUES(1)');
+                $this->db->exec('INSERT INTO pam_schema(version) VALUES(2)');
             }
             $this->db->exec('COMMIT');
         } catch (Throwable $e) {
@@ -174,9 +174,9 @@ final class KiComPam
     }
 
     /**
-     * Claim INTERNAL work only. A lease prevents concurrent scheduled runs
-     * from executing the same step. Claims are not permission grants.
-     * The executor must independently enforce the current action boundary.
+     * Claim only READY INTERNAL work. An expired lease is quarantined instead of
+     * being replayed: the previous executor may have completed side effects
+     * before its response was lost. Claims are never permission grants.
      */
     public function claimInternal(int $id, string $leaseSha, int $leaseSeconds = 300): bool
     {
@@ -184,13 +184,68 @@ final class KiComPam
         if ($id < 1 || $leaseSeconds < 1 || $leaseSeconds > 3600) {
             throw new InvalidArgumentException('Invalid claim');
         }
-        $now = $this->now();
-        $q = $this->db->prepare('UPDATE pam_actions SET state="LEASED",
-            claimed_at=?,lease_until=?,lease_sha256=?
-            WHERE id=? AND boundary="internal" AND
-            (state="READY" OR (state="LEASED" AND lease_until<?))');
-        $q->execute([$now, $now + $leaseSeconds, $leaseSha, $id, $now]);
-        return $q->rowCount() === 1;
+        $this->db->exec('BEGIN IMMEDIATE');
+        try {
+            $now = $this->now();
+            $q = $this->db->prepare('UPDATE pam_actions SET state="LEASED",
+                claimed_at=?,lease_until=?,lease_sha256=?
+                WHERE id=? AND boundary="internal" AND state="READY"');
+            $q->execute([$now, $now + $leaseSeconds, $leaseSha, $id]);
+            if ($q->rowCount() === 1) {
+                $this->db->exec('COMMIT');
+                return true;
+            }
+            $q = $this->db->prepare('UPDATE pam_actions SET state="NEEDS_RECONCILIATION",
+                lease_until=NULL,lease_sha256=NULL
+                WHERE id=? AND boundary="internal" AND state="LEASED" AND lease_until<=?');
+            $q->execute([$id, $now]);
+            if ($q->rowCount() === 1) {
+                $event = $this->db->prepare('INSERT INTO pam_action_events
+                    (action_id,state,occurred_at,evidence_sha256) VALUES(?,?,?,?)');
+                // This is an internal transition fingerprint, NOT an external
+                // observation that the previous action did or did not execute.
+                $event->execute([$id, 'NEEDS_RECONCILIATION', $now,
+                    hash('sha256', 'pam:lease-expired:' . $id . ':' . $now)]);
+            }
+            $this->db->exec('COMMIT');
+            return false;
+        } catch (Throwable $e) {
+            $this->db->exec('ROLLBACK');
+            throw $e;
+        }
+    }
+
+    /**
+     * An independent trusted caller must inspect the target's actual state,
+     * then supply a SHA-256 fingerprint of that evidence. Only evidence of
+     * non-execution permits READY. PAM cannot verify evidence or authorize
+     * the eventual action: the real executor must re-check its own boundary.
+     */
+    public function reconcileInternal(int $id, string $evidenceSha, string $resolution): bool
+    {
+        self::sha($evidenceSha);
+        if ($id < 1 || !in_array($resolution, ['READY', 'SUCCEEDED', 'FAILED', 'BLOCKED'], true)) {
+            throw new InvalidArgumentException('Invalid reconciliation');
+        }
+        $this->db->exec('BEGIN IMMEDIATE');
+        try {
+            $now = $this->now();
+            $q = $this->db->prepare('UPDATE pam_actions SET state=?,lease_until=NULL,lease_sha256=NULL
+                WHERE id=? AND boundary="internal" AND state="NEEDS_RECONCILIATION"');
+            $q->execute([$resolution, $id]);
+            if ($q->rowCount() !== 1) {
+                $this->db->exec('ROLLBACK');
+                return false;
+            }
+            $event = $this->db->prepare('INSERT INTO pam_action_events
+                (action_id,state,occurred_at,evidence_sha256) VALUES(?,?,?,?)');
+            $event->execute([$id, 'RECONCILED_' . $resolution, $now, $evidenceSha]);
+            $this->db->exec('COMMIT');
+            return true;
+        } catch (Throwable $e) {
+            $this->db->exec('ROLLBACK');
+            throw $e;
+        }
     }
 
     /** Record the result only while the caller owns a live lease. */
@@ -205,7 +260,7 @@ final class KiComPam
         try {
             $now = $this->now();
             $q = $this->db->prepare('UPDATE pam_actions SET state=?,lease_until=NULL,lease_sha256=NULL
-                WHERE id=? AND state="LEASED" AND lease_sha256=? AND lease_until>=?');
+                WHERE id=? AND state="LEASED" AND lease_sha256=? AND lease_until>?');
             $q->execute([$result, $id, $leaseSha, $now]);
             if ($q->rowCount() !== 1) {
                 $this->db->exec('ROLLBACK');
