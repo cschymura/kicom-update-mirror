@@ -53,6 +53,9 @@ final class KiComPamHighWaterVerifier
         if ($root === false || !is_dir($root) || is_link($trustedSnapshotDir)) {
             return self::refuse('SNAPSHOT_ROOT_UNAVAILABLE');
         }
+        if ($sequencer->snapshotRoot() !== $root) {
+            return self::refuse('SNAPSHOT_SEQUENCER_ROOT_MISMATCH');
+        }
         // Never normalize another caller-supplied path into an independent
         // trust source: this root only identifies the locally checked bytes.
         $native = $sequencer->inspect();
