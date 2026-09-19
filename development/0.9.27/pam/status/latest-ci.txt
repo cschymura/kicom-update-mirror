@@ -1,0 +1,25 @@
+CI_RESULT=success
+RUN_ID=35435356239
+TRIGGER_SHA=280f1fd9f7ea0d2ce2bdbd4b96708857cc94df42
+PASS Unknown until observed
+PASS Fresh sourced observation
+PASS Observation TTL and original evidence preserved
+PASS Observation cannot create authority state
+PASS Evidence checksum required
+PASS External action never claimable from internal queue
+PASS Idempotent action insertion
+PASS Idempotency collision refuses changed action
+PASS First owner claims internal work
+PASS Concurrent owner cannot duplicate claim
+PASS Expired lease may be recovered
+PASS Old lease owner cannot record result
+PASS Current lease owner records audited result
+PASS Completed action cannot be finalized twice
+PASS One immutable outcome event
+PASS Completed action cannot be claimed again
+PASS Idempotent durable checkpoint
+PASS Checkpoint collision fails closed
+PASS Latest checkpoint available for next run
+PASS Original KiCom tables untouched
+PASS Schema version persisted
+PAM_TESTS_PASSED=21
