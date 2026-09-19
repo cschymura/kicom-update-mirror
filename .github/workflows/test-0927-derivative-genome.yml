@@ -1,0 +1,42 @@
+name: KiCom derivative genome integration
+on:
+  push:
+    branches: [work/kicom-0.9.27-pam]
+    paths:
+      - 'development/0.9.27/reproduction/**'
+      - 'source/0.9.26-r3/**'
+      - '.github/workflows/test-0927-derivative-genome.yml'
+permissions:
+  contents: read
+jobs:
+  derivative-genome:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: sodium
+          coverage: none
+      - name: Verify unchanged R3 source and package
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f  releases/0.9.26/KiCom-0.9.26-R3.zip' | sha256sum -c -
+          (cd source/0.9.26-r3 && sha256sum --status -c MANIFEST.sha256)
+      - name: Test derivative genome binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l development/0.9.27/reproduction/KiComDerivativeGenome.php
+          php -l development/0.9.27/reproduction/test-derivative-genome.php
+          php development/0.9.27/reproduction/test-derivative-genome.php
+      - name: Re-run existing birth quarantine tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          php development/0.9.27/reproduction/test-child-lineage.php
+          php development/0.9.27/reproduction/test-child-birth-gate.php
