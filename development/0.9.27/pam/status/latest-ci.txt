@@ -1,6 +1,9 @@
-CI_RESULT=success
-RUN_ID=35435582125
-TRIGGER_SHA=055455386a2025b706dce133e08eee73e2e42d18
+CI_RESULT=failure
+RUN_ID=35436617988
+TRIGGER_SHA=b3f836a1fa79f70730f3b23b622fb1b2842528de
+PASS Unknown until observed
+PASS Fresh sourced observation
+PASS Observation TTL and original evidence preserved
 PASS Observation cannot create authority state
 PASS Evidence checksum required
 PASS External action never claimable from internal queue
@@ -8,28 +11,3 @@ PASS Idempotent action insertion
 PASS Idempotency collision refuses changed action
 PASS First owner claims internal work
 PASS Concurrent owner cannot duplicate claim
-PASS Expired lease may be recovered
-PASS Old lease owner cannot record result
-PASS Current lease owner records audited result
-PASS Completed action cannot be finalized twice
-PASS One immutable outcome event
-PASS Completed action cannot be claimed again
-PASS Idempotent durable checkpoint
-PASS Checkpoint collision fails closed
-PASS Latest checkpoint available for next run
-PASS Original KiCom tables untouched
-PASS Schema version persisted
-PAM_TESTS_PASSED=21
-PASS Healthy fixed-endpoint KCL mapped to observations
-PASS RED protected action recognized
-PASS Protected install remains denied by PAM
-PASS Release review is internal work, not production execution
-PASS Adapter does not enqueue a production installation
-PASS Transient request IDs do not invalidate semantic state
-PASS Next scheduled run can read latest checkpoint
-PASS Same release review is idempotent
-PASS Real health degradation is recorded
-PASS Error response never interpreted as healthy
-PASS Ambiguous duplicate fact rejected
-PASS Unapproved endpoint evidence rejected
-PAM_KCL_TESTS_PASSED=12
