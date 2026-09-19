@@ -47,7 +47,9 @@ jobs:
           php -l development/0.9.27/pam/test-high-water.php
           php -l development/0.9.27/pam/KiComPamOriginalInventory.php
           php -l development/0.9.27/pam/test-original-inventory.php
-          { php development/0.9.27/pam/test.php && php development/0.9.27/pam/test-kcl.php && php development/0.9.27/pam/test-persistence.php && php development/0.9.27/pam/test-snapshot-order.php && php development/0.9.27/pam/test-sequencer.php && php development/0.9.27/pam/test-high-water.php && php development/0.9.27/pam/test-original-inventory.php; } | tee /tmp/pam-test-log.txt
+          php -l development/0.9.27/pam/KiComPamRecoveryDecision.php
+          php -l development/0.9.27/pam/test-recovery-decision.php
+          { php development/0.9.27/pam/test.php && php development/0.9.27/pam/test-kcl.php && php development/0.9.27/pam/test-persistence.php && php development/0.9.27/pam/test-snapshot-order.php && php development/0.9.27/pam/test-sequencer.php && php development/0.9.27/pam/test-high-water.php && php development/0.9.27/pam/test-original-inventory.php && php development/0.9.27/pam/test-recovery-decision.php; } | tee /tmp/pam-test-log.txt
       - name: Persist isolated PAM outcome (conflict-safe)
         if: always()
         shell: bash
