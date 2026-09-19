@@ -1,0 +1,20 @@
+CI_RESULT=success
+RUN_ID=35436936790
+TRIGGER_SHA=dfe043a586317b8f76dfffd7875a16583371d62e
+R3_ZIP_SHA256=6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f
+PASS Actual R3 storage and canonical-memory initialization succeeds
+PASS Actual R3 SQLite PDO is reachable
+PASS Actual R3 schema and full SQLite integrity healthy
+PASS PAM tables absent before isolated integration
+PASS PAM schema does not change KiCom native schema_migrations
+PASS PAM v2 schema coexists on the actual R3 PDO connection
+PASS Only the five expected PAM tables are created
+PASS Native SQLite integrity preserved after PAM migration
+PASS Isolated R3 integration persists PAM task and checkpoint
+PASS Native R3 full health remains OK after PAM writes
+PASS Unmodified R3 native SQLite snapshot succeeds with PAM tables
+PASS Native R3 snapshot manifest/hash verification succeeds
+PASS Native R3 snapshot passes independent full SQLite integrity check
+PASS Native R3 snapshot preserves PAM v2 observation and checkpoint
+PASS Native R3 schema remains unchanged in snapshot
+PAM_R3_RUNTIME_TESTS_PASSED=15
