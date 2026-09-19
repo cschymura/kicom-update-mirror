@@ -37,8 +37,10 @@ jobs:
           set -euo pipefail
           echo '6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f  releases/0.9.26/KiCom-0.9.26-R3.zip' | sha256sum -c -
           (cd source/0.9.26-r3 && sha256sum --status -c MANIFEST.sha256)
+          echo '6eedd8ae7c6141fe2f8e10d323d06e7cd13cfca1a9198d55b0c4f4aed2a6f04b  releases/0.9.26/KiCom-0.9.26.zip' | sha256sum -c -
           php -l development/0.9.27/pam/KiComPam.php
           php -l development/0.9.27/pam/KiComPamKclAdapter.php
+          php -l development/0.9.27/pam/KiComPamReleaseProof.php
           php -l development/0.9.27/pam/test-r3-runtime.php
       - name: Test isolated R3 runtime and native snapshot
         id: integration
@@ -51,7 +53,7 @@ jobs:
           mkdir -p /tmp/kicom-pam-r3-runtime/var/project_memory
           cp source/0.9.25/memory/*.kcl /tmp/kicom-pam-r3-runtime/var/project_memory/
           cp source/0.9.26-r3/var/.htaccess /tmp/kicom-pam-r3-runtime/var/.htaccess
-          php -d display_errors=1 development/0.9.27/pam/test-r3-runtime.php /tmp/kicom-pam-r3-runtime | tee /tmp/pam-r3-runtime-test-log.txt
+          php -d display_errors=1 development/0.9.27/pam/test-r3-runtime.php /tmp/kicom-pam-r3-runtime "$(pwd)/releases/0.9.26/KiCom-0.9.26-R3.zip" "$(pwd)/releases/0.9.26/KiCom-0.9.26.zip" | tee /tmp/pam-r3-runtime-test-log.txt
       - name: Preserve isolated compatibility result
         if: always()
         shell: bash
