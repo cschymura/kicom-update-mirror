@@ -30,6 +30,7 @@ require_once __DIR__ . '/KiComPamKclAdapter.php';
 require_once __DIR__ . '/KiComPamReleaseProof.php';
 require_once __DIR__ . '/KiComPamReadOnlyCycle.php';
 require_once __DIR__ . '/KiComPamSnapshotOrder.php';
+require_once __DIR__ . '/KiComPamRecoveryGate.php';
 $checks = 0;
 function runtimeOk(bool $value, string $message): void {
     global $checks;
@@ -237,5 +238,42 @@ runtimeOk((KiComPamSnapshotOrder::select([$firstMeta, $badManifest], $nativeVeri
 runtimeOk((KiComPamSnapshotOrder::select([$cycleMeta], $nativeVerify)['snapshot']['id'] ?? '')
     === $cycleSnapshot['id'],
     'An explicitly identified and verified native snapshot remains selectable');
+
+
+$recovery = KiComPamRecoveryGate::inspect();
+runtimeOk($sameSecond
+    ? (!$recovery['ok'] && $recovery['code'] === 'SNAPSHOT_ORDER_AMBIGUOUS')
+    : ($recovery['ok'] && $recovery['snapshot_id'] === $cycleSnapshot['id']),
+    'Read-only native recovery preflight detects ambiguous same-second snapshots');
+if (!empty($recovery['ok'])) {
+    runtimeOk($recovery['inspection_only'] === true
+        && $recovery['restore_permitted'] === false,
+        'Recovery preflight returns identity but cannot authorize restoration');
+}
+// An identical-timestamp fixture tests ambiguity independent of runner speed.
+$collisionId = substr($cycleSnapshot['id'], 0, 15) . 'eeeeeeeeee';
+if ($collisionId === $cycleSnapshot['id']) {
+    $collisionId = substr($cycleSnapshot['id'], 0, 15) . 'dddddddddd';
+}
+$collision = $cycleMeta;
+$collision['id'] = $collisionId;
+$collision['file_name'] = 'snapshot-' . $collisionId . '.sqlite';
+$collisionJson = kicomSqliteSnapshotDir() . '/snapshot-' . $collisionId . '.json';
+$collisionFile = kicomSqliteSnapshotDir() . '/' . $collision['file_name'];
+if (!copy($cycleFile, $collisionFile) ||
+    file_put_contents($collisionJson, json_encode($collision, JSON_THROW_ON_ERROR), LOCK_EX) === false) {
+    throw new RuntimeException('Could not create disposable collision fixture');
+}
+runtimeOk((KiComPamRecoveryGate::inspect()['code'] ?? '') === 'SNAPSHOT_ORDER_AMBIGUOUS',
+    'Two individually valid identical-second native backups cannot be arbitrarily ordered');
+unlink($collisionJson);
+unlink($collisionFile);
+$originalJson = (string)file_get_contents($cycleMetaFile);
+$forged = $cycleMeta;
+$forged['sha256'] = str_repeat('0', 64);
+file_put_contents($cycleMetaFile, json_encode($forged, JSON_THROW_ON_ERROR), LOCK_EX);
+runtimeOk((KiComPamRecoveryGate::inspect()['code'] ?? '') === 'SNAPSHOT_VERIFICATION_FAILED',
+    'Recovery preflight rejects a corrupt newest candidate rather than silently picking an older backup');
+file_put_contents($cycleMetaFile, $originalJson, LOCK_EX);
 
 echo "PAM_R3_RUNTIME_TESTS_PASSED=$checks\n";
