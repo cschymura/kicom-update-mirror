@@ -27,13 +27,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: work/kicom-0.9.27-pam
+          ref: ${{ github.sha }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           extensions: pdo_sqlite, sqlite3
           coverage: none
       - name: Verify immutable R3 package and source manifest
+        id: preflight
         shell: bash
         run: |
           set -euo pipefail
@@ -56,22 +57,52 @@ jobs:
           mkdir -p /tmp/kicom-pam-r3-runtime/var/project_memory
           cp source/0.9.25/memory/*.kcl /tmp/kicom-pam-r3-runtime/var/project_memory/
           cp source/0.9.26-r3/var/.htaccess /tmp/kicom-pam-r3-runtime/var/.htaccess
-          php -d display_errors=1 development/0.9.27/pam/test-r3-runtime.php /tmp/kicom-pam-r3-runtime "$(pwd)/releases/0.9.26/KiCom-0.9.26-R3.zip" "$(pwd)/releases/0.9.26/KiCom-0.9.26.zip" | tee /tmp/pam-r3-runtime-test-log.txt
-      - name: Preserve isolated compatibility result
+          php -d display_errors=1 development/0.9.27/pam/test-r3-runtime.php /tmp/kicom-pam-r3-runtime "$(pwd)/releases/0.9.26/KiCom-0.9.26-R3.zip" "$(pwd)/releases/0.9.26/KiCom-0.9.26.zip" 2>&1 | tee /tmp/pam-r3-runtime-test-log.txt
+      - name: Preserve isolated compatibility result (conflict-safe)
         if: always()
         shell: bash
         env:
+          PREFLIGHT_RESULT: ${{ steps.preflight.outcome }}
           TEST_RESULT: ${{ steps.integration.outcome }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          mkdir -p development/0.9.27/pam/status
-          printf 'CI_RESULT=%s\nRUN_ID=%s\nTRIGGER_SHA=%s\nR3_ZIP_SHA256=6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f\n' "$TEST_RESULT" "$GITHUB_RUN_ID" "$GITHUB_SHA" > development/0.9.27/pam/status/r3-runtime-ci.txt
+          tested_sha="$(git rev-parse HEAD)"
+          report="/tmp/pam-r3-$GITHUB_RUN_ID.txt"
+          result=failure
+          if [ "$PREFLIGHT_RESULT" = success ] && [ "$TEST_RESULT" = success ]; then result=success; fi
+          printf 'CI_RESULT=%s\nRUN_ID=%s\nTRIGGER_SHA=%s\nTESTED_SHA=%s\nPREFLIGHT_RESULT=%s\nTEST_STEP_RESULT=%s\nR3_ZIP_SHA256=6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f\n' "$result" "$GITHUB_RUN_ID" "$GITHUB_SHA" "$tested_sha" "$PREFLIGHT_RESULT" "$TEST_RESULT" > "$report"
           if [ -s /tmp/pam-r3-runtime-test-log.txt ]; then
-            tail -n 36 /tmp/pam-r3-runtime-test-log.txt >> development/0.9.27/pam/status/r3-runtime-ci.txt
+            tail -n 55 /tmp/pam-r3-runtime-test-log.txt >> "$report"
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add development/0.9.27/pam/status/r3-runtime-ci.txt
-          git diff --cached --quiet || (git commit -m 'Record isolated R3 PAM compatibility CI outcome [skip ci]' && git push origin HEAD:work/kicom-0.9.27-pam)
+          branch=work/kicom-0.9.27-pam
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "$branch"
+            git checkout -B "$branch" "origin/$branch"
+            dir=development/0.9.27/pam/status
+            mkdir -p "$dir"
+            historical="$dir/r3-run-$GITHUB_RUN_ID.txt"
+            latest="$dir/r3-runtime-ci.txt"
+            if [ -f "$historical" ]; then
+              cmp -s "$historical" "$report" || { echo 'Immutable report collision'; exit 1; }
+              echo 'Verified report was already persisted'
+              exit 0
+            fi
+            cp "$report" "$historical"
+            previous="$(sed -n 's/^RUN_ID=//p' "$latest" 2>/dev/null | head -n 1 || true)"
+            if ! [[ "$previous" =~ ^[0-9]+$ ]] || [ "$GITHUB_RUN_ID" -ge "$previous" ]; then
+              cp "$report" "$latest"
+            fi
+            git add "$historical" "$latest"
+            if git diff --cached --quiet; then exit 0; fi
+            git commit -m "Preserve immutable PAM R3 CI run $GITHUB_RUN_ID [skip ci]"
+            if git push origin "HEAD:$branch"; then
+              echo "Persisted R3 CI evidence on attempt $attempt"
+              exit 0
+            fi
+          done
+          echo 'Report persistence failed after bounded fast-forward retries' >&2
+          exit 1
