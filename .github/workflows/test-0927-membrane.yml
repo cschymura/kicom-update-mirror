@@ -31,6 +31,7 @@ jobs:
           php -l development/0.9.27/membrane/KiComMembraneShadow.php
           php -l development/0.9.27/membrane/test-shadow.php
           php -l development/0.9.27/membrane/test-r3-transport.php
+          php -l development/0.9.27/membrane/test-local-wire.php
       - name: Test passive shadow and legacy R3 communication contract
         shell: bash
         run: |
@@ -39,3 +40,29 @@ jobs:
           cp -a source/0.9.26-r3 /tmp/kicom-pam-r3-runtime
           php development/0.9.27/membrane/test-shadow.php
           php development/0.9.27/membrane/test-r3-transport.php /tmp/kicom-pam-r3-runtime
+      - name: Compare real isolated R3 HTTP communication with passive observer loaded
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=/tmp/kicom-membrane-base-runtime
+          shadow=/tmp/kicom-membrane-shadow-runtime
+          rm -rf "$base" "$shadow"
+          cp -a source/0.9.26-r3 "$base"
+          cp -a source/0.9.26-r3 "$shadow"
+          for target in "$base" "$shadow"; do
+            rm -rf "$target/var"
+            mkdir -p "$target/var/project_memory"
+            cp source/0.9.25/memory/*.kcl "$target/var/project_memory/"
+            cp source/0.9.26-r3/var/.htaccess "$target/var/.htaccess"
+          done
+          php -S 127.0.0.1:18727 -t "$base" > /tmp/kicom-membrane-base-server.log 2>&1 &
+          base_pid=$!
+          php -d auto_prepend_file="$(pwd)/development/0.9.27/membrane/KiComMembraneShadow.php" -S 127.0.0.1:18728 -t "$shadow" > /tmp/kicom-membrane-shadow-server.log 2>&1 &
+          shadow_pid=$!
+          trap 'kill "$base_pid" "$shadow_pid" 2>/dev/null || true' EXIT
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS 'http://127.0.0.1:18727/index.php?q=PING' >/dev/null &&
+               curl -fsS 'http://127.0.0.1:18728/index.php?q=PING' >/dev/null; then break; fi
+            sleep 1
+          done
+          php development/0.9.27/membrane/test-local-wire.php http://127.0.0.1:18727 http://127.0.0.1:18728
