@@ -10,16 +10,27 @@ require_once __DIR__ . '/KiComPam.php';
 final class KiComPamKclAdapter
 {
     private const ENDPOINTS = ['HELLO', 'GENOME_STATUS', 'SQLITE_STATUS', 'UPDATE_STATUS'];
+    private const SUCCESS = [
+        'HELLO' => 'hello',
+        'GENOME_STATUS' => 'living_status',
+        'SQLITE_STATUS' => 'sqlite_status',
+        'UPDATE_STATUS' => 'update_status',
+    ];
 
     public function __construct(private KiComPam $pam)
     {
     }
 
     /** @return array<string,string> */
-    private function facts(string $wire): array
+    private function facts(string $wire, string $endpoint): array
     {
-        if (strlen($wire) > 32768 || !preg_match('/\AKCL\/1\r?\nOK [a-z_]+\r?\n/', $wire)) {
-            throw new InvalidArgumentException('Not a bounded successful KCL/1 response');
+        $wire = str_replace("\r\n", "\n", $wire);
+        $wire = rtrim($wire, "\n");
+        $expectedStatus = self::SUCCESS[$endpoint] ?? null;
+        if ($expectedStatus === null || strlen($wire) > 32768
+            || !str_starts_with($wire, "KCL/1\nOK " . $expectedStatus . "\n")
+            || !str_ends_with($wire, "\nEND")) {
+            throw new InvalidArgumentException('Unexpected, incomplete or unsuccessful KCL/1 response');
         }
         $found = [];
         foreach (explode("\n", str_replace("\r\n", "\n", $wire)) as $line) {
@@ -65,7 +76,7 @@ final class KiComPamKclAdapter
             if (!is_string($responses[$endpoint])) {
                 throw new InvalidArgumentException('KCL response must be text');
             }
-            $facts[$endpoint] = $this->facts($responses[$endpoint]);
+            $facts[$endpoint] = $this->facts($responses[$endpoint], $endpoint);
             $evidence[$endpoint] = hash('sha256', $responses[$endpoint]);
         }
 
