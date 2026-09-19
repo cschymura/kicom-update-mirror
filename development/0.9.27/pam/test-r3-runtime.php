@@ -181,5 +181,20 @@ runtimeOk((KiComPamReleaseProof::inspectR3()['code'] ?? '') === 'NO_PENDING_PACK
     'Release diagnostics do not leave a staged package behind');
 runtimeOk(!empty(kicomSqliteHealth(true)['ok']),
     'Pending identity inspection does not modify KiCom SQLite health');
+$cycleSnapshot = kicomSqliteSnapshot('pam-readonly-cycle-completed');
+runtimeOk(!empty($cycleSnapshot['ok']), 'Native KiCom snapshot remains available after completed PAM cycle');
+$verifiedCycleSnapshot = kicomSqliteLatestSnapshot();
+runtimeOk(is_array($verifiedCycleSnapshot)
+    && ($verifiedCycleSnapshot['sha256'] ?? '') === ($cycleSnapshot['sha256'] ?? null),
+    'Native snapshot metadata binds the latest PAM-cycle database');
+$cycleCopy = new PDO('sqlite:' . $verifiedCycleSnapshot['full'], null, null,
+    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+runtimeOk($cycleCopy->query('PRAGMA integrity_check')->fetchColumn() === 'ok'
+    && (int)$cycleCopy->query("SELECT COUNT(*) FROM pam_actions WHERE idempotency_key LIKE 'readonly-r3-identity:%' AND state='SUCCEEDED'")->fetchColumn() === 1,
+    'Independent snapshot retains the single completed internal release-identity review');
+runtimeOk((int)$cycleCopy->query("SELECT COUNT(*) FROM pam_action_events WHERE state='SUCCEEDED'")->fetchColumn() === 1
+    && (int)$cycleCopy->query("SELECT COUNT(*) FROM pam_actions WHERE boundary='protected-external'")->fetchColumn() === 0,
+    'Snapshot preserves one audited result and no protected external installation task');
+
 
 echo "PAM_R3_RUNTIME_TESTS_PASSED=$checks\n";
