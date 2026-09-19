@@ -35,6 +35,8 @@ jobs:
           php -l development/0.9.27/membrane/test-post-wire.php
           php -l development/0.9.27/membrane/KiComMembraneTransparentTap.php
           php -l development/0.9.27/membrane/test-transparent-tap.php
+          php -l development/0.9.27/membrane/fixture-loopback.php
+          php -l development/0.9.27/membrane/test-loopback-wire.php
       - name: Test passive shadow and legacy R3 communication contract
         shell: bash
         run: |
@@ -71,6 +73,24 @@ jobs:
           done
           php development/0.9.27/membrane/test-local-wire.php http://127.0.0.1:18727 http://127.0.0.1:18728
           php development/0.9.27/membrane/test-post-wire.php http://127.0.0.1:18727 http://127.0.0.1:18728
+      - name: Test positive bidirectional local synthetic transport without external sends
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f /tmp/kicom-membrane-loopback-base-hits /tmp/kicom-membrane-loopback-shadow-hits
+          fixture="$(pwd)/development/0.9.27/membrane"
+          KICOM_MEMBRANE_TEST_HITS=/tmp/kicom-membrane-loopback-base-hits php -S 127.0.0.1:18729 -t "$fixture" > /tmp/kicom-loopback-base.log 2>&1 &
+          base_pid=$!
+          KICOM_MEMBRANE_TEST_HITS=/tmp/kicom-membrane-loopback-shadow-hits php -d auto_prepend_file="$fixture/KiComMembraneShadow.php" -S 127.0.0.1:18730 -t "$fixture" > /tmp/kicom-loopback-shadow.log 2>&1 &
+          shadow_pid=$!
+          trap 'kill "$base_pid" "$shadow_pid" 2>/dev/null || true' EXIT
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            if curl -fsS 'http://127.0.0.1:18729/fixture-loopback.php?serial=ready' >/dev/null &&
+               curl -fsS 'http://127.0.0.1:18730/fixture-loopback.php?serial=ready' >/dev/null; then break; fi
+            sleep 1
+          done
+          rm -f /tmp/kicom-membrane-loopback-base-hits /tmp/kicom-membrane-loopback-shadow-hits
+          php "$fixture/test-loopback-wire.php" http://127.0.0.1:18729 http://127.0.0.1:18730
       - name: Prove independent OS-enforced inner and membrane principals on isolated runner
         shell: bash
         run: |
