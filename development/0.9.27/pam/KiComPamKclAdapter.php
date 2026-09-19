@@ -87,7 +87,12 @@ final class KiComPamKclAdapter
         $this->pam->observe('KiCom:' . $version, 'runtime', 'AVAILABLE', 'KCL:HELLO', $evidence['HELLO'], 300);
 
         $genome = $facts['GENOME_STATUS'];
-        $healthy = ($genome['version'] ?? '') === $version
+        // The live 0.9.26 R3 baseline has an exact genome identity; the
+        // canonical PROJECT_STATE may lag the actual trusted runtime.
+        // Refuse an unknown 0.9.26 lineage even when all Boolean flags look OK.
+        $lineageOk = $version !== '0.9.26'
+            || ($genome['genome_id'] ?? '') === 'kicom-0.9.26-g25r3';
+        $healthy = $lineageOk && ($genome['version'] ?? '') === $version
             && ($genome['healthy'] ?? '') === 'true'
             && ($genome['trusted'] ?? '') === 'true'
             && ($genome['lkg_ok'] ?? '') === 'true'
@@ -107,13 +112,23 @@ final class KiComPamKclAdapter
         $pending = $update['pending_version'] ?? '';
         $risk = strtolower($update['pending_risk'] ?? '');
         $red = $pending !== '' && $risk === 'red';
+        $pendingKnown = array_key_exists('pending_version', $update)
+            && array_key_exists('pending_risk', $update)
+            && array_key_exists('pending_source', $update);
+        $pendingConsistent = $pendingKnown
+            && (($pending === '' && $risk === '' && $update['pending_source'] === '')
+                || ($pending !== '' && $risk !== '' && $update['pending_source'] !== ''));
         $this->pam->observe('KiCom:' . $version, 'production-install',
             $red ? 'FORBIDDEN' : 'UNKNOWN',
+            'KCL:UPDATE_STATUS', $evidence['UPDATE_STATUS'], 60);
+        $this->pam->observe('KiCom:' . $version, 'pending-update-consistency',
+            $pendingConsistent ? 'AVAILABLE' : 'DEGRADED',
             'KCL:UPDATE_STATUS', $evidence['UPDATE_STATUS'], 60);
 
         $normal = [
             'version' => $version, 'genome_healthy' => $healthy,
-            'sqlite_quick_check' => $dbHealthy, 'pending_version' => $pending,
+            'sqlite_quick_check' => $dbHealthy, 'genome_id' => $genome['genome_id'] ?? '',
+            'pending_consistent' => $pendingConsistent, 'pending_version' => $pending,
             'pending_risk' => $risk, 'pending_source' => $update['pending_source'] ?? ''
         ];
         $stateSha = hash('sha256', json_encode($normal, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
@@ -131,7 +146,8 @@ final class KiComPamKclAdapter
         return [
             'checkpoint_id' => $checkpointId, 'state_sha256' => $stateSha,
             'version' => $version, 'genome_healthy' => $healthy,
-            'sqlite_quick_check' => $dbHealthy,
+            'sqlite_quick_check' => $dbHealthy, 'genome_id' => $genome['genome_id'] ?? '',
+            'pending_consistent' => $pendingConsistent,
             'protected_install_pending' => $red
         ];
     }
