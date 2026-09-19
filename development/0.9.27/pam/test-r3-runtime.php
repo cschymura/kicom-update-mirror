@@ -27,6 +27,7 @@ chdir($root);
 require_once $root . '/lib.php';
 require_once __DIR__ . '/KiComPam.php';
 require_once __DIR__ . '/KiComPamKclAdapter.php';
+require_once __DIR__ . '/KiComPamReleaseProof.php';
 $checks = 0;
 function runtimeOk(bool $value, string $message): void {
     global $checks;
@@ -76,4 +77,70 @@ runtimeOk((int) $copy->query('SELECT version FROM pam_schema')->fetchColumn() ==
     'Native R3 snapshot preserves PAM v2 observation and checkpoint');
 runtimeOk((int) $copy->query('SELECT MAX(version) FROM schema_migrations')->fetchColumn() === 1,
     'Native R3 schema remains unchanged in snapshot');
+
+// READ-ONLY identity diagnostics using KiCom's existing bounded pending helpers.
+// All pending metadata and package files below exist ONLY in the disposable CI clone.
+$beforeProof = KiComPamReleaseProof::inspectR3();
+runtimeOk(($beforeProof['code'] ?? '') === 'NO_PENDING_PACKAGE',
+    'No pending ZIP is not falsely interpreted as a verified release');
+$r3Zip = realpath($argv[2] ?? '');
+$oldZip = realpath($argv[3] ?? '');
+$oldSha = '6eedd8ae7c6141fe2f8e10d323d06e7cd13cfca1a9198d55b0c4f4aed2a6f04b';
+$r3Sha = '6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f';
+runtimeOk(is_string($r3Zip) && hash_file('sha256', $r3Zip) === $r3Sha
+    && is_string($oldZip) && hash_file('sha256', $oldZip) === $oldSha,
+    'Both reference ZIPs are bound to exact bytes');
+$store = kicomSelfUpdatePackagesDir();
+if (!is_dir($store) && !mkdir($store, 0700, true) && !is_dir($store)) {
+    throw new RuntimeException('Cannot prepare isolated package store');
+}
+$r3Stored = $store . '/' . $r3Sha . '.zip';
+$oldStored = $store . '/' . $oldSha . '.zip';
+if (!copy($r3Zip, $r3Stored) || !copy($oldZip, $oldStored)) {
+    throw new RuntimeException('Cannot copy verified test ZIP into isolated package store');
+}
+$writePending = static function (string $sha, string $name): void {
+    $pending = [
+        'package_file' => $name, 'from_version' => '0.9.25',
+        'to_version' => '0.9.26', 'zip_sha256' => $sha,
+        'risk_class' => 'red', 'source' => 'pull:mirror',
+        'created_at' => '2026-09-19T00:00:00+00:00'
+    ];
+    if (file_put_contents(kicomSelfUpdatePendingFile(),
+        json_encode($pending, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT), LOCK_EX) === false) {
+        throw new RuntimeException('Cannot set disposable pending fixture');
+    }
+};
+$writePending($r3Sha, basename($r3Stored));
+$proof = KiComPamReleaseProof::inspectR3();
+runtimeOk(($proof['code'] ?? '') === 'EXACT_R3_PENDING_BYTES_VERIFIED'
+    && !empty($proof['matched'])
+    && ($proof['pending_sha256'] ?? '') === $r3Sha,
+    'Trusted pending metadata and on-disk ZIP jointly prove exact R3 identity');
+runtimeOk(($proof['installation_permitted'] ?? null) === false
+    && ($proof['human_approval_granted'] ?? null) === false,
+    'Read-only identity proof never becomes production authorization');
+$writePending($oldSha, basename($oldStored));
+$older = KiComPamReleaseProof::inspectR3();
+runtimeOk(($older['code'] ?? '') === 'DIFFERENT_PENDING_RELEASE'
+    && ($older['pending_sha256'] ?? '') === $oldSha && empty($older['matched']),
+    'Different ZIP with the same version is detected rather than mistaken for R3');
+$writePending($r3Sha, basename($oldStored));
+runtimeOk((KiComPamReleaseProof::inspectR3()['code'] ?? '') === 'PENDING_METADATA_INVALID',
+    'Cross-wired package filename and declared checksum fail closed');
+$writePending($oldSha, basename($oldStored));
+file_put_contents($oldStored, 'tampered', LOCK_EX);
+runtimeOk((KiComPamReleaseProof::inspectR3()['code'] ?? '') === 'STORED_PACKAGE_HASH_MISMATCH',
+    'Stored package content tampering is independently detected');
+unlink($oldStored);
+symlink($oldZip, $oldStored);
+runtimeOk((KiComPamReleaseProof::inspectR3()['code'] ?? '') === 'STORED_PACKAGE_UNAVAILABLE',
+    'Symlink leaving the managed package directory is rejected');
+unlink($oldStored);
+unlink(kicomSelfUpdatePendingFile());
+runtimeOk((KiComPamReleaseProof::inspectR3()['code'] ?? '') === 'NO_PENDING_PACKAGE',
+    'Release diagnostics do not leave a staged package behind');
+runtimeOk(!empty(kicomSqliteHealth(true)['ok']),
+    'Pending identity inspection does not modify KiCom SQLite health');
+
 echo "PAM_R3_RUNTIME_TESTS_PASSED=$checks\n";
