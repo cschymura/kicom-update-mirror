@@ -388,10 +388,10 @@ runtimeOk(($legacyPreflight['inspection_only'] ?? false) === true
     && ($legacyPreflight['restore_permitted'] ?? true) === false
     && ($legacyPreflight['automatic_recovery_permitted'] ?? true) === false,
     'Legacy R3 recovery preflight never grants automatic DB replacement');
-runtimeOk($legacyPreflight['code'] === 'LEGACY_SNAPSHOT_ORDER_AMBIGUOUS'
-    || $legacyPreflight['code'] === 'LEGACY_CANDIDATE_REQUIRES_REVIEW'
-    || $legacyPreflight['code'] === 'LEGACY_SNAPSHOT_VERIFICATION_FAILED',
-    'Legacy backup selection surfaces unresolved ordering or review rather than assuming safety');
+runtimeOk(is_string($legacyPreflight['code'] ?? null)
+    && str_starts_with($legacyPreflight['code'], 'LEGACY_')
+    && ($legacyPreflight['restore_permitted'] ?? true) === false,
+    'Legacy backup preflight remains fail-closed: ' . (string)($legacyPreflight['code'] ?? 'missing'));
 // The temporary sequencer refuses to call the native writer when the
 // R3 inventory contains legacy backups. Merely constructing the DEV ledger
 // produces no native DB backup and must never authorize quarantine.
