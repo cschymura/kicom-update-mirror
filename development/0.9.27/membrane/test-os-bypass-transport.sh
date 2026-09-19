@@ -4,10 +4,17 @@ set -euo pipefail
 # This proves cross-UID synthetic communications and filesystem access denial.
 # It does NOT prove a non-bypassable production egress gateway.
 root="/tmp/kicom-membrane-os-$GITHUB_RUN_ID"
-fixture="$(pwd)/development/0.9.27/membrane"
+source="$(pwd)/development/0.9.27/membrane"
+fixture="$root/fixtures"
 test -d "$root/interior"
-test -f "$fixture/fixture-isolated-transport.php"
-test -f "$fixture/test-cross-uid-transport.php"
+test -f "$source/fixture-isolated-transport.php"
+test -f "$source/test-cross-uid-transport.php"
+# The checkout may live below a private runner home; the two real test
+# principals must NOT be given access to that home. Copy only inert fixtures
+# into a root-owned read-only path outside both their writable domains.
+sudo install -d -m 0755 -o root -g root "$fixture"
+sudo install -m 0644 -o root -g root "$source/fixture-isolated-transport.php" "$fixture/fixture-isolated-transport.php"
+sudo install -m 0644 -o root -g root "$source/test-cross-uid-transport.php" "$fixture/test-cross-uid-transport.php"
 sudo -u kicom_inner_ci ln -s "$root/policy/identity" "$root/interior/policy-proxy"
 if sudo -u kicom_inner_ci sh -c 'printf forged > "$1"' sh "$root/interior/policy-proxy" 2>/dev/null; then
   echo 'FAIL interior wrote privileged policy through symlink' >&2
@@ -46,7 +53,7 @@ done
 test "$ready" -eq 1 || { cat /tmp/kicom-membrane-cross-uid.log; exit 1; }
 sudo -u kicom_inner_ci rm -f "$receipts"
 sudo -u kicom_membrane_ci php "$fixture/test-cross-uid-transport.php" http://127.0.0.1:18731
-test "$(sudo -u kicom_inner_ci wc -l < "$receipts")" -eq 4 || {
+test "$(sudo -u kicom_inner_ci sh -c 'wc -l < "$1"' sh "$receipts")" -eq 4 || {
   echo 'FAIL cross-UID request receipts not exactly once' >&2
   exit 1
 }
