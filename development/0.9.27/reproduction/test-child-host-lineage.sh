@@ -65,8 +65,7 @@ sudo php -r '
      ||$r["child_public_fingerprint"]!==hash("sha256",$c)
      ||$r["native_genome_bound"]||$r["recovery_bound"]
      ||$r["independent_host_qualified"]||$r["external_action_authorized"])exit(4);
-'
- "$root"
+' "$root"
 echo 'PASS lineage fingerprints bind distinct keys without falsely claiming native Genome'
 sudo test -f "$root/daughter/daughter-private.key"
 sudo test -f "$root/interior/mother-private.key"
