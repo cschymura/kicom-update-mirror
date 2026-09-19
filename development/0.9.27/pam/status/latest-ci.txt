@@ -1,9 +1,6 @@
 CI_RESULT=success
-RUN_ID=35435356239
-TRIGGER_SHA=280f1fd9f7ea0d2ce2bdbd4b96708857cc94df42
-PASS Unknown until observed
-PASS Fresh sourced observation
-PASS Observation TTL and original evidence preserved
+RUN_ID=35435482590
+TRIGGER_SHA=0c061e479ecb23f028584b5793648da159ce6f9b
 PASS Observation cannot create authority state
 PASS Evidence checksum required
 PASS External action never claimable from internal queue
@@ -23,3 +20,16 @@ PASS Latest checkpoint available for next run
 PASS Original KiCom tables untouched
 PASS Schema version persisted
 PAM_TESTS_PASSED=21
+PASS Healthy fixed-endpoint KCL mapped to observations
+PASS RED protected action recognized
+PASS Protected install remains denied by PAM
+PASS Release review is internal work, not production execution
+PASS Adapter does not enqueue a production installation
+PASS Transient request IDs do not invalidate semantic state
+PASS Next scheduled run can read latest checkpoint
+PASS Same release review is idempotent
+PASS Real health degradation is recorded
+PASS Error response never interpreted as healthy
+PASS Ambiguous duplicate fact rejected
+PASS Unapproved endpoint evidence rejected
+PAM_KCL_TESTS_PASSED=12
