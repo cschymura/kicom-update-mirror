@@ -56,6 +56,9 @@ jobs:
           php -l development/0.9.27/reproduction/test-blueprint.php
           php -l development/0.9.27/reproduction/KiComChildLineage.php
           php -l development/0.9.27/reproduction/test-child-lineage.php
+          php -l development/0.9.27/reproduction/KiComChildBirthReadiness.php
+          php -l development/0.9.27/reproduction/test-child-birth-gate.php
+          php -l development/0.9.27/reproduction/test-real-native-birth.php
           bash -n development/0.9.27/reproduction/test-isolated-identity.sh
           bash -n development/0.9.27/reproduction/test-daughter-runtime.sh
           bash -n development/0.9.27/reproduction/test-child-host-lineage.sh
@@ -78,6 +81,7 @@ jobs:
           php development/0.9.27/membrane/test-staging-attestation.php
           php development/0.9.27/reproduction/test-blueprint.php
           php development/0.9.27/reproduction/test-child-lineage.php
+          php development/0.9.27/reproduction/test-child-birth-gate.php
       - name: Compare real isolated R3 HTTP communication with passive observer loaded
         shell: bash
         run: |
@@ -134,3 +138,4 @@ jobs:
           bash development/0.9.27/reproduction/test-daughter-runtime.sh
           bash development/0.9.27/reproduction/test-child-host-lineage.sh
           bash development/0.9.27/reproduction/test-daughter-recovery.sh
+          php development/0.9.27/reproduction/test-real-native-birth.php /tmp/kicom-membrane-os-$GITHUB_RUN_ID
