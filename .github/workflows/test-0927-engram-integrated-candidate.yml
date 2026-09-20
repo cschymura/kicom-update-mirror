@@ -68,7 +68,7 @@ jobs:
                      "modules/engram/KiComEngramWebAuthnApprovalController.php",
                      "modules/engram/KiComEngramFirstPartyReview.php",
                      "modules/engram/KiComEngramWebAuthnReviewHttpAdapter.php",
-                     "assets/engram-review-client.js","engram.php"] as $required) {
+                     "assets/engram-review-client.js"] as $required) {
               if(!isset($x["entries"][$required])) exit(75);
             }
             foreach(array_keys($x["entries"]) as $p) {
@@ -88,12 +88,12 @@ jobs:
               modules=json.loads(archive.read("genome/modules.json"))
               eng=[m for m in modules["modules"] if m["path"].startswith("modules/engram/")]
               assert len(eng)>=14 and all(m["enabled"] is False for m in eng)
-              route=archive.read("engram.php")
-              assert b"http_response_code(404)" in route and b"exit;" in route
-              assert b"require_once" not in route and b"php://input" not in route
+              assert "engram.php" not in archive.namelist()
+              assert archive.read("index.php") == open("source/0.9.26-r3/index.php","rb").read()
+              assert archive.read("api.php") == open("source/0.9.26-r3/api.php","rb").read()
               assert "private_memory_read_write_enabled" not in archive.namelist()
           print("ENGRAM_INTEGRATED_MODULES_PRESENT_AND_DISABLED=1")
-          print("ENGRAM_INTEGRATED_PUBLIC_ROUTE_FAILS_CLOSED=1")
+          print("ENGRAM_INTEGRATED_PUBLIC_ROUTE_UNREGISTERED=1")
           print("ENGRAM_INTEGRATED_REAL_MEMORY_INGESTION_ENABLED=0")
           PY
       - uses: actions/upload-artifact@v4
