@@ -4,6 +4,7 @@ if (!class_exists('KiComDevSessionManager',false)) {
     require_once __DIR__.'/../../../source/0.9.26-r3/modules/dev/DevSession.php';
 }
 require_once __DIR__.'/KiComEngramFirstPartyReview.php';
+require_once __DIR__.'/KiComEngramBrowserReviewPage.php';
 require_once __DIR__.'/KiComEngramDevMemoryAdapter.php';
 
 $reviewChecks=0;
@@ -79,6 +80,22 @@ try {
     preg_match('/name="csrf" value="([a-f0-9]{64})"/',$html,$m);
     $csrf=$m[1]??'';
     $reviewCheck(strlen($csrf)===64,'render creates distinct unpredictable CSRF token');
+    $interactive=KiComEngramBrowserReviewPage::decorate(
+        $html,'/engram/review-api.php','/engram/engram-review-client.js'
+    );
+    $reviewCheck(str_contains($interactive,'data-engram-review-api="/engram/review-api.php"')
+        && str_contains($interactive,'<script defer src="/engram/engram-review-client.js"></script>')
+        && str_contains($interactive,'aria-live="polite"'),
+        'review page is wired to same-origin signed-passkey client and accessible status');
+    $reviewCheck(str_contains($interactive,'&lt;script&gt;')
+        && !str_contains($interactive,'<script>alert'),
+        'interactive review still escapes untrusted memory text');
+    $reviewDeny(static fn()=>KiComEngramBrowserReviewPage::decorate(
+        $html,'https://evil.example/review.php','/engram/engram-review-client.js'
+    ),'cross-origin review API URL forbidden in browser page');
+    $reviewDeny(static fn()=>KiComEngramBrowserReviewPage::decorate(
+        $html,'/engram/review-api.php','//evil.example/client.js'
+    ),'cross-origin review JS URL forbidden in browser page');
     $post=['review_id'=>$id,'csrf'=>$csrf,'decision'=>'approve_one'];
     $reviewDeny(static fn()=> $flow->confirm($post,['browser_session'=>'browser-a']),
         'ordinary logged-in browser alone cannot mint consent without fresh passkey assertion');
