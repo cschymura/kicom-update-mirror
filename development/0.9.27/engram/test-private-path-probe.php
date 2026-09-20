@@ -97,6 +97,9 @@ try {
     denyProbe(static fn() => KiComEngramPrivatePathProbe::runAgainstWebRoots(
         $data, $backups, [$web, $root]
     ), 'hosting account ancestor mapped as a website denied');
+    denyProbe(static fn() => KiComEngramPrivatePathProbe::runAgainstWebRoots(
+        $data, $backups, [DIRECTORY_SEPARATOR]
+    ), 'filesystem root cannot be accepted as safe website inventory');
     $webAlias = $root . '/web-alias';
     symlink($webTwo, $webAlias);
     denyProbe(static fn() => KiComEngramPrivatePathProbe::runAgainstWebRoots(
