@@ -10,7 +10,8 @@ if (PHP_SAPI !== 'cli' || $argc !== 5
     || !preg_match('/\Amirror-[a-f0-9]{32}\.json\z/D', $argv[2])
     || !preg_match('/\A[a-f0-9]{64}\z/D', $argv[3])
     || !in_array($argv[4],[
-        'before-first-copy','after-first-copy','after-second-copy',
+        'before-first-copy','during-first-copy','after-first-copy',
+        'during-second-copy','after-second-copy',
         'before-manifest-publish','after-manifest-publish'
     ],true)) {
     exit(64);
