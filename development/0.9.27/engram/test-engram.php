@@ -206,6 +206,9 @@ require __DIR__ . '/test-engram-private-consent-ledger.php';
 // Full isolated KiCom DEV passkey -> registry -> consent -> SQLite -> new-session read acceptance.
 require __DIR__ . '/test-engram-integrated-private-memory.php';
 
+// First-party HTML review and fresh-step-up exact-record consent before synthetic memory write.
+require __DIR__ . '/test-engram-first-party-review.php';
+
 
 
 // Synthetic-only immutable RAID-1-inspired mirror/recovery with externally pinned manifest.
