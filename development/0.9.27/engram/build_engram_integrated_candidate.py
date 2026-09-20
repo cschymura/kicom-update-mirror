@@ -58,6 +58,62 @@ def build(dest: Path) -> dict:
     with tempfile.TemporaryDirectory(prefix="kicom-engram-disabled-") as tmp:
         host_probe.patch_candidate(files, Path(tmp) / "candidate")
     host_probe.patch_version(files)
+    # A COMPLETE fail-closed runtime discovery path, rather than requiring
+    # Christoph to manually install a PHP auto_prepend_file:
+    # an independently operator-provisioned 0600 fixed-name JSON config in a
+    # 0700 sibling directory OUTSIDE KiCom webroot may enable the feature.
+    # No config exists in the release ZIP, so the default remains 404.
+    lib=files["lib.php"]
+    lib_anchor=b"function kicomBaseDir(): string { return __DIR__; }"
+    if lib.count(lib_anchor)!=1:
+        raise RuntimeError("KiCom R3 private runtime anchor changed")
+    runtime_loader=b"""/*
+ * Private Engram runtime bootstrap. An absent or unsafe operator-owned
+ * fixed sibling config is equivalent to DISABLED. Not controllable through
+ * HTTP payload, headers, DEV bearer, Slack, GitHub or browser session.
+ * Before provisioning the operator must separately verify ALL vhost aliases,
+ * PHP UID isolation, retention and genuine human passkey owner binding.
+ */
+if (!function_exists('kicomEngramServerRuntime')) {
+    function kicomEngramServerRuntime(): array {
+        $web=realpath(__DIR__);
+        if ($web===false) return [];
+        $dir=dirname($web).'/engram-private';
+        $config=$dir.'/engram-host.json';
+        clearstatcache(true,$dir);
+        clearstatcache(true,$config);
+        if (is_link($dir) || !is_dir($dir)
+            || (fileperms($dir)&0077)!==0
+            || is_link($config) || !is_file($config)) return [];
+        $realDir=realpath($dir);
+        if ($realDir===false || $realDir===$web
+            || str_starts_with($realDir,$web.DIRECTORY_SEPARATOR)
+            || str_starts_with($web,$realDir.DIRECTORY_SEPARATOR)) return [];
+        $st=@stat($config);
+        if ($st===false || ($st['nlink']??0)!==1
+            || ($st['mode']&0077)!==0
+            || ($st['size']??0)<=0 || $st['size']>16384) return [];
+        $h=@fopen($config,'rb');
+        if ($h===false) return [];
+        try {
+            $opened=@fstat($h);
+            if ($opened===false || $opened['nlink']!==1
+                || ($opened['mode']&0077)!==0
+                || $opened['size']!==$st['size']) return [];
+            $raw=stream_get_contents($h,16385);
+        } finally { fclose($h); }
+        if (!is_string($raw) || strlen($raw)!==$st['size']) return [];
+        $data=json_decode($raw,true);
+        if (!is_array($data) || ($data['schema']??null)!==1
+            || ($data['web_root']??null)!==$web
+            || ($data['runtime_source']??null)!=='server-only-reviewed') return [];
+        unset($data['schema']);
+        return $data;
+    }
+}
+
+"""
+    files["lib.php"]=lib.replace(lib_anchor,runtime_loader+lib_anchor,1)
     # Integrate ONLY a narrowly scoped branch in the existing native-allowlisted
     # api.php. Without a separately preloaded, trusted host runtime callback it
     # returns 404 BEFORE reading request body or constructing private storage.
