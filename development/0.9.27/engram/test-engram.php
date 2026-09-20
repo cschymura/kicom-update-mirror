@@ -185,6 +185,10 @@ require __DIR__ . '/test-engram-integrity.php';
 // Synthetic-only explicit per-record consent and secret-screening gate.
 require __DIR__ . '/test-engram-ingestion.php';
 
+// Synthetic-only identity-scoped independent-session Engram write/retrieve roundtrip.
+require __DIR__ . '/test-engram-authenticated-bridge.php';
+
+
 // Synthetic-only immutable RAID-1-inspired mirror/recovery with externally pinned manifest.
 require __DIR__ . '/test-engram-mirror.php';
 
