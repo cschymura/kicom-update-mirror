@@ -67,6 +67,11 @@ jobs:
             echo "ENGRAM_NATIVE_API_DEFAULT_DENY_FAILED=1"; exit 83
           fi
           echo "ENGRAM_NATIVE_API_DEFAULT_DENY_PASSED=1"
+          REVIEW_RESULT="$(php -r '$root=$argv[1]; $_GET=["q"=>"ENGRAM_REVIEW"]; $_SERVER["REQUEST_METHOD"]="POST"; $_SERVER["HTTPS"]="on"; require $root."/api.php";' /tmp/kicom-engram-extracted)"
+          if [ "$REVIEW_RESULT" != '{"ok":false,"code":"ENGRAM_REVIEW_UNAVAILABLE"}' ]; then
+            echo "ENGRAM_REVIEW_API_DEFAULT_DENY_FAILED=1"; exit 84
+          fi
+          echo "ENGRAM_REVIEW_API_DEFAULT_DENY_PASSED=1"
       - name: Localhost HTTP acceptance through ACTUAL extracted KiCom api.php
         shell: bash
         run: |
@@ -99,6 +104,7 @@ jobs:
                      "modules/engram/KiComEngramFirstPartyReview.php",
                      "modules/engram/KiComEngramWebAuthnReviewHttpAdapter.php",
                      "modules/engram/KiComEngramNativeMemoryRoute.php",
+                     "modules/engram/KiComEngramFirstPartyHostBridge.php",
                      "assets/engram-review-client.js"] as $required) {
               if(!isset($x["entries"][$required])) exit(75);
             }
@@ -118,7 +124,7 @@ jobs:
           with zipfile.ZipFile(path) as archive:
               modules=json.loads(archive.read("genome/modules.json"))
               eng=[m for m in modules["modules"] if m["path"].startswith("modules/engram/")]
-              assert len(eng)>=15 and all(m["enabled"] is False for m in eng)
+              assert len(eng)>=16 and all(m["enabled"] is False for m in eng)
               assert "engram.php" not in archive.namelist()
               assert archive.read("index.php") == open("source/0.9.26-r3/index.php","rb").read()
               original=open("source/0.9.26-r3/api.php","rb").read()
@@ -127,8 +133,15 @@ jobs:
               split=original.index(anchor)
               assert routed.startswith(original[:split]+b"/* Engram native memory:")
               assert routed.endswith(original[split:])
-              assert routed.count(b"kicomEngramServerRuntime") == 2
+              assert routed.count(b"kicomEngramServerRuntime") == 4
               assert b"ENGRAM_MEMORY_UNAVAILABLE" in routed
+              assert b"ENGRAM_REVIEW_UNAVAILABLE" in routed
+              admin=archive.read("admin.php")
+              original_admin=open("source/0.9.26-r3/admin.php","rb").read()
+              assert admin.startswith(original_admin[:original_admin.index(b"if(isset($_GET['logout']))")])
+              assert b"KiComEngramFirstPartyHostBridge::adminPage" in admin
+              assert b"empty($_SESSION['admin'])" in admin
+              assert b"csrf();" in admin
               assert "private_memory_read_write_enabled" not in archive.namelist()
           print("ENGRAM_INTEGRATED_MODULES_PRESENT_AND_DISABLED=1")
           print("ENGRAM_INTEGRATED_NATIVE_ROUTE_DEFAULT_DENY=1")
