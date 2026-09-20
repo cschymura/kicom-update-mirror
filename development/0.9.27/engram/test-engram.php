@@ -175,3 +175,6 @@ try {
 
 // Run the separate synthetic local-path probe suite through the existing Engram CI.
 require __DIR__ . '/test-private-path-probe.php';
+
+// End-to-end synthetic DEV session/HTTP authorization candidate regression.
+require __DIR__ . '/test-engram-dev-route.php';
