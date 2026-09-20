@@ -175,6 +175,122 @@ final class KiComEngramMirrorSet
     }
 
     /**
+     * A NEW immutable generation from an independently anchored, degraded v1/v2
+     * generation. Never rewrite the damaged copy or choose by timestamp.
+     * The caller must separately anchor the returned NEW manifest digest.
+     *
+     * This only reconstructs an offline snapshot, never changes the live DB.
+     * On copy failure leave new uncommitted files for operator quarantine.
+     */
+    public function rebuildNewGeneration(string $parentManifest, string $trustedParentDigest): array
+    {
+        $parent = $this->inspect($parentManifest, $trustedParentDigest);
+        if ($parent['state'] !== 'degraded' || $parent['verified_mirrors'] !== 1
+            || count($parent['source_indexes']) !== 1) {
+            throw new RuntimeException('Repair requires exactly one anchored intact parent mirror');
+        }
+        $sourceIndex = $parent['source_indexes'][0];
+        $sourceDirectory = [$this->first, $this->second][$sourceIndex];
+        $sourceFile = $sourceDirectory . DIRECTORY_SEPARATOR . $parent['snapshot'];
+        if (!hash_equals($parent['snapshot_sha256'], (string)self::digestFile($sourceFile))) {
+            throw new RuntimeException('Parent snapshot changed before repair');
+        }
+        $generation = bin2hex(random_bytes(16));
+        $newSnapshot = 'engram-' . $generation . '.sqlite';
+        $newManifest = 'mirror-' . $generation . '.json';
+        foreach ([$this->first, $this->second] as $dir) {
+            $dest = $dir . DIRECTORY_SEPARATOR . $newSnapshot;
+            if (file_exists($dest) || is_link($dest)) {
+                throw new RuntimeException('Repair snapshot name already exists');
+            }
+        }
+        $manifestPath = $this->manifestDir . DIRECTORY_SEPARATOR . $newManifest;
+        if (file_exists($manifestPath) || is_link($manifestPath)) {
+            throw new RuntimeException('Repair manifest name already exists');
+        }
+        // Copy from exactly the same verified parent snapshot, not two
+        // independent database backups or a currently changing live WAL.
+        foreach ([$this->first, $this->second] as $dir) {
+            self::copyPrivateSnapshot(
+                $sourceFile, $dir . DIRECTORY_SEPARATOR . $newSnapshot,
+                $parent['snapshot_sha256']
+            );
+        }
+        // Re-check source AND both destination copies immediately before
+        // publishing a complete manifest; an incomplete generation lacks it.
+        if (!hash_equals($parent['snapshot_sha256'], (string)self::digestFile($sourceFile))) {
+            throw new RuntimeException('Parent snapshot changed during repair');
+        }
+        foreach ([$this->first, $this->second] as $dir) {
+            if (!hash_equals($parent['snapshot_sha256'],
+                (string)self::digestFile($dir . DIRECTORY_SEPARATOR . $newSnapshot))) {
+                throw new RuntimeException('Repair snapshot verification failed');
+            }
+        }
+        $manifest = [
+            'format' => 'engram-mirror-v2',
+            'generation' => $generation,
+            'snapshot' => $newSnapshot,
+            'snapshot_sha256' => $parent['snapshot_sha256'],
+            'revision_count' => $parent['revision_count'],
+            'parent_manifest' => $parentManifest,
+            'parent_manifest_sha256' => $trustedParentDigest,
+            'parent_source_mirror' => $sourceIndex,
+        ];
+        $bytes = json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        self::putExclusive($manifestPath, $bytes);
+        return [
+            'manifest' => $newManifest,
+            'manifest_sha256' => hash('sha256', $bytes),
+            'revision_count' => $parent['revision_count'],
+            'previous_state' => 'degraded',
+            'mirrors_created' => 2,
+            'independent_manifest_anchor_stored' => false,
+        ];
+    }
+
+    /**
+     * Exclusive bounded copy. Never touches an existing destination. Partially
+     * written output is retained for quarantine, never advertised via manifest.
+     */
+    private static function copyPrivateSnapshot(
+        string $source, string $destination, string $expectedSha256
+    ): void {
+        if (!hash_equals($expectedSha256, (string)self::digestFile($source))) {
+            throw new RuntimeException('Snapshot source integrity failed');
+        }
+        $bytes = filesize($source);
+        if ($bytes === false || $bytes < 1 || $bytes > 536870912) {
+            throw new RuntimeException('Snapshot outside DEV bounded size');
+        }
+        $mask = umask(0077);
+        try {
+            $input = @fopen($source, 'rb');
+            $output = @fopen($destination, 'x+b');
+            if ($input === false || $output === false) {
+                if (is_resource($input)) fclose($input);
+                if (is_resource($output)) fclose($output);
+                throw new RuntimeException('Exclusive repair copy failed to start');
+            }
+            try {
+                if (!@chmod($destination, 0600)
+                    || stream_copy_to_stream($input, $output, 536870913) !== $bytes
+                    || !fflush($output)) {
+                    throw new RuntimeException('Exclusive repair copy failed');
+                }
+            } finally {
+                fclose($input);
+                fclose($output);
+            }
+        } finally {
+            umask($mask);
+        }
+        if (!hash_equals($expectedSha256, (string)self::digestFile($destination))) {
+            throw new RuntimeException('Exclusive repair copy hash mismatch');
+        }
+    }
+
+    /**
      * The supplied digest is operator-trusted independently of the mirror set;
      * never accept a digest read from the same untrusted storage as authority.
      * Returns only diagnostics, not snapshot bytes or private paths.
@@ -192,10 +308,21 @@ final class KiComEngramMirrorSet
             throw new RuntimeException('Independent trusted manifest digest mismatch');
         }
         $m = json_decode((string)file_get_contents($path), true, 8, JSON_THROW_ON_ERROR);
-        if (!is_array($m) || array_keys($m) !== [
-                'format','generation','snapshot','snapshot_sha256','revision_count'
-            ]
-            || $m['format'] !== 'engram-mirror-v1'
+        $baseKeys = ['format','generation','snapshot','snapshot_sha256','revision_count'];
+        $v2Keys = array_merge($baseKeys, [
+            'parent_manifest','parent_manifest_sha256','parent_source_mirror'
+        ]);
+        if (!is_array($m)
+            || !in_array($m['format'] ?? null, ['engram-mirror-v1','engram-mirror-v2'], true)
+            || array_keys($m) !== ($m['format'] === 'engram-mirror-v1' ? $baseKeys : $v2Keys)
+            || ($m['format'] === 'engram-mirror-v2' && (
+                !is_string($m['parent_manifest'])
+                || !preg_match('/\Amirror-[a-f0-9]{32}\.json\z/D', $m['parent_manifest'])
+                || !is_string($m['parent_manifest_sha256'])
+                || !preg_match('/\A[a-f0-9]{64}\z/D', $m['parent_manifest_sha256'])
+                || !in_array($m['parent_source_mirror'], [0,1], true)
+                || $m['parent_manifest'] === $manifestName
+            ))
             || $manifestName !== 'mirror-' . $m['generation'] . '.json'
             || !preg_match('/\A[a-f0-9]{32}\z/D', $m['generation'])
             || !preg_match('/\Aengram-[a-f0-9]{32}\.sqlite\z/D', $m['snapshot'])
