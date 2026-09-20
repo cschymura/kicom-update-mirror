@@ -126,6 +126,34 @@ try {
         'symlink backup directory denied');
     unset($reopened);
 
+
+    $sidecarDir = $root . '/sidecar-denial';
+    mkdir($sidecarDir, 0700);
+    $outside = $root . '/harmless-target';
+    file_put_contents($outside, 'synthetic');
+    symlink($outside, $sidecarDir . '/engrams.sqlite-wal');
+    rejects(static fn() => new KiComEngramStore($sidecarDir, $web),
+        'preexisting WAL symlink denied before database open');
+    unlink($sidecarDir . '/engrams.sqlite-wal');
+    symlink($outside, $sidecarDir . '/engrams.sqlite-shm');
+    rejects(static fn() => new KiComEngramStore($sidecarDir, $web),
+        'preexisting SHM symlink denied before database open');
+    unlink($sidecarDir . '/engrams.sqlite-shm');
+    file_put_contents($sidecarDir . '/engrams.sqlite-wal', 'synthetic');
+    chmod($sidecarDir . '/engrams.sqlite-wal', 0644);
+    rejects(static fn() => new KiComEngramStore($sidecarDir, $web),
+        'preexisting readable WAL file denied');
+    unlink($sidecarDir . '/engrams.sqlite-wal');
+    file_put_contents($sidecarDir . '/engrams.sqlite-shm', 'synthetic');
+    chmod($sidecarDir . '/engrams.sqlite-shm', 0644);
+    rejects(static fn() => new KiComEngramStore($sidecarDir, $web),
+        'preexisting readable SHM file denied');
+    unlink($sidecarDir . '/engrams.sqlite-shm');
+    $sidecarStore = new KiComEngramStore($sidecarDir, $web);
+    check(($sidecarStore->health()['quick_check'] ?? null) === 'ok',
+        'safe storage opens after rejecting unsafe sidecars');
+    unset($sidecarStore);
+
     echo "KICOM_ENGRAM_TESTS_PASSED=$checks\n";
 } finally {
     unset($store);
