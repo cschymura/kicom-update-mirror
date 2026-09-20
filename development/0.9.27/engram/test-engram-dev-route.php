@@ -73,7 +73,7 @@ try {
     $issued = $sessions->issue(['auth_method' => 'passkey', 'credential_id' => 'synthetic-credential']);
     routeCheck(!empty($issued['ok']) && in_array('engram.path.probe', $issued['capabilities'], true),
         'new synthetic DEV session receives only defined capabilities');
-    $config = ['data'=>$routeData, 'backups'=>$routeBackups, 'webroot'=>$routeWeb];
+    $config = ['data'=>$routeData, 'backups'=>$routeBackups, 'webroots'=>[$routeWeb]];
     $configCalls = 0;
     $handler = KiComEngramDevPathHandler::handlers(
         static function () use (&$config, &$configCalls): array { $configCalls++; return $config; }
@@ -122,7 +122,7 @@ try {
         'authorized probe leaves no residual synthetic private files');
     routeCheck(!str_contains(json_encode($good, JSON_THROW_ON_ERROR), $routeRoot),
         'DEV probe response does not disclose local filesystem paths');
-    $config = ['data'=>$routeData,'backups'=>$routeBackups,'webroot'=>$routeData];
+    $config = ['data'=>$routeData,'backups'=>$routeBackups,'webroots'=>[$routeData]];
     $blocked = $router->handle($op, $sid, $token);
     routeCheck($blocked['code'] === 'ENGRAM_PATH_PROBE_UNAVAILABLE'
         && !str_contains(json_encode($blocked, JSON_THROW_ON_ERROR), $routeRoot),
@@ -130,7 +130,7 @@ try {
     $config = [];
     routeCheck($router->handle($op, $sid, $token)['code'] === 'ENGRAM_PATH_PROBE_UNAVAILABLE',
         'unprovisioned server configuration fails closed');
-    $config = ['data'=>$routeData,'backups'=>$routeBackups,'webroot'=>$routeWeb];
+    $config = ['data'=>$routeData,'backups'=>$routeBackups,'webroots'=>[$routeWeb]];
     $sessions->revoke($sid);
     routeCheck($router->handle($op, $sid, $token)['code'] === 'DEV_SESSION_REVOKED',
         'revoked DEV session can no longer access private probe');
