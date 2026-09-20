@@ -1,0 +1,21 @@
+# KiCom Engram — DEV-19 macOS operator setup handoff (documentation only)
+
+Date: 2026-09-20. User chose **macOS on their own computer** for the independent encrypted offline backup and expressly prohibited private-key transfer and paid actions. Continuation from DEV-18. Public GitHub contains only technical guidance, code and synthetic test references; NO real personal memories, original conversations, actual private DB/backup, real operator keys, tokens, OTP, local Mac paths discovered from their device, server secrets or private retrieval contents.
+
+## Canonical baseline and tested implementation
+
+Read live KiCom BOOTSTRAP and PROJECT_STATE/NEXT during this cycle: production baseline continues to report **0.9.26**. Existing DEV-18 synthetic PHP-to-Python encrypted SQLite transfer tested code SHA **28507e69ca2e32b1b6d71383c43acd0fcaf6e3f9**, GitHub Actions run **35507938960**, job **106070790417**, success, **351 synthetic checks**, non-installable host review ZIP builder succeeded. No new executable code was changed or run on the user's Mac in this DEV-19 cycle. The macOS setup procedure is guidance, NOT a demonstrated macOS test result.
+
+## Persistent macOS handoff
+
+New `development/0.9.27/engram/MACOS-LOKALES-ENGRAM-SETUP.md` gives exact user-run Terminal commands to check macOS/Python>=3.11, SQLite `deserialize` and FileVault; create a local 0700 directory under `~/Library/Application Support/KiCom/Engram` instead of iCloud Drive; install free PyNaCl==1.5.0 inside a local venv; download and inspect the Python DEV-18 script at its **pinned tested GitHub commit**; then generate a NEW mode-0600 local X25519 private decryption key and show only public-key metadata. It explains never to transmit the private key or raw key bytes via chat, GitHub, Slack, Mail, KiCom or hosting, never overwrite a prior key, retain an independently secured encrypted key-recovery copy, and distinguish the decryption key from the still-unprovisioned Ed25519 signer and anti-rollback trust root.
+
+The guide includes later instructions for `inspect-synthetic` only AFTER a separately approved/authenticated synthetic encrypted bundle exists. The current GitHub host review ZIP is a SOURCE REVIEW artifact, not a sealed SQLite bundle, executable release or proof that a real user-memory backup is available. Initial key creation must occur ON THE USER'S MAC, not in CI, this chat or on the All-inkl server. Verify FileVault (Apple guidance) and external encrypted drive availability; do not format existing media, install paid software, or assume arbitrary iCloud/Time Machine configurations are private. The user need not share any key or sensitive Mac data back: only high-level prerequisite/file-permission status or sanitized error text.
+
+## Remaining operator action and server gate
+
+The assistant has not accessed the user's macOS filesystem, enabled FileVault, installed Python/PyNaCl there, generated/received a user key, transferred any encrypted SQLite bundle, configured an external drive or performed a live backup. The user can perform steps A–C of the macOS guide, then report ONLY nonsensitive success indicators. If Python 3.11+/SQLite deserialize or FileVault is missing, address that prerequisite before key creation. No cost-bearing action is authorized.
+
+The synthetic host-probe preparation is still REVIEW ONLY: no actual KiCom installation, DEV endpoint activation, real-host effective UID/open_basedir/default-host mapping, cross-app isolation test, trusted server config, production memory migration/export or automated backup was performed. Preparation approval is not live-install approval; require exact reviewed live package/update preflight and explicit bounded human approval immediately before protected installation. Real private data remains blocked pending user-scoped consent, complete backup inventory and deletion/retention/restore controls.
+
+This DEV-19 checkpoint is documentation-only; do not count it as a new executable CI pass. On a new chat read BOOTSTRAP/canonical resources and this checkpoint/guide, then continue from confirmed actual macOS prerequisite/key-generation status without requesting or displaying the private key.
