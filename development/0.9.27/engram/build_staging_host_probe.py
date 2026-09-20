@@ -144,6 +144,9 @@ def patch_genome(files: dict[str, bytes], base_genome: dict) -> None:
         modules["modules"].append({"path": path, "enabled": True})
     files["genome/modules.json"] = (json.dumps(modules, ensure_ascii=False, indent=2) + "\n").encode()
     by_path["genome/modules.json"]["sha256"] = sha(files["genome/modules.json"])
+    # lib.php changes ONLY the version constant, but its genome digest MUST
+    # still be advanced, or the trusted KiCom verifier rejects the package.
+    by_path["lib.php"]["sha256"] = sha(files["lib.php"])
     files["genome/genome.json"] = (json.dumps(genome, ensure_ascii=False, indent=2) + "\n").encode()
 
 
