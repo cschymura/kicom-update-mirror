@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
-require_once __DIR__ . '/../../../source/0.9.26-r3/modules/dev/DevSession.php';
+if (!class_exists('KiComDevSessionManager', false)) {
+    require_once __DIR__ . '/../../../source/0.9.26-r3/modules/dev/DevSession.php';
+}
 require_once __DIR__ . '/KiComEngramDevMemoryAdapter.php';
 
 $httpChecks = 0;
