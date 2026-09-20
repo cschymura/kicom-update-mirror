@@ -193,3 +193,6 @@ require __DIR__ . '/test-engram-fault.php';
 
 // Real CI-only Linux SIGKILL of a synthetic mirror-rebuild subprocess.
 require __DIR__ . '/test-engram-kill.php';
+
+// Linux synthetic inter-process same-parent lease exclusion and SIGKILL lock release.
+require __DIR__ . '/test-engram-concurrency.php';
