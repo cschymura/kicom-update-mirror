@@ -105,6 +105,25 @@ try {
         'existing database cannot be overwritten');
     rejects(static fn() => KiComEngramStore::restore($source, $root . '/private', $web, str_repeat('0', 64)),
         'mismatched independent digest rejected');
+
+    $emptyRestore = $root . '/empty-restore';
+    mkdir($emptyRestore, 0700);
+    $backupLink = $backups . '/alias.sqlite';
+    symlink($source, $backupLink);
+    rejects(static fn() => KiComEngramStore::restore($backupLink, $emptyRestore, $web, $snapshot['sha256']),
+        'symlink backup source denied');
+    chmod($source, 0644);
+    rejects(static fn() => KiComEngramStore::restore($source, $emptyRestore, $web, $snapshot['sha256']),
+        'overpermissive backup source denied');
+    chmod($source, 0600);
+    $badDirectory = $root . '/open-backup';
+    mkdir($badDirectory, 0755);
+    rejects(static fn() => $store->backup($badDirectory, $web),
+        'overpermissive backup directory denied');
+    $backupLinkDir = $root . '/alias-backup-dir';
+    symlink($backups, $backupLinkDir);
+    rejects(static fn() => $store->backup($backupLinkDir, $web),
+        'symlink backup directory denied');
     unset($reopened);
 
     echo "KICOM_ENGRAM_TESTS_PASSED=$checks\n";
