@@ -197,6 +197,9 @@ require __DIR__ . '/test-engram-verified-credential-resolver.php';
 // Actual KiCom DEV session JSON credential reader and cross-session synthetic memory retrieval.
 require __DIR__ . '/test-engram-dev-session-credential-reader.php';
 
+// Private on-disk operator owner mapping with actual KiCom DEV session read-back.
+require __DIR__ . '/test-engram-private-owner-registry.php';
+
 
 
 // Synthetic-only immutable RAID-1-inspired mirror/recovery with externally pinned manifest.
