@@ -37,6 +37,7 @@ final class KiComEngramDevCandidatePatcher
             throw new RuntimeException('Candidate output directory must be empty');
         }
         $out = [];
+        $preflighted = [];
         foreach (self::SOURCE_HASHES as $name => $expected) {
             $source = $originalDevModules . '/' . $name;
             $raw = @file_get_contents($source);
@@ -56,6 +57,10 @@ final class KiComEngramDevCandidatePatcher
                     "        'DEV_LOG_READ' => 'logs.read',\n        'DEV_ENGRAM_PATH_PROBE' => 'engram.path.probe',"
                 );
             }
+            $preflighted[$name] = $raw;
+        }
+        // Hash-check and patch all trusted sources before writing any output.
+        foreach ($preflighted as $name => $raw) {
             $target = $emptyCandidateDirectory . '/' . $name;
             $fh = @fopen($target, 'x+b');
             if ($fh === false) {
