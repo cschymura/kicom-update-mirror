@@ -190,3 +190,6 @@ require __DIR__ . '/test-engram-mirror.php';
 
 // Deterministic interrupted-repair checkpoints and read-only orphan inventory.
 require __DIR__ . '/test-engram-fault.php';
+
+// Real CI-only Linux SIGKILL of a synthetic mirror-rebuild subprocess.
+require __DIR__ . '/test-engram-kill.php';
