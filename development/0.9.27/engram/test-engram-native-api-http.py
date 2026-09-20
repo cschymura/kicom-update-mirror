@@ -2,11 +2,10 @@
 """Synthetic localhost HTTP acceptance against the ACTUAL unpacked KiCom ZIP.
 
 No production connection, real passkeys, personal memory, secrets or installer.
-Host config below is injected ONLY by this disposable CI local server shim.
+Tests actual fixed-name private sibling config auto-discovery; only HTTPS is shimmed by the disposable localhost PHP server.
 """
 from __future__ import annotations
 import json
-import os
 from pathlib import Path
 import socket
 import subprocess
@@ -81,14 +80,15 @@ with tempfile.TemporaryDirectory(prefix="kicom-native-http-") as temp:
 declare(strict_types=1);
 // STRICTLY CI-ONLY SAPI shim: real hosting MUST verify HTTPS itself.
 $_SERVER['HTTPS']='on';
-function kicomEngramServerRuntime(): array {
-    return json_decode(file_get_contents(getenv('ENGRAM_TEST_RUNTIME_JSON')),true,
-        512,JSON_THROW_ON_ERROR);
-}
 """)
     bootstrap.chmod(0o600)
-    config = private / "trusted-runtime.json"
-    config.write_text(json.dumps({
+    # KiCom discovers ONLY this operator-owned fixed-name sibling path.
+    # The config is absent for the initial fail-closed test.
+    private_host_dir = web.parent / "engram-private"
+    assert not private_host_dir.exists(), "Refuse to touch preexisting host config"
+    config = private_host_dir / "engram-host.json"
+    configuration = {
+        "schema": 1,
         "enabled": True,
         "operator_approved": True,
         "host_isolation_verified": True,
@@ -101,8 +101,7 @@ function kicomEngramServerRuntime(): array {
         "dev_session_root": str(private / "dev-sessions"),
         "owner_registry": str(private / "owners" / "engram-owners.json"),
         "consent_dir": str(private / "consent"),
-    }))
-    config.chmod(0o600)
+    }
     fixture = r"""
 $web=$argv[1];$private=$argv[2];
 require $web.'/modules/dev/DevSession.php';
@@ -153,9 +152,12 @@ echo json_encode(['a'=>$a,'a2'=>$a2,'b'=>$b],JSON_THROW_ON_ERROR);
         print("ENGRAM_NATIVE_HTTP_DEFAULT_404_WITHOUT_TRUSTED_BOOTSTRAP=1")
     finally:
         stop_server(disabled)
-    env = dict(os.environ)
-    env["ENGRAM_TEST_RUNTIME_JSON"] = str(config)
-    active = start_server(port, bootstrap, env)
+    private_host_dir.mkdir(mode=0o700)
+    config.write_text(json.dumps(configuration))
+    config.chmod(0o600)
+    # Deliberately NO function override: actual installed lib.php locates
+    # its safe sibling runtime configuration itself.
+    active = start_server(port, bootstrap)
     try:
         status, payload = request(url, WRITE, identities["b"])
         assert status == 403, (status, payload)
@@ -177,4 +179,7 @@ echo json_encode(['a'=>$a,'a2'=>$a2,'b'=>$b],JSON_THROW_ON_ERROR);
         print("ENGRAM_NATIVE_HTTP_ANONYMOUS_READ_DENIED=1")
     finally:
         stop_server(active)
+        config.unlink(missing_ok=True)
+        private_host_dir.rmdir()
+print("ENGRAM_NATIVE_HTTP_PRIVATE_HOST_BOOTSTRAP_AUTODISCOVERED=1")
 print("ENGRAM_NATIVE_HTTP_SYNTHETIC_ACCEPTANCE_PASSED=7")
