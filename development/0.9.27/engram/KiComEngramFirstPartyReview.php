@@ -42,6 +42,7 @@ final class KiComEngramFirstPartyReview
             $this->db->exec('PRAGMA busy_timeout=5000');
             $this->db->exec('PRAGMA journal_mode=WAL');
             $this->db->exec('PRAGMA synchronous=FULL');
+            $this->db->exec('PRAGMA secure_delete=ON');
             $this->db->exec('CREATE TABLE IF NOT EXISTS drafts(
                 id TEXT PRIMARY KEY, subject TEXT NOT NULL, entry_json TEXT NOT NULL,
                 csrf_hash TEXT, displayed_at INTEGER, expires_at INTEGER NOT NULL,
@@ -107,7 +108,7 @@ final class KiComEngramFirstPartyReview
     public function stage(array $trustedActor,array $entry): string
     {
         $subject=self::subject($trustedActor,false);
-        $binding=self::binding($subject,$entry);
+        self::binding($subject,$entry);
         if (!in_array($entry['namespace'],$trustedActor['namespaces']??[],true)
             || !in_array('engram.write',$trustedActor['engram_rights']??[],true)) {
             throw new RuntimeException('ENGRAM_REVIEW_SCOPE_FORBIDDEN');
@@ -115,6 +116,8 @@ final class KiComEngramFirstPartyReview
         $id=bin2hex(random_bytes(16));
         $this->db->beginTransaction();
         try {
+            $remove=$this->db->prepare('DELETE FROM drafts WHERE expires_at<=:now OR status="approved"');
+            $remove->execute([':now'=>time()]);
             $q=$this->db->prepare('INSERT INTO drafts
                 (id,subject,entry_json,expires_at,status)
                 VALUES(:id,:subject,:entry,:expiry,"pending")');
@@ -144,7 +147,7 @@ final class KiComEngramFirstPartyReview
                 throw new RuntimeException('ENGRAM_REVIEW_NOT_FOUND');
             }
             $entry=json_decode($row['entry_json'],true,512,JSON_THROW_ON_ERROR);
-            $binding=self::binding($subject,$entry);
+            self::binding($subject,$entry);
             $csrf=bin2hex(random_bytes(32));
             $u=$this->db->prepare('UPDATE drafts SET csrf_hash=:hash,displayed_at=:now
                 WHERE id=:id AND status="pending"');
@@ -205,14 +208,14 @@ final class KiComEngramFirstPartyReview
             $binding=self::binding($subject,$entry);
             // The consent ledger must use a trusted callback bound to this
             // independently verified same-subject review of this exact draft.
-            $receipt=$this->ledger->issue($binding,180);
+            $this->ledger->issue($binding,180);
             $q=$this->db->prepare('UPDATE drafts SET status="approved",
                 csrf_hash=NULL,entry_json="{}" WHERE id=:id AND status="pending"');
             $q->execute([':id'=>$post['review_id']]);
             if ($q->rowCount()!==1) throw new RuntimeException('ENGRAM_REVIEW_CONFLICT');
             $this->db->exec('COMMIT');
             return ['ok'=>true,'code'=>'ENGRAM_REVIEW_APPROVED',
-                'binding'=>$binding,'receipt_id'=>$receipt['receipt_id']];
+                'review_id'=>$post['review_id']];
         } catch(Throwable $e){$this->db->exec('ROLLBACK');throw $e;}
     }
 }
