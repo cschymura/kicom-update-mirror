@@ -196,3 +196,6 @@ require __DIR__ . '/test-engram-kill.php';
 
 // Linux synthetic inter-process same-parent lease exclusion and SIGKILL lock release.
 require __DIR__ . '/test-engram-concurrency.php';
+
+// Synthetic ephemeral Ed25519 receipt verification of independent immutable manifest anchors.
+require __DIR__ . '/test-engram-anchor.php';
