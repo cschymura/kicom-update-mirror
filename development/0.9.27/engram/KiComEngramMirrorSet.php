@@ -182,8 +182,14 @@ final class KiComEngramMirrorSet
      * This only reconstructs an offline snapshot, never changes the live DB.
      * On copy failure leave new uncommitted files for operator quarantine.
      */
-    public function rebuildNewGeneration(string $parentManifest, string $trustedParentDigest): array
-    {
+    public function rebuildNewGeneration(
+        string $parentManifest, string $trustedParentDigest, ?callable $devFaultHook = null
+    ): array {
+        // DEV-only deterministic interruption fixture; callback receives only a
+        // constant phase label, NEVER a private path or memory content.
+        $fault = static function (string $phase) use ($devFaultHook): void {
+            if ($devFaultHook !== null) { $devFaultHook($phase); }
+        };
         $parent = $this->inspect($parentManifest, $trustedParentDigest);
         if ($parent['state'] !== 'degraded' || $parent['verified_mirrors'] !== 1
             || count($parent['source_indexes']) !== 1) {
@@ -210,11 +216,13 @@ final class KiComEngramMirrorSet
         }
         // Copy from exactly the same verified parent snapshot, not two
         // independent database backups or a currently changing live WAL.
-        foreach ([$this->first, $this->second] as $dir) {
+        $fault('before-first-copy');
+        foreach ([$this->first, $this->second] as $index => $dir) {
             self::copyPrivateSnapshot(
                 $sourceFile, $dir . DIRECTORY_SEPARATOR . $newSnapshot,
                 $parent['snapshot_sha256']
             );
+            $fault($index === 0 ? 'after-first-copy' : 'after-second-copy');
         }
         // Re-check source AND both destination copies immediately before
         // publishing a complete manifest; an incomplete generation lacks it.
@@ -238,7 +246,9 @@ final class KiComEngramMirrorSet
             'parent_source_mirror' => $sourceIndex,
         ];
         $bytes = json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $fault('before-manifest-publish');
         self::putExclusive($manifestPath, $bytes);
+        $fault('after-manifest-publish');
         return [
             'manifest' => $newManifest,
             'manifest_sha256' => hash('sha256', $bytes),
