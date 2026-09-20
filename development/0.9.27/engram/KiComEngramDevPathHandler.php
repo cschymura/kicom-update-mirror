@@ -25,13 +25,13 @@ final class KiComEngramDevPathHandler
                 }
                 try {
                     $config = $trustedServerConfig();
-                    if (!is_array($config) || array_keys($config) !== ['data', 'backups', 'webroot']
+                    if (!is_array($config) || array_keys($config) !== ['data', 'backups', 'webroots']
                         || !is_string($config['data']) || !is_string($config['backups'])
-                        || !is_string($config['webroot'])) {
+                        || !is_array($config['webroots'])) {
                         throw new RuntimeException('Trusted probe config missing');
                     }
-                    $result = KiComEngramPrivatePathProbe::run(
-                        $config['data'], $config['backups'], $config['webroot']
+                    $result = KiComEngramPrivatePathProbe::runAgainstWebRoots(
+                        $config['data'], $config['backups'], $config['webroots']
                     );
                 } catch (Throwable $error) {
                     // Never expose absolute paths, PHP identity, exceptions or file contents.
