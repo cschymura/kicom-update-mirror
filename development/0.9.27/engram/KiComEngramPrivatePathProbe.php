@@ -69,20 +69,64 @@ final class KiComEngramPrivatePathProbe
      */
     public static function run(string $dataDirectory, string $backupDirectory, string $webDocumentRoot): array
     {
-        $webRoot = realpath($webDocumentRoot);
-        if ($webRoot === false || !is_dir($webRoot)) {
-            throw new RuntimeException('Web document root could not be verified');
+        // Backwards-compatible isolated DEV test wrapper. The actual first-party
+        // handler MUST use runAgainstWebRoots with the complete reviewed list.
+        return self::runAgainstWebRoots($dataDirectory, $backupDirectory, [$webDocumentRoot]);
+    }
+
+    /**
+     * Filesystem isolation against EVERY operator-reviewed vhost document root,
+     * including provider/default-host roots where known. The caller supplies a
+     * fixed server-side list; request parameters must NEVER control this list.
+     * This cannot discover unlisted aliases or prove external HTTP non-exposure.
+     */
+    public static function runAgainstWebRoots(
+        string $dataDirectory,
+        string $backupDirectory,
+        array $webDocumentRoots
+    ): array {
+        if (count($webDocumentRoots) < 1 || count($webDocumentRoots) > 32
+            || array_keys($webDocumentRoots) !== range(0, count($webDocumentRoots) - 1)) {
+            throw new RuntimeException('Reviewed webroot list missing or invalid');
         }
-        $data = self::checkDirectory($dataDirectory, $webRoot);
-        $backups = self::checkDirectory($backupDirectory, $webRoot);
-        if ($data === $backups || dirname($data) !== dirname($backups)
-            || basename($data) !== 'data' || basename($backups) !== 'backups') {
-            throw new RuntimeException('Private data and backup directories are not isolated siblings');
+        $webRoots = [];
+        foreach ($webDocumentRoots as $requestedRoot) {
+            if (!is_string($requestedRoot) || $requestedRoot === ''
+                || $requestedRoot[0] !== DIRECTORY_SEPARATOR) {
+                throw new RuntimeException('Webroot must be an absolute path');
+            }
+            $cursor = $requestedRoot;
+            while (true) {
+                if (is_link($cursor)) {
+                    throw new RuntimeException('Webroot path contains symlink');
+                }
+                $parent = dirname($cursor);
+                if ($parent === $cursor) { break; }
+                $cursor = $parent;
+            }
+            $root = realpath($requestedRoot);
+            if ($root === false || !is_dir($root) || in_array($root, $webRoots, true)) {
+                throw new RuntimeException('Webroot is missing or duplicated');
+            }
+            $webRoots[] = $root;
         }
-        self::checkDirectory(dirname($data), $webRoot);
+        // Preflight every webroot before any synthetic file creation. Check
+        // the private parent as well as data and backup directories.
+        $data = null;
+        $backups = null;
+        foreach ($webRoots as $webRoot) {
+            $data = self::checkDirectory($dataDirectory, $webRoot);
+            $backups = self::checkDirectory($backupDirectory, $webRoot);
+            if ($data === $backups || dirname($data) !== dirname($backups)
+                || basename($data) !== 'data' || basename($backups) !== 'backups') {
+                throw new RuntimeException('Private data and backup directories are not isolated siblings');
+            }
+            self::checkDirectory(dirname($data), $webRoot);
+        }
         self::syntheticReadWrite($data);
         self::syntheticReadWrite($backups);
         return ['private_paths_checked' => true, 'synthetic_rw_data' => true,
-            'synthetic_rw_backups' => true, 'public_http_exposure_verified' => false];
+            'synthetic_rw_backups' => true, 'configured_webroots_checked' => count($webRoots),
+            'public_http_exposure_verified' => false];
     }
 }
