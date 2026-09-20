@@ -188,6 +188,10 @@ require __DIR__ . '/test-engram-ingestion.php';
 // Synthetic-only identity-scoped independent-session Engram write/retrieve roundtrip.
 require __DIR__ . '/test-engram-authenticated-bridge.php';
 
+// DEV memory HTTP-like adapter: separate server-authenticated synthetic sessions.
+require __DIR__ . '/test-engram-dev-memory-adapter.php';
+
+
 
 // Synthetic-only immutable RAID-1-inspired mirror/recovery with externally pinned manifest.
 require __DIR__ . '/test-engram-mirror.php';
