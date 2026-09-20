@@ -90,6 +90,11 @@ def build(dest: Path) -> dict:
     if len(js) > 15000:
         raise RuntimeError("Unexpected browser asset size")
     additions["assets/engram-review-client.js"] = js
+    for probe in ("KiComEngramDevPathHandler.php", "KiComEngramPrivatePathProbe.php"):
+        probe_path = "modules/dev/" + probe
+        if probe_path not in files:
+            raise RuntimeError("Missing verified DEV-only probe source")
+        additions[probe_path] = files[probe_path]
     files.update(additions)
     files["genome/modules.json"] = (
         json.dumps(module_manifest, ensure_ascii=False, indent=2) + "\n"
@@ -123,7 +128,8 @@ def build(dest: Path) -> dict:
                 "path": rel,
                 "sha256": digest(data),
                 "role": "engram-disabled-public-route" if rel == "engram.php"
-                else ("engram-inert-source" if rel.endswith(".php") else "engram-inert-asset"),
+                else ("dev-only-probe" if rel.startswith("modules/dev/")
+                      else ("engram-inert-source" if rel.endswith(".php") else "engram-inert-asset")),
                 "auto_heal": True,
             })
     if "lib.php" not in changed or "genome/modules.json" not in changed:
