@@ -178,3 +178,6 @@ require __DIR__ . '/test-private-path-probe.php';
 
 // End-to-end synthetic DEV session/HTTP authorization candidate regression.
 require __DIR__ . '/test-engram-dev-route.php';
+
+// Synthetic content-integrity regression: structurally valid SQLite may hold tampered revisions.
+require __DIR__ . '/test-engram-integrity.php';
