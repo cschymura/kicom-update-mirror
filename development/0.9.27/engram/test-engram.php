@@ -202,3 +202,6 @@ require __DIR__ . '/test-engram-anchor.php';
 
 // Synthetic independently signed multi-generation lineage and trusted head audit.
 require __DIR__ . '/test-engram-catalog.php';
+
+// Synthetic-only sealed SQLite transfer to separate operator-workstation private key.
+require __DIR__ . '/test-engram-offline-transfer.php';
