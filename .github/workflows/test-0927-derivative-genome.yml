@@ -4,6 +4,7 @@ on:
     branches: [work/kicom-0.9.27-pam]
     paths:
       - 'development/0.9.27/reproduction/**'
+      - 'development/0.9.27/membrane/test-os-boundary.sh'
       - 'source/0.9.26-r3/**'
       - '.github/workflows/test-0927-derivative-genome.yml'
 permissions:
@@ -19,7 +20,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: sodium
+          extensions: pdo_sqlite, sqlite3, sodium
           coverage: none
       - name: Verify unchanged R3 source and package
         shell: bash
@@ -39,12 +40,17 @@ jobs:
         run: |
           set -euo pipefail
           bash development/0.9.27/reproduction/test-derivative-runtime.sh
-      - name: Re-run existing reproduction quarantine tests
+      - name: Re-run existing reproduction quarantine tests with required OS fixture
         shell: bash
         run: |
           set -euo pipefail
           php development/0.9.27/reproduction/test-child-lineage.php
           php development/0.9.27/reproduction/test-child-birth-gate.php
+          # The OS-backed quarantine scripts are intentionally stateful and must
+          # run in the same prerequisite order as the canonical membrane suite.
+          bash development/0.9.27/membrane/test-os-boundary.sh
+          bash development/0.9.27/reproduction/test-isolated-identity.sh
+          bash development/0.9.27/reproduction/test-daughter-runtime.sh
           bash development/0.9.27/reproduction/test-child-host-lineage.sh
           bash development/0.9.27/reproduction/test-daughter-recovery.sh
-          bash development/0.9.27/reproduction/test-daughter-runtime.sh
+          php development/0.9.27/reproduction/test-real-native-birth.php /tmp/kicom-membrane-os-$GITHUB_RUN_ID
