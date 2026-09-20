@@ -208,6 +208,160 @@ final class KiComEngramStore
         return $q->fetchAll();
     }
 
+
+    /**
+     * DEV-only offline private snapshot. SQLite VACUUM INTO takes a consistent
+     * transaction-level copy including committed WAL content; do NOT copy the
+     * live .sqlite file alone. Backup files contain ALL historical revisions,
+     * including withdrawn records, and must stay outside webroot.
+     *
+     * Return metadata only: never send the backup or its path to public logs.
+     */
+    public function backup(string $backupDirectory, string $publicDocumentRoot): array
+    {
+        $directory = self::checkedPrivateDirectory($backupDirectory, $publicDocumentRoot);
+        $filename = 'engram-' . bin2hex(random_bytes(16)) . '.sqlite';
+        $path = $directory . DIRECTORY_SEPARATOR . $filename;
+        if (file_exists($path) || is_link($path)) {
+            throw new RuntimeException('Backup path already exists');
+        }
+        $old = umask(0077);
+        try {
+            $this->db->exec('VACUUM INTO ' . $this->db->quote($path));
+            if (!is_file($path) || is_link($path) || !@chmod($path, 0600)) {
+                throw new RuntimeException('Private backup creation failed');
+            }
+            $stat = stat($path);
+            if ($stat === false || $stat['nlink'] !== 1 || ($stat['mode'] & 0077) !== 0) {
+                throw new RuntimeException('Backup is not a single-link private regular file');
+            }
+            $snapshot = new PDO('sqlite:' . $path, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+            if ($snapshot->query('PRAGMA quick_check')->fetchColumn() !== 'ok') {
+                throw new RuntimeException('Backup integrity check failed');
+            }
+            $rows = (int)$snapshot->query('SELECT COUNT(*) FROM engram_revisions')->fetchColumn();
+            unset($snapshot);
+            $hash = hash_file('sha256', $path);
+            if ($hash === false) {
+                throw new RuntimeException('Backup digest failed');
+            }
+            return ['filename' => $filename, 'sha256' => $hash, 'revision_count' => $rows];
+        } catch (Throwable $e) {
+            // Failed incomplete snapshot only; never remove pre-existing backups.
+            if (is_file($path) && !is_link($path)) {
+                @unlink($path);
+            }
+            throw $e;
+        } finally {
+            umask($old);
+        }
+    }
+
+    /**
+     * Restore into an EMPTY, already-provisioned private directory only.
+     * The expected SHA-256 MUST be supplied through a separate trusted
+     * operator manifest; a checksum stored beside the backup is not authority.
+     * This never overwrites a live database, WAL, SHM, or a previous restore.
+     */
+    public static function restore(
+        string $backupPath,
+        string $destinationDirectory,
+        string $publicDocumentRoot,
+        string $expectedSha256
+    ): array {
+        if (!preg_match('/\\A[a-f0-9]{64}\\z/D', $expectedSha256)) {
+            throw new InvalidArgumentException('Invalid independent backup digest');
+        }
+        $sourceDirectory = self::checkedPrivateDirectory(dirname($backupPath), $publicDocumentRoot);
+        $destination = self::checkedPrivateDirectory($destinationDirectory, $publicDocumentRoot);
+        $source = $sourceDirectory . DIRECTORY_SEPARATOR . basename($backupPath);
+        if (is_link($backupPath) || !is_file($backupPath) || realpath($backupPath) !== $source) {
+            throw new RuntimeException('Backup path must be a private regular file');
+        }
+        $s = stat($source);
+        if ($s === false || $s['nlink'] !== 1 || ($s['mode'] & 0077) !== 0) {
+            throw new RuntimeException('Backup file permissions or links invalid');
+        }
+        if (!hash_equals($expectedSha256, (string)hash_file('sha256', $source))) {
+            throw new RuntimeException('Independent backup digest mismatch');
+        }
+        $probe = new PDO('sqlite:' . $source, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        if ($probe->query('PRAGMA quick_check')->fetchColumn() !== 'ok') {
+            throw new RuntimeException('Backup quick_check failed');
+        }
+        $rows = (int)$probe->query('SELECT COUNT(*) FROM engram_revisions')->fetchColumn();
+        unset($probe);
+        $final = $destination . DIRECTORY_SEPARATOR . 'engrams.sqlite';
+        foreach ([$final, $final . '-wal', $final . '-shm'] as $occupied) {
+            if (file_exists($occupied) || is_link($occupied)) {
+                throw new RuntimeException('Restore destination is not empty');
+            }
+        }
+        $temporary = $destination . DIRECTORY_SEPARATOR . '.engram-restore-' . bin2hex(random_bytes(16));
+        $old = umask(0077);
+        try {
+            $input = @fopen($source, 'rb');
+            $output = @fopen($temporary, 'x+b');
+            if ($input === false || $output === false) {
+                if (is_resource($input)) { fclose($input); }
+                if (is_resource($output)) { fclose($output); }
+                throw new RuntimeException('Restore copy could not start');
+            }
+            try {
+                $copied = stream_copy_to_stream($input, $output);
+                if ($copied === false || !fflush($output)) {
+                    throw new RuntimeException('Restore copy failed');
+                }
+            } finally {
+                fclose($input);
+                fclose($output);
+            }
+            if (!@chmod($temporary, 0600)
+                || !hash_equals($expectedSha256, (string)hash_file('sha256', $temporary))) {
+                throw new RuntimeException('Restore copy failed integrity verification');
+            }
+            // link is an atomic no-clobber creation; rename could overwrite.
+            if (!@link($temporary, $final)) {
+                throw new RuntimeException('Concurrent restore or destination conflict');
+            }
+            unlink($temporary);
+            $restored = new self($destination, $publicDocumentRoot);
+            if ($restored->health()['quick_check'] !== 'ok') {
+                throw new RuntimeException('Restored DB health check failed');
+            }
+            unset($restored);
+            return ['sha256' => $expectedSha256, 'revision_count' => $rows, 'restored' => true];
+        } finally {
+            if (is_file($temporary) && !is_link($temporary)) { @unlink($temporary); }
+            umask($old);
+        }
+    }
+
+    /** Deny webroot, unsafe mode and symlink ancestors; directory must preexist. */
+    private static function checkedPrivateDirectory(string $privateDirectory, string $publicDocumentRoot): string
+    {
+        if (is_link($privateDirectory) || !is_dir($privateDirectory)) {
+            throw new RuntimeException('Private directory must exist without symlinks');
+        }
+        $directory = realpath($privateDirectory);
+        $web = realpath($publicDocumentRoot);
+        if ($directory === false || $web === false || !is_dir($web)
+            || $directory === $web || str_starts_with($directory, $web . DIRECTORY_SEPARATOR)
+            || (fileperms($directory) & 0077) !== 0) {
+            throw new RuntimeException('Private directory isolation or permissions invalid');
+        }
+        $cursor = $privateDirectory;
+        while (true) {
+            if (is_link($cursor)) {
+                throw new RuntimeException('Symlink component in private directory path');
+            }
+            $parent = dirname($cursor);
+            if ($parent === $cursor || $cursor === '.' || $cursor === '') { break; }
+            $cursor = $parent;
+        }
+        return $directory;
+    }
+
     public function health(): array
     {
         return [
