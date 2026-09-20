@@ -44,6 +44,7 @@ MEMORY_MODULES = [
     "KiComEngramPrivatePathProbe.php",
     "KiComEngramDevPathHandler.php",
     "KiComEngramNativeMemoryRoute.php",
+    "KiComEngramFirstPartyHostBridge.php",
 ]
 ASSET = "engram-review-client.js"
 
@@ -103,6 +104,79 @@ if (strtoupper((string)($_GET['q']??'')) === 'ENGRAM_MEMORY') {
 
 """
     files["api.php"] = api.replace(anchor, dispatch+anchor, 1)
+    # First-party review branch: original admin PHP session + independently
+    # signed WebAuthn; no anonymous or DEV-token-only approval issuance.
+    review_dispatch = b"""/* Engram review requires ORIGINAL logged-in KiCom admin PHP session,
+   trusted host runtime AND a fresh same-owner signed WebAuthn assertion. */
+if (strtoupper((string)($_GET['q']??'')) === 'ENGRAM_REVIEW') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, private');
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('Referrer-Policy: no-referrer');
+    header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
+    if (!function_exists('kicomEngramServerRuntime')) {
+        http_response_code(404);
+        echo '{"ok":false,"code":"ENGRAM_REVIEW_UNAVAILABLE"}';
+        exit;
+    }
+    try {
+        if (session_status()!==PHP_SESSION_ACTIVE) session_start();
+        $runtime=kicomEngramServerRuntime();
+        if (!is_array($runtime) || ($runtime['review_enabled']??null)!==true) {
+            throw new RuntimeException('ENGRAM_REVIEW_DISABLED');
+        }
+        require_once __DIR__.'/modules/engram/KiComEngramFirstPartyHostBridge.php';
+        $body=file_get_contents('php://input',false,null,0,16385);
+        if (!is_string($body)) throw new RuntimeException('ENGRAM_BODY_UNAVAILABLE');
+        $response=KiComEngramFirstPartyHostBridge::reviewApi(
+            $runtime,$_SESSION,session_id(),$_SERVER,$body);
+        foreach (($response['headers']??[]) as $key=>$value) {
+            if (is_string($key) && is_string($value)) header($key.': '.$value);
+        }
+        http_response_code((int)($response['http_status']??503));
+        echo json_encode($response['body']??['ok'=>false,'code'=>'ENGRAM_REVIEW_UNAVAILABLE'],
+            JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+    } catch (Throwable $error) {
+        http_response_code(404);
+        echo '{"ok":false,"code":"ENGRAM_REVIEW_UNAVAILABLE"}';
+    }
+    exit;
+}
+
+"""
+    files["api.php"] = files["api.php"].replace(anchor,review_dispatch+anchor,1)
+    # Bind review creation/rendering to KiCom's original authenticated admin
+    # session and existing CSRF gate, without introducing a public PHP file.
+    admin = files["admin.php"]
+    admin_anchor = b"if(isset($_GET['logout'])){session_destroy();header('Location: admin.php');exit;}"
+    if admin.count(admin_anchor)!=1:
+        raise RuntimeError("Original KiCom admin auth/session anchor changed")
+    admin_review = b"""
+if (isset($_GET['engram_review'])) {
+    header('Cache-Control: no-store, private');
+    if (empty($_SESSION['admin']) || !function_exists('kicomEngramServerRuntime')) {
+        http_response_code(404); echo 'Engram review unavailable'; exit;
+    }
+    try {
+        csrf(); // Existing admin CSRF initialization, never a client flag.
+        $runtime=kicomEngramServerRuntime();
+        if (!is_array($runtime) || ($runtime['review_enabled']??null)!==true) {
+            throw new RuntimeException('ENGRAM_REVIEW_DISABLED');
+        }
+        require_once __DIR__.'/modules/engram/KiComEngramFirstPartyHostBridge.php';
+        $result=KiComEngramFirstPartyHostBridge::adminPage(
+            $runtime,$_SESSION,session_id(),$_SERVER,$_GET,$_POST);
+        header('Content-Type: '.$result['content_type']);
+        http_response_code((int)$result['status']);
+        echo $result['body'];
+    } catch (Throwable $error) {
+        http_response_code(404); echo 'Engram review unavailable';
+    }
+    exit;
+}
+"""
+    files["admin.php"]=admin.replace(admin_anchor,admin_anchor+admin_review,1)
     module_manifest = json.loads(files["genome/modules.json"])
     old_paths = {m["path"] for m in module_manifest["modules"]}
     if any(name.startswith("modules/engram/") for name in files):
