@@ -64,7 +64,7 @@
       status.textContent = "Passkey-Bestätigung wird vorbereitet …";
       try {
         const payload = { review_id: review.value, csrf: csrf.value };
-        const begin = await post(target.pathname, "ENGRAM_REVIEW_BEGIN", payload);
+        const begin = await post(target.pathname + target.search, "ENGRAM_REVIEW_BEGIN", payload);
         const publicKey = begin.publicKey;
         if (!publicKey || !Array.isArray(publicKey.allowCredentials) ||
             typeof begin.challenge_id !== "string") {
@@ -93,7 +93,7 @@
             signature: toBase64url(credential.response.signature)
           }
         };
-        await post(target.pathname, "ENGRAM_REVIEW_CONFIRM", {
+        await post(target.pathname + target.search, "ENGRAM_REVIEW_CONFIRM", {
           ...payload,
           challenge_id: begin.challenge_id,
           assertion
