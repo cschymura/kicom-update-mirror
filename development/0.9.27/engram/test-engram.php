@@ -172,3 +172,6 @@ try {
     unset($store);
     recursiveRemove($root);
 }
+
+// Run the separate synthetic local-path probe suite through the existing Engram CI.
+require __DIR__ . '/test-private-path-probe.php';
