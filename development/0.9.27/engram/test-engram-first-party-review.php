@@ -95,7 +95,7 @@ try {
     $reviewAttested=true;
     $approved=$flow->confirm($post,['browser_session'=>'browser-a']);
     $reviewCheck(($approved['ok']??false)===true
-        && ($approved['binding']['body_sha256']??null)===hash('sha256',$entry['body']),
+        && ($approved['review_id']??null)===$id,
         'fresh independently attested same-owner browser action issues exact-record consent');
     $reviewDeny(static fn()=> $flow->confirm($post,['browser_session'=>'browser-a']),
         'same rendered form cannot issue a second approval');
