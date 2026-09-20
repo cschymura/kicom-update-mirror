@@ -190,6 +190,27 @@ final class KiComEngramMirrorSet
         $fault = static function (string $phase) use ($devFaultHook): void {
             if ($devFaultHook !== null) { $devFaultHook($phase); }
         };
+        // Advisory, local-filesystem parent-generation lease: never use a
+        // mutable new lock file that could accidentally become an orphan.
+        // SIGKILL releases the kernel flock; retry still needs the externally
+        // trusted manifest digest. No cross-host/distributed guarantee.
+        $this->assertStorageTopology();
+        if (!preg_match('/\\Amirror-[a-f0-9]{32}\\.json\\z/D', $parentManifest)) {
+            throw new RuntimeException('Repair parent manifest name invalid');
+        }
+        $lockPath = $this->manifestDir . DIRECTORY_SEPARATOR . $parentManifest;
+        if (!self::privateFile($lockPath)) {
+            throw new RuntimeException('Repair parent manifest is not a private regular file');
+        }
+        $parentHandle = @fopen($lockPath, 'rb');
+        if ($parentHandle === false) {
+            throw new RuntimeException('Repair parent manifest cannot be opened');
+        }
+        if (!@flock($parentHandle, LOCK_EX | LOCK_NB)) {
+            fclose($parentHandle);
+            throw new RuntimeException('Concurrent repair of this parent is already active');
+        }
+        try {
         $parent = $this->inspect($parentManifest, $trustedParentDigest);
         if ($parent['state'] !== 'degraded' || $parent['verified_mirrors'] !== 1
             || count($parent['source_indexes']) !== 1) {
@@ -260,6 +281,10 @@ final class KiComEngramMirrorSet
             'mirrors_created' => 2,
             'independent_manifest_anchor_stored' => false,
         ];
+        } finally {
+            @flock($parentHandle, LOCK_UN);
+            fclose($parentHandle);
+        }
     }
 
     /**
