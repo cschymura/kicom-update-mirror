@@ -29,7 +29,9 @@ if (!function_exists('proc_open') || !function_exists('proc_terminate')
 }
 $killStages = [
     'before-first-copy'=>[0,0],
+    'during-first-copy'=>[1,0],
     'after-first-copy'=>[1,0],
+    'during-second-copy'=>[2,0],
     'after-second-copy'=>[2,0],
     'before-manifest-publish'=>[2,0],
     'after-manifest-publish'=>[2,1],
@@ -102,6 +104,25 @@ foreach ($killStages as $stage=>$expected) {
             && !$inventory['auto_recovery_permitted'],
             'process-killed generation leaves only reviewable orphan counts at '.$stage
         );
+        if (str_starts_with($stage, 'during-')) {
+            $newA = array_values(array_filter(
+                glob($root.'/a/engram-*.sqlite') ?: [],
+                static fn(string $file): bool => $file !== $parentBadFile
+            ));
+            $newB = array_values(array_filter(
+                glob($root.'/b/engram-*.sqlite') ?: [],
+                static fn(string $file): bool => $file !== $parentGoodFile
+            ));
+            $incomplete = $stage === 'during-first-copy'
+                ? ($newA[0] ?? '') : ($newB[0] ?? '');
+            killCheck(count($newA) === 1
+                && count($newB) === ($stage === 'during-first-copy' ? 0 : 1)
+                && is_file($incomplete)
+                && filesize($incomplete) === 512
+                && filesize($incomplete) < filesize($parentGoodFile)
+                && hash_file('sha256',$incomplete) !== $p['snapshot_sha256'],
+                'actual SIGKILL leaves a non-recoverable 512-byte partial mirror at '.$stage);
+        }
         killCheck(
             $set->inspect($parent['manifest'],$parent['manifest_sha256'])['state']==='degraded'
             && hash_file('sha256',$parentBadFile)===$badHash
