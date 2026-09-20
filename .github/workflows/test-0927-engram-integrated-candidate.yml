@@ -1,0 +1,101 @@
+name: KiCom Engram integrated-disabled release review
+on:
+  push:
+    branches: [work/kicom-0.9.27-pam]
+    paths:
+      - 'development/0.9.27/engram/**'
+      - '.github/workflows/test-0927-engram-integrated-candidate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inert-engram-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite,sqlite3,sodium,zip
+          coverage: none
+      - name: Verify baseline and tested memory code
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f  releases/0.9.26/KiCom-0.9.26-R3.zip' | sha256sum -c -
+          (cd source/0.9.26-r3 && sha256sum -c MANIFEST.sha256)
+          node --check development/0.9.27/engram/engram-review-client.js
+          python3 -m py_compile development/0.9.27/engram/build_engram_integrated_candidate.py
+          php development/0.9.27/engram/test-engram.php
+      - name: Build whole KiCom Engram inert candidate from exact R3
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 development/0.9.27/engram/build_engram_integrated_candidate.py "$GITHUB_WORKSPACE/KiCom-0.9.27-Engram-INTEGRATED-DISABLED.zip" | tee "$GITHUB_WORKSPACE/engram-integrated-build-record.json"
+          unzip -tqq "$GITHUB_WORKSPACE/KiCom-0.9.27-Engram-INTEGRATED-DISABLED.zip"
+          sha256sum "$GITHUB_WORKSPACE/KiCom-0.9.27-Engram-INTEGRATED-DISABLED.zip"
+      - name: Native KiCom protected self-update verifier and strict privacy gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/kicom-engram-integrated-review
+          cp -a source/0.9.26-r3/. /tmp/kicom-engram-integrated-review/
+          php -d display_errors=0 -r '
+            chdir($argv[1]); require "lib.php";
+            $x=kicomSelfUpdateZipInspect($argv[2]);
+            if(empty($x["ok"])) {
+              fwrite(STDERR,"ENGRAM_INTEGRATED_NATIVE_VERIFIER_DENIED=".($x["code"]??"UNKNOWN")."\n"); exit(71);
+            }
+            if(($x["version"]??"")!=="0.9.27"
+              || ($x["genome"]["id"]??"")!=="kicom-0.9.27-g26-engram-integrated-disabled"
+              || ($x["genome"]["parent"]??"")!=="kicom-0.9.26-g25r3"
+              || (int)($x["genome"]["generation"]??0)!==26
+              || !empty($x["kernel_update"])) exit(72);
+            if((kicomSelfUpdateRiskClass($x)["class"]??"")!=="red")exit(73);
+            foreach(["index.php","api.php","guardian.php","recovery.php",".htaccess"] as $critical) {
+              if(!hash_equals(hash_file("sha256",$argv[1]."/".$critical),
+                    $x["entries"][$critical]["sha256"]??"")) exit(74);
+            }
+            foreach(["modules/engram/KiComEngramStore.php",
+                     "modules/engram/KiComEngramWebAuthnApprovalController.php",
+                     "modules/engram/KiComEngramFirstPartyReview.php",
+                     "modules/engram/KiComEngramWebAuthnReviewHttpAdapter.php",
+                     "assets/engram-review-client.js","engram.php"] as $required) {
+              if(!isset($x["entries"][$required])) exit(75);
+            }
+            foreach(array_keys($x["entries"]) as $p) {
+              if((str_starts_with($p,"var/")&&$p!=="var/.htaccess")
+                || (str_starts_with($p,"stage/")&&$p!=="stage/.htaccess")
+                || preg_match("~(^|/)(?:\\.env|.*\\.(?:key|sqlite|db|pem|bak))$~i",$p)) exit(76);
+            }
+            echo "ENGRAM_INTEGRATED_NATIVE_VERIFIER_OK=1\n";
+            echo "ENGRAM_INTEGRATED_REVIEW_RISK=red\n";
+            echo "ENGRAM_INTEGRATED_KERNEL_UNCHANGED=1\n";
+            echo "ENGRAM_INTEGRATED_INSTALL_ATTEMPTED=0\n";
+          ' /tmp/kicom-engram-integrated-review "$GITHUB_WORKSPACE/KiCom-0.9.27-Engram-INTEGRATED-DISABLED.zip"
+          python3 - <<'PY'
+          import json,zipfile
+          path="KiCom-0.9.27-Engram-INTEGRATED-DISABLED.zip"
+          with zipfile.ZipFile(path) as archive:
+              modules=json.loads(archive.read("genome/modules.json"))
+              eng=[m for m in modules["modules"] if m["path"].startswith("modules/engram/")]
+              assert len(eng)>=14 and all(m["enabled"] is False for m in eng)
+              route=archive.read("engram.php")
+              assert b"http_response_code(404)" in route and b"exit;" in route
+              assert b"require_once" not in route and b"php://input" not in route
+              assert "private_memory_read_write_enabled" not in archive.namelist()
+          print("ENGRAM_INTEGRATED_MODULES_PRESENT_AND_DISABLED=1")
+          print("ENGRAM_INTEGRATED_PUBLIC_ROUTE_FAILS_CLOSED=1")
+          print("ENGRAM_INTEGRATED_REAL_MEMORY_INGESTION_ENABLED=0")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KiCom-0927-Engram-INTEGRATED-DISABLED-REVIEW
+          path: |
+            KiCom-0.9.27-Engram-INTEGRATED-DISABLED.zip
+            engram-integrated-build-record.json
+          if-no-files-found: error
+          retention-days: 14
