@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__ . '/KiComEngramMirrorSet.php';
 
 /**
  * Isolated DEV-only verification of a DETACHED Ed25519 signature over an
@@ -15,6 +16,40 @@ declare(strict_types=1);
  */
 final class KiComEngramAnchorVerifier
 {
+    /**
+     * Verify receipt against its actual immutable manifest, without logging
+     * paths, engram data or returning authority for writes/current promotion.
+     * This checks a v2 parent digest matches the current manifest metadata,
+     * but does NOT independently authenticate or fetch the parent generation.
+     */
+    public static function inspectSignedMirror(
+        KiComEngramMirrorSet $mirrors,
+        string $receiptJson, string $trustedPublicKeyHex,
+        string $expectedStoreId, int $minimumSequence, int $trustedNow
+    ): array {
+        $anchor = self::verify(
+            $receiptJson, $trustedPublicKeyHex, $expectedStoreId,
+            $minimumSequence, $trustedNow
+        );
+        $status = $mirrors->inspect($anchor['manifest'], $anchor['manifest_sha256']);
+        if (($status['manifest_format'] === 'engram-mirror-v1'
+                && $anchor['parent_manifest_sha256'] !== null)
+            || ($status['manifest_format'] === 'engram-mirror-v2'
+                && ($anchor['parent_manifest_sha256'] === null
+                    || !hash_equals($status['parent_manifest_sha256'],
+                        $anchor['parent_manifest_sha256'])))) {
+            throw new RuntimeException('Signed anchor parent metadata does not match manifest');
+        }
+        return [
+            'signature_verified' => true,
+            'state' => $status['state'],
+            'verified_mirrors' => $status['verified_mirrors'],
+            'sequence' => $anchor['sequence'],
+            'manifest' => $anchor['manifest'],
+            'manifest_sha256' => $anchor['manifest_sha256'],
+        ];
+    }
+
     public static function verify(
         string $receiptJson,
         string $trustedPublicKeyHex,
