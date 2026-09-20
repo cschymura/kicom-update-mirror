@@ -191,6 +191,9 @@ require __DIR__ . '/test-engram-authenticated-bridge.php';
 // DEV memory HTTP-like adapter: separate server-authenticated synthetic sessions.
 require __DIR__ . '/test-engram-dev-memory-adapter.php';
 
+// DEV identity resolver: server-owned passkey credential fingerprint to private-memory subject.
+require __DIR__ . '/test-engram-verified-credential-resolver.php';
+
 
 
 // Synthetic-only immutable RAID-1-inspired mirror/recovery with externally pinned manifest.
