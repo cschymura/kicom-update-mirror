@@ -2,9 +2,9 @@
 """Build a complete CODE-CONTAINING KiCom release candidate with Engram inert.
 
 Uses exact verified 0.9.26-R3 parent and trusted native update packaging.
-Includes all synthetic-test-proven memory modules, browser assets and a
-fail-closed first-party route. NO private configuration or user memories.
-The route is intentionally NOT activated without a later approved genuine
+Includes all synthetic-test-proven memory modules and browser assets but NO
+first-party route (native KiCom update allowlist forbids a new root PHP entry).
+NO private configuration or user memories. The feature is NOT activated without a later approved genuine
 server-bound browser identity, audited host isolation and connector bridge.
 """
 from __future__ import annotations
@@ -45,20 +45,6 @@ MEMORY_MODULES = [
     "KiComEngramDevPathHandler.php",
 ]
 ASSET = "engram-review-client.js"
-ENTRY = """<?php
-declare(strict_types=1);
-/* Engram private memory remains OFF in this code-containing release.
-   This route cannot be enabled by query parameters, headers, cookies,
-   GitHub/Slack messages or an ordinary KiCom DEV bearer token.
-   The genuine first-party browser identity and private host config still
-   need an explicitly reviewed production integration. */
-header('Cache-Control: no-store, private');
-header('X-Content-Type-Options: nosniff');
-header('X-Frame-Options: DENY');
-header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
-http_response_code(404);
-exit;
-"""
 
 
 def digest(data: bytes) -> str:
@@ -72,10 +58,10 @@ def build(dest: Path) -> dict:
     host_probe.patch_version(files)
     module_manifest = json.loads(files["genome/modules.json"])
     old_paths = {m["path"] for m in module_manifest["modules"]}
-    if "engram.php" in files or any(name.startswith("modules/engram/") for name in files):
+    if any(name.startswith("modules/engram/") for name in files):
         raise RuntimeError("Unrecognized original Engram code in trusted R3")
 
-    additions: dict[str, bytes] = {"engram.php": ENTRY.encode("utf-8")}
+    additions: dict[str, bytes] = {}
     for name in MEMORY_MODULES:
         raw = (BASE / name).read_bytes()
         if not raw.startswith(b"<?php"):
@@ -127,9 +113,8 @@ def build(dest: Path) -> dict:
             components.append({
                 "path": rel,
                 "sha256": digest(data),
-                "role": "engram-disabled-public-route" if rel == "engram.php"
-                else ("dev-only-probe" if rel.startswith("modules/dev/")
-                      else ("engram-inert-source" if rel.endswith(".php") else "engram-inert-asset")),
+                "role": "dev-only-probe" if rel.startswith("modules/dev/")
+                else ("engram-inert-source" if rel.endswith(".php") else "engram-inert-asset"),
                 "auto_heal": True,
             })
     if "lib.php" not in changed or "genome/modules.json" not in changed:
