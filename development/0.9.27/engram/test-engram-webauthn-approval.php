@@ -9,6 +9,8 @@ if (!class_exists('KiComDevSessionManager',false)) {
 }
 require_once __DIR__.'/KiComEngramWebAuthnApprovalController.php';
 require_once __DIR__.'/KiComEngramWebAuthnReviewHttpAdapter.php';
+require_once __DIR__.'/KiComEngramFirstPartyHostBridge.php';
+require_once __DIR__.'/KiComEngramNativeMemoryRoute.php';
 require_once __DIR__.'/KiComEngramDevMemoryAdapter.php';
 
 $webAuthnChecks=0;
@@ -288,6 +290,116 @@ try {
     ]],JSON_THROW_ON_ERROR);
     $checkWebAuthn(($newAdapter->handle($newHeaders,$read2)['body']['records'][0]['body']??null)===$secondEntry['body'],
         'new authenticated session recovers private HTTP-reviewed memory');
+
+    // Real first-party HOST bridge uses the existing KiCom ADMIN PHP
+    // session, not a caller-provided actor or a DEV bearer as reviewer.
+    mkdir($root.'/private/data',0700);
+    mkdir($root.'/private/backups',0700);
+    $adminSession=['admin'=>true,'csrf'=>bin2hex(random_bytes(24))];
+    $adminSid=bin2hex(random_bytes(20));
+    $host=[
+        'enabled'=>true,'operator_approved'=>true,'host_isolation_verified'=>true,
+        'review_enabled'=>true,'runtime_source'=>'server-only-reviewed',
+        'private_memory_scope'=>'dev-verified-owner',
+        'web_root'=>$root.'/web','reviewed_web_roots'=>[$root.'/web'],
+        'data_dir'=>$root.'/private/data','backups_dir'=>$root.'/private/backups',
+        'owner_registry'=>$ownerPath,'consent_dir'=>$root.'/private/consent',
+        'review_dir'=>$root.'/private/drafts','stepup_dir'=>$root.'/private/stepup',
+        'passkey_store'=>$root.'/private/passkeys','admin_subject'=>'synthetic-a',
+        'expected_origin'=>$origin,'rp_id'=>$rpId,
+        'dev_session_root'=>$root.'/sessions',
+    ];
+    $adminRequest=['REQUEST_METHOD'=>'GET','HTTPS'=>'on'];
+    $page=KiComEngramFirstPartyHostBridge::adminPage(
+        $host,$adminSession,$adminSid,$adminRequest,[],[]
+    );
+    $checkWebAuthn($page['status']===200
+        && str_contains($page['body'],'name="body"'),
+        'real KiCom admin PHP session can open private first-party review form');
+    $notAdmin=$adminSession;$notAdmin['admin']=false;
+    $checkWebAuthn(KiComEngramFirstPartyHostBridge::adminPage(
+        $host,$notAdmin,$adminSid,$adminRequest,[],[])['status']===404,
+        'no original KiCom admin session means no first-party memory review');
+    $offHost=$host;$offHost['review_enabled']=false;
+    $checkWebAuthn(KiComEngramFirstPartyHostBridge::adminPage(
+        $offHost,$adminSession,$adminSid,$adminRequest,[],[])['status']===404,
+        'unapproved host cannot expose first-party browser review');
+
+    $thirdEntryBody='Synthetic lime engine confirmed by authenticated KiCom admin and real P-256 passkey.';
+    $thirdEntrySource='note:admin-synthetic-review';
+    $stage=KiComEngramFirstPartyHostBridge::adminPage(
+        $host,$adminSession,$adminSid,
+        ['REQUEST_METHOD'=>'POST','HTTPS'=>'on'],[],
+        ['csrf'=>$adminSession['csrf'],
+         'body'=>$thirdEntryBody,'source_ref'=>$thirdEntrySource]
+    );
+    preg_match('/name="review_id" value="([a-f0-9]{32})"/',$stage['body'],$reviewMatch);
+    preg_match('/name="csrf" value="([a-f0-9]{64})"/',$stage['body'],$csrfMatch);
+    $reviewId=$reviewMatch[1]??'';$reviewCsrf=$csrfMatch[1]??'';
+    $checkWebAuthn($stage['status']===200 && strlen($reviewId)===32
+        && strlen($reviewCsrf)===64
+        && str_contains($stage['body'],'data-engram-review-api="/api.php?q=ENGRAM_REVIEW"'),
+        'original admin session stages one exact record and renders live-route WebAuthn UI');
+    $reviewHttp=['REQUEST_METHOD'=>'POST','HTTPS'=>'on','HTTP_ORIGIN'=>$origin,
+        'CONTENT_TYPE'=>'application/json'];
+    $startJson=json_encode(['operation'=>'ENGRAM_REVIEW_BEGIN','payload'=>[
+        'review_id'=>$reviewId,'csrf'=>$reviewCsrf
+    ]],JSON_THROW_ON_ERROR);
+    $noSession=KiComEngramFirstPartyHostBridge::reviewApi(
+        $host,$notAdmin,$adminSid,$reviewHttp,$startJson
+    );
+    $checkWebAuthn($noSession['http_status']===404,
+        'valid review CSRF alone cannot substitute for original KiCom admin session');
+    $started=KiComEngramFirstPartyHostBridge::reviewApi(
+        $host,$adminSession,$adminSid,$reviewHttp,$startJson
+    );
+    $checkWebAuthn($started['http_status']===200
+        && ($started['body']['publicKey']['userVerification']??null)==='required',
+        'first-party admin session obtains ORIGINAL KiCom signed challenge');
+    $thirdAssertion=$sign($started['body'],$a,3);
+    $confirmJson=json_encode(['operation'=>'ENGRAM_REVIEW_CONFIRM','payload'=>[
+        'review_id'=>$reviewId,'csrf'=>$reviewCsrf,
+        'challenge_id'=>$started['body']['challenge_id'],
+        'assertion'=>$thirdAssertion
+    ]],JSON_THROW_ON_ERROR);
+    $thirdApproved=KiComEngramFirstPartyHostBridge::reviewApi(
+        $host,$adminSession,$adminSid,$reviewHttp,$confirmJson
+    );
+    $checkWebAuthn($thirdApproved['http_status']===200
+        && ($thirdApproved['body']['code']??null)==='ENGRAM_REVIEW_APPROVED',
+        'real signed P-256 step-up grants exact memory after existing admin login');
+    $checkWebAuthn(KiComEngramFirstPartyHostBridge::reviewApi(
+        $host,$adminSession,$adminSid,$reviewHttp,$confirmJson
+    )['http_status']===403,
+        'admin cannot replay previously signed exact-record browser confirmation');
+
+    $thirdEntry=[
+        'namespace'=>'project','kind'=>'technical','body'=>$thirdEntryBody,
+        'source_kind'=>'explicit_user','source_ref'=>$thirdEntrySource,
+        'sensitivity'=>'ordinary',
+    ];
+    $nativeWrite=json_encode(['operation'=>'ENGRAM_REMEMBER','payload'=>$thirdEntry],
+        JSON_THROW_ON_ERROR);
+    $nativeSaved=KiComEngramNativeMemoryRoute::handle(
+        ['REQUEST_METHOD'=>'POST','HTTPS'=>'on','CONTENT_TYPE'=>'application/json',
+         'HTTP_X_KICOM_DEV_SESSION'=>$sessionA['session_id'],
+         'HTTP_X_KICOM_DEV_TOKEN'=>$sessionA['token']],
+        $nativeWrite,$host
+    );
+    $checkWebAuthn($nativeSaved['http_status']===200,
+        'browser signed consent is actually consumed by separate native KiCom API write');
+    $nativeRead=json_encode(['operation'=>'ENGRAM_RECALL','payload'=>[
+        'namespace'=>'project','query'=>'lime engine','limit'=>3
+    ]],JSON_THROW_ON_ERROR);
+    $nativeRecalled=KiComEngramNativeMemoryRoute::handle(
+        ['REQUEST_METHOD'=>'POST','HTTPS'=>'on','CONTENT_TYPE'=>'application/json',
+         'HTTP_X_KICOM_DEV_SESSION'=>$secondSession['session_id'],
+         'HTTP_X_KICOM_DEV_TOKEN'=>$secondSession['token']],
+        $nativeRead,$host
+    );
+    $checkWebAuthn($nativeRecalled['http_status']===200
+        && ($nativeRecalled['body']['records'][0]['body']??null)===$thirdEntryBody,
+        'independent original KiCom DEV session recalls admin+signed-passkey-approved record');
 
     echo "KICOM_ENGRAM_REAL_WEBAUTHN_APPROVAL_TESTS_PASSED=$webAuthnChecks\n";
 } finally {
