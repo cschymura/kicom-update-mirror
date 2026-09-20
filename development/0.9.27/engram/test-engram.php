@@ -1,0 +1,90 @@
+<?php
+declare(strict_types=1);
+require __DIR__ . '/KiComEngramStore.php';
+
+$checks = 0;
+function check(bool $value, string $message): void {
+    global $checks;
+    if (!$value) { throw new RuntimeException('FAIL: ' . $message); }
+    $checks++;
+    echo "PASS " . $message . "\n";
+}
+function rejects(callable $action, string $message): void {
+    $failedClosed = false;
+    try { $action(); } catch (RuntimeException|InvalidArgumentException $e) { $failedClosed = true; }
+    check($failedClosed, $message);
+}
+function recursiveRemove(string $path): void {
+    if (is_link($path) || is_file($path)) { unlink($path); return; }
+    if (!is_dir($path)) { return; }
+    foreach (scandir($path) as $item) {
+        if ($item !== '.' && $item !== '..') { recursiveRemove($path . '/' . $item); }
+    }
+    rmdir($path);
+}
+$root = sys_get_temp_dir() . '/kicom-engram-ci-' . bin2hex(random_bytes(7));
+mkdir($root, 0700);
+$web = $root . '/web';
+$private = $root . '/private';
+mkdir($web, 0755);
+mkdir($private, 0700);
+try {
+    rejects(static fn() => new KiComEngramStore($web, $web), 'web-root storage rejected');
+    mkdir($web . '/insecure', 0700);
+    rejects(static fn() => new KiComEngramStore($web . '/insecure', $web), 'nested web-root storage rejected');
+    $link = $root . '/link';
+    symlink($private, $link);
+    rejects(static fn() => new KiComEngramStore($link, $web), 'symlink private directory rejected');
+    chmod($private, 0755);
+    rejects(static fn() => new KiComEngramStore($private, $web), 'world-accessible private directory rejected');
+    chmod($private, 0700);
+    $store = new KiComEngramStore($private, $web);
+    check(($store->health()['quick_check'] ?? null) === 'ok', 'SQLite quick_check ok');
+    check(($store->health()['journal_mode'] ?? null) === 'wal', 'SQLite WAL enabled');
+    check((fileperms($private . '/engrams.sqlite') & 0077) === 0, 'database file private permissions');
+    $one = $store->create('subject-a', 'project', 'collaboration',
+        'Synthetic: summarize decisions before implementation.', 'synthetic_test', 'fixture://one');
+    check(strlen($one['id']) === 32 && $one['revision'] === 1, 'new independent engram id and revision');
+    $same = $store->search('subject-a', 'project', 'decisions');
+    check(count($same) === 1 && $same[0]['body'] === 'Synthetic: summarize decisions before implementation.', 'literal scoped search retrieves synthetic note');
+    check(count($store->search('subject-b', 'project', 'decisions')) === 0, 'cross-subject read fails');
+    check(count($store->search('subject-a', 'other', 'decisions')) === 0, 'cross-namespace read fails');
+    check(count($store->search('subject-a', 'project', '%')) === 0, 'percent character cannot become LIKE wildcard');
+    check(count($store->search('subject-a', 'project', "' OR 1=1 --")) === 0, 'SQL-like text cannot expand search');
+    rejects(static fn() => $store->search('subject-a', 'project', 'Synthetic', 21), 'unbounded search limit rejected');
+    rejects(static fn() => $store->search('../subject-a', 'project', 'Synthetic'), 'traversal-like identity rejected');
+    rejects(static fn() => $store->create('subject-a', 'project', 'authority', 'Synthetic', 'synthetic_test', 'fixture://x'), 'invalid engram type rejected');
+    rejects(static fn() => $store->create('subject-a', 'project', 'lesson', str_repeat('x', 4097), 'synthetic_test', 'fixture://x'), 'oversized body rejected');
+    rejects(static fn() => $store->create('subject-a', 'project', 'lesson', 'Synthetic', 'untrusted_chat', 'fixture://x'), 'unapproved provenance rejected');
+    $two = $store->revise('subject-a', 'project', $one['id'], 1, $one['revision_hash'],
+        'Synthetic: verified new collaboration decision.', 'synthetic_test', 'fixture://two');
+    check($two['revision'] === 2 && $two['revision_hash'] !== $one['revision_hash'], 'revision chain updated');
+    check(count($store->search('subject-a', 'project', 'summarize')) === 0, 'old revision not presented as current');
+    check(count($store->search('subject-a', 'project', 'verified new')) === 1, 'new revision searchable');
+    rejects(static fn() => $store->revise('subject-a', 'project', $one['id'], 1, $one['revision_hash'],
+        'Synthetic stale write', 'synthetic_test', 'fixture://stale'), 'stale revision denied');
+    rejects(static fn() => $store->revise('subject-b', 'project', $one['id'], 2, $two['revision_hash'],
+        'Synthetic forbidden update', 'synthetic_test', 'fixture://cross'), 'cross-subject revision denied');
+    rejects(static fn() => $store->revise('subject-a', 'project', $one['id'], 2, str_repeat('0', 64),
+        'Synthetic forged update', 'synthetic_test', 'fixture://bad'), 'wrong revision hash denied');
+    $three = $store->revise('subject-a', 'project', $one['id'], 2, $two['revision_hash'],
+        'Synthetic: withdraw this note.', 'synthetic_test', 'fixture://withdraw', true);
+    check($three['revision'] === 3, 'withdrawal appends a new revision');
+    check(count($store->search('subject-a', 'project', 'Synthetic')) === 0, 'withdrawn engram absent from current search');
+    rejects(static fn() => $store->revise('subject-a', 'project', $one['id'], 3, $three['revision_hash'],
+        'Synthetic: resurrect', 'synthetic_test', 'fixture://resurrect'), 'withdrawn note cannot be silently reactivated');
+
+    $insecure = $root . '/insecure-db';
+    mkdir($insecure, 0700);
+    file_put_contents($insecure . '/engrams.sqlite', 'not-real-sqlite');
+    chmod($insecure . '/engrams.sqlite', 0644);
+    rejects(static fn() => new KiComEngramStore($insecure, $web), 'preexisting readable database rejected');
+    unlink($insecure . '/engrams.sqlite');
+    symlink($private . '/engrams.sqlite', $insecure . '/engrams.sqlite');
+    rejects(static fn() => new KiComEngramStore($insecure, $web), 'database symlink rejected');
+    check(($store->health()['quick_check'] ?? null) === 'ok', 'database remains healthy after negative tests');
+    echo "KICOM_ENGRAM_TESTS_PASSED=$checks\n";
+} finally {
+    unset($store);
+    recursiveRemove($root);
+}
