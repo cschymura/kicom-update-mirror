@@ -42,6 +42,26 @@ jobs:
           python3 development/0.9.27/engram/build_engram_integrated_candidate.py "$GITHUB_WORKSPACE/KiCom-0.9.27-Engram-INTEGRATED-DISABLED.zip" | tee "$GITHUB_WORKSPACE/engram-integrated-build-record.json"
           unzip -tqq "$GITHUB_WORKSPACE/KiCom-0.9.27-Engram-INTEGRATED-DISABLED.zip"
           sha256sum "$GITHUB_WORKSPACE/KiCom-0.9.27-Engram-INTEGRATED-DISABLED.zip"
+      - name: Smoke test ACTUAL extracted release module layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/kicom-engram-extracted
+          unzip -q "$GITHUB_WORKSPACE/KiCom-0.9.27-Engram-INTEGRATED-DISABLED.zip" -d /tmp/kicom-engram-extracted
+          find /tmp/kicom-engram-extracted/modules/engram -name '*.php' -print0 | xargs -0 -n1 php -l
+          php -r '
+            $root=$argv[1];
+            require $root."/modules/engram/KiComEngramWebAuthnApprovalController.php";
+            if(!class_exists("KiComPasskeyBridge",false)
+                || !class_exists("KiComEngramFirstPartyReview",false)
+                || !class_exists("KiComEngramPrivateOwnerRegistry",false)
+                || !class_exists("KiComEngramWebAuthnApprovalController",false))exit(81);
+            echo "ENGRAM_EXTRACTED_WEBAUTHN_MODULE_REQUIRE_OK=1\\n";
+          ' /tmp/kicom-engram-extracted
+          if grep -R -l -F 'source/0.9.26-r3/' /tmp/kicom-engram-extracted/modules/engram; then
+            echo "ENGRAM_PACKAGED_DEV_SOURCE_PATH_LEAK=1"; exit 82
+          fi
+          echo "ENGRAM_PACKAGED_DEV_SOURCE_PATH_LEAK=0"
       - name: Native KiCom protected self-update verifier and strict privacy gate
         shell: bash
         run: |
