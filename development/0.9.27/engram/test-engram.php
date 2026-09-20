@@ -181,3 +181,6 @@ require __DIR__ . '/test-engram-dev-route.php';
 
 // Synthetic content-integrity regression: structurally valid SQLite may hold tampered revisions.
 require __DIR__ . '/test-engram-integrity.php';
+
+// Synthetic-only explicit per-record consent and secret-screening gate.
+require __DIR__ . '/test-engram-ingestion.php';
