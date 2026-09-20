@@ -175,6 +175,32 @@ final class KiComEngramFirstPartyReview
     }
 
     /**
+     * Server-only read of the EXACT currently rendered record and CSRF binding.
+     * A valid browser session alone may inspect but NEVER issue consent.
+     * Do not expose the returned digest as proof of human approval.
+     */
+    public function inspect(string $id,string $csrf,array $serverBrowserAuth): array
+    {
+        $subject=self::subject(($this->reviewer)($serverBrowserAuth),false);
+        if (preg_match('/\\A[a-f0-9]{32}\\z/D',$id)!==1
+            || preg_match('/\\A[a-f0-9]{64}\\z/D',$csrf)!==1) {
+            throw new RuntimeException('ENGRAM_REVIEW_NOT_FOUND');
+        }
+        $q=$this->db->prepare('SELECT * FROM drafts WHERE id=:id');
+        $q->execute([':id'=>$id]);$row=$q->fetch();
+        if (!is_array($row) || $row['status']!=='pending'
+            || !hash_equals($row['subject'],$subject)
+            || (int)$row['expires_at']<=time()
+            || (int)$row['displayed_at']<=0
+            || !is_string($row['csrf_hash'])
+            || !hash_equals($row['csrf_hash'],hash('sha256',$csrf))) {
+            throw new RuntimeException('ENGRAM_REVIEW_NOT_FOUND');
+        }
+        $entry=json_decode($row['entry_json'],true,512,JSON_THROW_ON_ERROR);
+        return self::binding($subject,$entry);
+    }
+
+    /**
      * Called by a FIRST-PARTY verified browser POST after displaying the text.
      * Host MUST provide fresh independently verified human WebAuthn assertion
      * for the same mapped subject and enforce no-store, HTTPS and CSRF origin.
