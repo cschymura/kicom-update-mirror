@@ -68,16 +68,16 @@ final class KiComEngramDevCandidatePatcher
                     . "        && is_file(__DIR__.'/KiComEngramDevPathHandler.php')" . "\n"
                     . "        && is_file(__DIR__.'/KiComEngramPrivatePathProbe.php')) {" . "\n"
                     . "        if (!class_exists('KiComEngramDevPathHandler', false)) require_once __DIR__.'/KiComEngramDevPathHandler.php';" . "\n"
-                    . "        $handlers=array_merge($handlers,KiComEngramDevPathHandler::handlers(" . "\n"
+                    . "        \$handlers=array_merge(\$handlers,KiComEngramDevPathHandler::handlers(" . "\n"
                     . "            static fn(): array => kicomEngramDevTrustedConfig()" . "\n"
                     . "        ));" . "\n"
                     . "    }"
                 );
                 $raw = self::replaceOnce(
                     $raw,
-                    "    if($op==='')return ['ok'=>false,'code'=>'DEV_BRIDGE_OPERATION_REQUIRED'];",
-                    "    if($op==='')return ['ok'=>false,'code'=>'DEV_BRIDGE_OPERATION_REQUIRED'];" . "\n"
-                    . "    if($op==='DEV_ENGRAM_PATH_PROBE')return ['ok'=>false,'code'=>'DEV_ENGRAM_POST_REQUIRED'];"
+                    "    if(\$op==='')return ['ok'=>false,'code'=>'DEV_BRIDGE_OPERATION_REQUIRED'];",
+                    "    if(\$op==='')return ['ok'=>false,'code'=>'DEV_BRIDGE_OPERATION_REQUIRED'];" . "\n"
+                    . "    if(\$op==='DEV_ENGRAM_PATH_PROBE')return ['ok'=>false,'code'=>'DEV_ENGRAM_POST_REQUIRED'];"
                 );
             }
             $preflighted[$name] = $raw;
