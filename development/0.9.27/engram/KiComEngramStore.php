@@ -228,7 +228,7 @@ final class KiComEngramStore
             throw new InvalidArgumentException('Search limit out of bounds');
         }
         $this->assertPrivateStorageFiles();
-        $q = $this->db->prepare('SELECT r.id,r.revision,r.kind,r.body,r.source_kind,r.source_ref,r.revision_hash
+        $q = $this->db->prepare('SELECT r.*
             FROM engram_revisions r
             WHERE r.subject=:subject AND r.namespace=:namespace AND r.entry_state=\'active\'
             AND r.revision=(SELECT MAX(p.revision) FROM engram_revisions p
@@ -240,7 +240,21 @@ final class KiComEngramStore
         $q->bindValue(':needle', $needle, PDO::PARAM_STR);
         $q->bindValue(':max_rows', $limit, PDO::PARAM_INT);
         $q->execute();
-        return $q->fetchAll();
+        $output = [];
+        foreach ($q->fetchAll() as $row) {
+            // SQLite quick_check only proves structural integrity; compare
+            // content hash BEFORE returning even a synthetically tampered row.
+            if (!is_string($row['revision_hash'])
+                || !hash_equals($row['revision_hash'], self::digest($row))) {
+                throw new RuntimeException('Engram revision content integrity check failed');
+            }
+            $output[] = array_intersect_key(
+                $row,
+                array_fill_keys(['id', 'revision', 'kind', 'body',
+                    'source_kind', 'source_ref', 'revision_hash'], true)
+            );
+        }
+        return $output;
     }
 
 
