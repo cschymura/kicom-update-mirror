@@ -17,7 +17,7 @@ final class KiComEngramBrowserReviewPage
         string $trustedJsonApiPath,
         string $trustedClientScriptPath
     ): string {
-        if (preg_match('#\\A/(?:[a-z0-9_-]+/)*[a-z0-9_-]+\\.php\\z#D',
+        if (preg_match('#\\A/api\\.php\\?q=ENGRAM_REVIEW\\z#D',
             $trustedJsonApiPath)!==1
             || preg_match('#\\A/(?:[a-z0-9_-]+/)*[a-z0-9_-]+\\.js\\z#D',
                 $trustedClientScriptPath)!==1) {
