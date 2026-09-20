@@ -145,6 +145,7 @@ try {
     mirrorCheck(file_get_contents($marker) === 'synthetic pre-existing data',
         'rejected restore leaves pre-existing destination file untouched');
 
+    require __DIR__ . '/test-engram-rebuild.php';
     echo "KICOM_ENGRAM_MIRROR_TESTS_PASSED=$mirrorTests\n";
 } finally {
     unset($raid,$source,$restoredStore,$reopened);
