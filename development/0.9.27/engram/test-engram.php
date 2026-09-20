@@ -154,6 +154,19 @@ try {
         'safe storage opens after rejecting unsafe sidecars');
     unset($sidecarStore);
 
+    chmod($sidecarDir, 0755);
+    rejects(static fn() => (new KiComEngramStore($sidecarDir, $web)),
+        'private directory mode downgrade prevents reopening');
+    chmod($sidecarDir, 0700);
+    $sidecarStore = new KiComEngramStore($sidecarDir, $web);
+    chmod($sidecarDir, 0755);
+    rejects(static fn() => $sidecarStore->health(),
+        'live private store denies directory permissions downgrade');
+    chmod($sidecarDir, 0700);
+    check(($sidecarStore->health()['quick_check'] ?? null) === 'ok',
+        'live store recovers after permissions restored');
+    unset($sidecarStore);
+
     echo "KICOM_ENGRAM_TESTS_PASSED=$checks\n";
 } finally {
     unset($store);
