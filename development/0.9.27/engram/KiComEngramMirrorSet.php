@@ -220,7 +220,10 @@ final class KiComEngramMirrorSet
         foreach ([$this->first, $this->second] as $index => $dir) {
             self::copyPrivateSnapshot(
                 $sourceFile, $dir . DIRECTORY_SEPARATOR . $newSnapshot,
-                $parent['snapshot_sha256']
+                $parent['snapshot_sha256'],
+                static function () use ($fault, $index): void {
+                    $fault($index === 0 ? 'during-first-copy' : 'during-second-copy');
+                }
             );
             $fault($index === 0 ? 'after-first-copy' : 'after-second-copy');
         }
@@ -264,7 +267,8 @@ final class KiComEngramMirrorSet
      * written output is retained for quarantine, never advertised via manifest.
      */
     private static function copyPrivateSnapshot(
-        string $source, string $destination, string $expectedSha256
+        string $source, string $destination, string $expectedSha256,
+        ?callable $firstChunkHook = null
     ): void {
         if (!hash_equals($expectedSha256, (string)self::digestFile($source))) {
             throw new RuntimeException('Snapshot source integrity failed');
@@ -283,10 +287,33 @@ final class KiComEngramMirrorSet
                 throw new RuntimeException('Exclusive repair copy failed to start');
             }
             try {
-                if (!@chmod($destination, 0600)
-                    || stream_copy_to_stream($input, $output, 536870913) !== $bytes
+                if (!@chmod($destination, 0600)) {
+                    throw new RuntimeException('Exclusive repair copy permissions invalid');
+                }
+                $copied = 0;
+                while ($copied < $bytes) {
+                    $chunk = fread($input, min(512, $bytes - $copied));
+                    if (!is_string($chunk) || $chunk === '') {
+                        throw new RuntimeException('Exclusive repair source read failed');
+                    }
+                    if (fwrite($output, $chunk) !== strlen($chunk)) {
+                        throw new RuntimeException('Exclusive repair partial write failed');
+                    }
+                    $copied += strlen($chunk);
+                    if ($copied === strlen($chunk) && $copied < $bytes
+                        && $firstChunkHook !== null) {
+                        // First 512 bytes have been flushed but the complete
+                        // file is not written. Deterministic synthetic tests
+                        // can now SIGKILL this separate process mid-copy.
+                        if (!fflush($output)) {
+                            throw new RuntimeException('Exclusive repair partial flush failed');
+                        }
+                        $firstChunkHook();
+                    }
+                }
+                if ($copied !== $bytes || fread($input, 1) !== ''
                     || !fflush($output)) {
-                    throw new RuntimeException('Exclusive repair copy failed');
+                    throw new RuntimeException('Exclusive repair copy length or flush mismatch');
                 }
             } finally {
                 fclose($input);
