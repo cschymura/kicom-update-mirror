@@ -62,6 +62,11 @@ jobs:
             echo "ENGRAM_PACKAGED_DEV_SOURCE_PATH_LEAK=1"; exit 82
           fi
           echo "ENGRAM_PACKAGED_DEV_SOURCE_PATH_LEAK=0"
+          ROUTE_RESULT="$(php -r '$root=$argv[1]; $_GET=["q"=>"ENGRAM_MEMORY"]; $_SERVER["REQUEST_METHOD"]="POST"; $_SERVER["HTTPS"]="on"; require $root."/api.php";' /tmp/kicom-engram-extracted)"
+          if [ "$ROUTE_RESULT" != '{"ok":false,"code":"ENGRAM_MEMORY_UNAVAILABLE"}' ]; then
+            echo "ENGRAM_NATIVE_API_DEFAULT_DENY_FAILED=1"; exit 83
+          fi
+          echo "ENGRAM_NATIVE_API_DEFAULT_DENY_PASSED=1"
       - name: Native KiCom protected self-update verifier and strict privacy gate
         shell: bash
         run: |
@@ -80,7 +85,7 @@ jobs:
               || (int)($x["genome"]["generation"]??0)!==26
               || !empty($x["kernel_update"])) exit(72);
             if((kicomSelfUpdateRiskClass($x)["class"]??"")!=="red")exit(73);
-            foreach(["index.php","api.php","guardian.php","recovery.php",".htaccess"] as $critical) {
+            foreach(["index.php","guardian.php","recovery.php",".htaccess"] as $critical) {
               if(!hash_equals(hash_file("sha256",$argv[1]."/".$critical),
                     $x["entries"][$critical]["sha256"]??"")) exit(74);
             }
@@ -88,6 +93,7 @@ jobs:
                      "modules/engram/KiComEngramWebAuthnApprovalController.php",
                      "modules/engram/KiComEngramFirstPartyReview.php",
                      "modules/engram/KiComEngramWebAuthnReviewHttpAdapter.php",
+                     "modules/engram/KiComEngramNativeMemoryRoute.php",
                      "assets/engram-review-client.js"] as $required) {
               if(!isset($x["entries"][$required])) exit(75);
             }
@@ -107,13 +113,20 @@ jobs:
           with zipfile.ZipFile(path) as archive:
               modules=json.loads(archive.read("genome/modules.json"))
               eng=[m for m in modules["modules"] if m["path"].startswith("modules/engram/")]
-              assert len(eng)>=14 and all(m["enabled"] is False for m in eng)
+              assert len(eng)>=15 and all(m["enabled"] is False for m in eng)
               assert "engram.php" not in archive.namelist()
               assert archive.read("index.php") == open("source/0.9.26-r3/index.php","rb").read()
-              assert archive.read("api.php") == open("source/0.9.26-r3/api.php","rb").read()
+              original=open("source/0.9.26-r3/api.php","rb").read()
+              routed=archive.read("api.php")
+              anchor=b"header('Content-Type: text/plain; charset=utf-8');"
+              split=original.index(anchor)
+              assert routed.startswith(original[:split]+b"/* Engram native memory:")
+              assert routed.endswith(original[split:])
+              assert routed.count(b"kicomEngramServerRuntime") == 2
+              assert b"ENGRAM_MEMORY_UNAVAILABLE" in routed
               assert "private_memory_read_write_enabled" not in archive.namelist()
           print("ENGRAM_INTEGRATED_MODULES_PRESENT_AND_DISABLED=1")
-          print("ENGRAM_INTEGRATED_PUBLIC_ROUTE_UNREGISTERED=1")
+          print("ENGRAM_INTEGRATED_NATIVE_ROUTE_DEFAULT_DENY=1")
           print("ENGRAM_INTEGRATED_REAL_MEMORY_INGESTION_ENABLED=0")
           PY
       - uses: actions/upload-artifact@v4
