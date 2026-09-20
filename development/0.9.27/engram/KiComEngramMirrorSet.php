@@ -400,6 +400,9 @@ final class KiComEngramMirrorSet
             }
         }
         return [
+            'manifest_format' => $m['format'],
+            'parent_manifest_sha256' => $m['format'] === 'engram-mirror-v2'
+                ? $m['parent_manifest_sha256'] : null,
             'state' => count($good) === 2 ? 'mirrored'
                 : (count($good) === 1 ? 'degraded' : 'unrecoverable'),
             'verified_mirrors' => count($good),
