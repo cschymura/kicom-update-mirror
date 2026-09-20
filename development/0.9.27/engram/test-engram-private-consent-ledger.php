@@ -90,7 +90,7 @@ try {
         $b['session_id']=>['verified'=>true,'subject'=>'synthetic-other',
             'namespaces'=>['project'],'engram_rights'=>['engram.read','engram.write']],
     ];
-    $identity=static fn(array $auth):array=>$actors[$auth['session_id']]??['verified'=>false];
+    $identity=static function(array $auth)use (&$actors):array { return $actors[$auth['session_id']]??['verified'=>false]; };
     $memory=new KiComEngramDevMemoryAdapter(
         $sessions,$identity,[$ledger,'consume'],
         static fn():KiComEngramStore=>new KiComEngramStore($root.'/private',$root.'/web')
