@@ -1,0 +1,29 @@
+# KiCom Engram — DEV-17 signed lineage catalog and explicit operator-boundary handoff
+
+Date: 2026-09-20. Continuation of DEV-16 after multiple autonomous isolated DEV cycles explicitly requested by user. Read current live BOOTSTRAP, canonical resources, collaboration protocol, task and latest checkpoint in any future chat. Public GitHub contains ONLY source code, synthetic tests, proof metadata and this document; NO actual personal memory, raw conversations, live SQLite, mirrored DB/backup bytes, operator private signing keys, real consent receipts, OTP, user IDs, tokens, private host configuration or retrieval results.
+
+## Implemented executable work
+
+- `KiComEngramMirrorSet::inspect()` returns the parent manifest NAME and SHA as metadata only for v2 (null for v1), without memory body, path, signature, authorization or automatic repair.
+- New `KiComEngramSignedCatalog.php` verifies a bounded (1-128), strictly ordered, explicitly supplied list of independent Ed25519-signed anchor receipts against the immutable on-disk generation manifests. A signed current-head manifest name, trusted public key, store scope, independently protected MINIMUM CURRENT sequence and trusted clock are required to be independently provisioned. Older parent receipts are verified without applying current-head minimum floor to their older valid sequences. Every v2 parent reference must have an EARLIER signed, exact-name/digest-matching ancestor receipt in the supplied list; missing/duplicate/reordered ancestor, validly signed but wrong parent, wrong scope/head/floor or tampered signature is refused.
+- Returns ONLY bounded metadata counts, current head state, degraded/unrecoverable counts, `operator_review_required`, `auto_recovery_permitted=false`, and `complete_replica_inventory_proven=false`. In particular it CANNOT prove the caller did not omit an unrelated earlier root, archived/private backup, copied manifest or external replica. It NEVER imports a memory, selects an unknown orphan, promotes a generation, deletes data or changes live KiCom.
+- `test-engram-catalog.php` signs synthetic three-generation lineage (v1->v2->v2) with an EPHEMERAL CI-only Ed25519 private key generated at test runtime and zeroed at teardown. It checks accepted exact head, degraded older states, missing signed ancestor/intermediate, unordered/duplicate sequence, head/scope mismatch, wrong parent digest, forged modification, and independent unanchored-file inventory. No real private keys were stored in GitHub.
+
+## Pinned CI evidence
+
+Tested executable SHA: **`5f420ff9f050ef5c3638b68be110313d780d362b`**.
+GitHub Actions workflow `KiCom private Engram DEV`: run **35507403041**; job **106069435918**; conclusion **success**.
+Original protected KiCom 0.9.26-R3 package and full source manifest preflight passed; PHP source/test driver lint and complete synthetic suite passed.
+Markers: original main 49 + path 23 + DEV route 23 + endpoint 14 + integrity 16 + ingestion 29 + mirror 46 + exception-fault 45 + actual SIGKILL 44 + concurrency 8 + signature anchor 22 + signed catalog 16 = **335 synthetic checks**.
+Evidence: https://github.com/cschymura/kicom-update-mirror/actions/runs/35507403041
+
+## Human decision/action now required before safely advancing beyond isolated DEV
+
+1. Real PRIVATE operator signing key location, independently secured PUBLIC verifier-key distribution and monotonically anchored current-generation sequence/head are UNPROVISIONED. A synthetic CI key or same-account PHP-writable key does not satisfy independence. The user/operator must choose and authorize a separate protected trust/backup location. Do NOT export actual memories to public GitHub, Slack or Mail as a workaround. Independently mirrored local directories under the same hosting UID remain vulnerable to account-wide compromise and whole-host failure.
+2. Actual All-inkl PHP SAPI effective UID, open_basedir restrictions, alias/default-host document roots, cross-application same-UID read isolation, private folder realpath and explicit synthetic server-side write/read/cleanup have NOT been verified. The operator must authorize a CONTROLLED, authenticated, minimal host staging path probe and supply/verify configuration using the existing protected KiCom update/authorization process. The private data directory must NEVER be configured as a public deployment target.
+3. Real memory ingestion MUST REMAIN DISABLED: immutable historical revisions, WAL/temp, all mirrors, all archived/off-host backups and signed catalogs still lack tested end-to-end personal-data retention and user/legal-required erasure procedures. A user/operator decision on retention (default preserve history vs explicit confidential erasure) and complete replica inventory is required before real personal memories are processed. Synthetic consent callbacks do NOT provide real KiCom user identity or an actual production record-specific approval issuer.
+4. No automatic background self-healing, real production installation, off-host backup, live restore drill or trusted key management has occurred. DEV-17 completes an ISOLATED technical preparation milestone, not a production release or user-memory migration. Do not claim true physical RAID or fully autonomous memory.
+
+User previously asked "bitte autonom weiter machen, bis benutzereingriff erforderlich". The actual next boundary is the selection/authorization of physically or administratively independent storage/signing and permission for an authenticated synthetic-only host probe. Stop protected real-host changes here; do not ask the user to redo earlier WebFTP data/backups 0700 setup, and do not automatically export private data or weaken access controls. Future conversation should read this verified checkpoint and ask the minimum user inputs to proceed safely.
+
+Documentation commit is NOT a new executable CI pass; pinned SHA/run above are the implementation evidence.
