@@ -203,6 +203,9 @@ require __DIR__ . '/test-engram-private-owner-registry.php';
 // Durable, atomic exact-record consent receipts before private synthetic memory ingestion.
 require __DIR__ . '/test-engram-private-consent-ledger.php';
 
+// Full isolated KiCom DEV passkey -> registry -> consent -> SQLite -> new-session read acceptance.
+require __DIR__ . '/test-engram-integrated-private-memory.php';
+
 
 
 // Synthetic-only immutable RAID-1-inspired mirror/recovery with externally pinned manifest.
