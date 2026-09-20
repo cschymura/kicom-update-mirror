@@ -73,6 +73,32 @@ endpointCheck(scandir($routeData) === ['.','..'] && scandir($routeBackups) === [
     'first-party endpoint leaves no synthetic private file behind');
 endpointCheck(!str_contains(json_encode($worked, JSON_THROW_ON_ERROR), $routeRoot),
     'first-party endpoint response exposes no absolute filesystem path');
+
+$extraWeb = $routeRoot . '/extra-host';
+mkdir($extraWeb, 0755);
+$GLOBALS['engram_fixture_config'] = [
+    'data'=>$routeData,'backups'=>$routeBackups,'webroots'=>[$routeWeb,$extraWeb]
+];
+$multiroot = kicomDevApiDispatch($apiHeaders,$emptyPayload);
+endpointCheck($multiroot['http_status'] === 200
+    && ($multiroot['body']['configured_webroots_checked'] ?? 0) === 2,
+    'actual endpoint validates multiple trusted vhost webroots');
+$GLOBALS['engram_fixture_config'] = [
+    'data'=>$routeData,'backups'=>$routeBackups,'webroots'=>[$routeWeb,$routeRoot]
+];
+$hostRoot = kicomDevApiDispatch($apiHeaders,$emptyPayload);
+endpointCheck(($hostRoot['body']['code'] ?? '') === 'ENGRAM_PATH_PROBE_UNAVAILABLE',
+    'actual endpoint rejects default-host mapping of private parent');
+$GLOBALS['engram_fixture_config'] = [
+    'data'=>$routeData,'backups'=>$routeBackups,'webroots'=>[]
+];
+$missingRoots = kicomDevApiDispatch($apiHeaders,$emptyPayload);
+endpointCheck(($missingRoots['body']['code'] ?? '') === 'ENGRAM_PATH_PROBE_UNAVAILABLE',
+    'actual endpoint denies incomplete empty webroot inventory');
+$GLOBALS['engram_fixture_config'] = [
+    'data'=>$routeData,'backups'=>$routeBackups,'webroots'=>[$routeWeb]
+];
+
 $GLOBALS['engram_fixture_config'] = ['data'=>$routeWeb,'backups'=>$routeBackups,'webroots'=>[$routeWeb]];
 $mappingDenied = kicomDevApiDispatch($apiHeaders,$emptyPayload);
 endpointCheck(($mappingDenied['body']['code'] ?? '') === 'ENGRAM_PATH_PROBE_UNAVAILABLE'
@@ -92,6 +118,6 @@ try {
 kicomDevSessions()->revoke($apiSession);
 $revokedResult = kicomDevApiDispatch($apiHeaders,$emptyPayload);
 endpointCheck($revokedResult['http_status'] === 401
-    && $GLOBALS['engram_fixture_config_reads'] === 2,
+    && $GLOBALS['engram_fixture_config_reads'] === 5,
     'actual endpoint rejects revoked session without another private config read');
 echo "KICOM_ENGRAM_ENDPOINT_TESTS_PASSED=$endpointChecks\n";
