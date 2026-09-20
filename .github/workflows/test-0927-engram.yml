@@ -36,6 +36,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node --check development/0.9.27/engram/engram-review-client.js
           php -l development/0.9.27/engram/KiComEngramStore.php
           php -l development/0.9.27/engram/test-engram.php
           php -l development/0.9.27/engram/KiComEngramSyntheticTransfer.php
