@@ -10,6 +10,7 @@ declare(strict_types=1);
 final class KiComEngramStore
 {
     private PDO $db;
+    private string $dbPath;
 
     public function __construct(string $privateDirectory, string $publicDocumentRoot)
     {
@@ -49,6 +50,10 @@ final class KiComEngramStore
                 umask($old);
             }
         }
+        $this->dbPath = $path;
+        $this->assertPrivateStorageFiles();
+        $oldOpenMask = umask(0077);
+        try {
         $this->db = new PDO('sqlite:' . $path, null, null, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -78,6 +83,27 @@ final class KiComEngramStore
         $check = $this->db->query('PRAGMA quick_check')->fetchColumn();
         if ($check !== 'ok') {
             throw new RuntimeException('Engram SQLite quick_check failed');
+        }
+        $this->assertPrivateStorageFiles();
+        } finally {
+            umask($oldOpenMask);
+        }
+    }
+
+    /** All SQLite main/WAL/SHM files are private, regular and single-link. */
+    private function assertPrivateStorageFiles(): void
+    {
+        foreach ([$this->dbPath, $this->dbPath . '-wal', $this->dbPath . '-shm'] as $file) {
+            clearstatcache(true, $file);
+            if (is_link($file)) {
+                throw new RuntimeException('Symlink in private SQLite storage denied');
+            }
+            if (!file_exists($file)) { continue; }
+            $st = @stat($file);
+            if ($st === false || !is_file($file) || $st['nlink'] !== 1
+                || ($st['mode'] & 0077) !== 0) {
+                throw new RuntimeException('SQLite storage file must be private and single-link');
+            }
         }
     }
 
@@ -122,6 +148,7 @@ final class KiComEngramStore
     /** Explicitly called by an already authorized local application. Never auto-ingest chat. */
     public function create(string $subject, string $namespace, string $kind, string $body, string $sourceKind, string $sourceRef): array
     {
+        $this->assertPrivateStorageFiles();
         $subject = self::key($subject);
         $namespace = self::key($namespace);
         $kind = self::kind($kind);
@@ -155,6 +182,7 @@ final class KiComEngramStore
         if ($expectedRevision < 1 || !preg_match('/\\A[a-f0-9]{64}\\z/D', $expectedHash)) {
             throw new InvalidArgumentException('Invalid revision precondition');
         }
+        $this->assertPrivateStorageFiles();
         $this->db->exec('BEGIN IMMEDIATE');
         try {
             $q = $this->db->prepare('SELECT * FROM engram_revisions
@@ -193,6 +221,7 @@ final class KiComEngramStore
         if ($limit < 1 || $limit > 20) {
             throw new InvalidArgumentException('Search limit out of bounds');
         }
+        $this->assertPrivateStorageFiles();
         $q = $this->db->prepare('SELECT r.id,r.revision,r.kind,r.body,r.source_kind,r.source_ref,r.revision_hash
             FROM engram_revisions r
             WHERE r.subject=:subject AND r.namespace=:namespace AND r.entry_state=\'active\'
@@ -219,6 +248,7 @@ final class KiComEngramStore
      */
     public function backup(string $backupDirectory, string $publicDocumentRoot): array
     {
+        $this->assertPrivateStorageFiles();
         $directory = self::checkedPrivateDirectory($backupDirectory, $publicDocumentRoot);
         $filename = 'engram-' . bin2hex(random_bytes(16)) . '.sqlite';
         $path = $directory . DIRECTORY_SEPARATOR . $filename;
@@ -364,6 +394,7 @@ final class KiComEngramStore
 
     public function health(): array
     {
+        $this->assertPrivateStorageFiles();
         return [
             'quick_check' => $this->db->query('PRAGMA quick_check')->fetchColumn(),
             'journal_mode' => $this->db->query('PRAGMA journal_mode')->fetchColumn(),
