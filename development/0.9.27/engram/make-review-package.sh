@@ -15,10 +15,10 @@ trap 'rm -rf -- "$TMP"' EXIT
 D="$TMP/Engram-Hostprobe-REVIEW-DEV"
 mkdir -p "$D/source" "$D/tests" "$D/workstation" "$D/baseline-r3"
 cp -- development/0.9.27/engram/HOST-PROBE-UND-LOKALES-BACKUP-REVIEW.md "$D/README-REVIEW.md"
-for file in KiComEngramStore.php KiComEngramIngestionGate.php KiComEngramAuthenticatedBridge.php KiComEngramPrivatePathProbe.php KiComEngramDevPathHandler.php KiComEngramDevCandidatePatcher.php KiComEngramSyntheticTransfer.php; do
+for file in KiComEngramStore.php KiComEngramIngestionGate.php KiComEngramAuthenticatedBridge.php KiComEngramDevMemoryAdapter.php KiComEngramPrivatePathProbe.php KiComEngramDevPathHandler.php KiComEngramDevCandidatePatcher.php KiComEngramSyntheticTransfer.php; do
   cp -- "development/0.9.27/engram/$file" "$D/source/$file"
 done
-for file in test-engram-authenticated-bridge.php test-private-path-probe.php test-engram-dev-route.php test-engram-endpoint.php test-engram-offline-transfer.php fixture-engram-trusted-config.php; do
+for file in test-engram-authenticated-bridge.php test-engram-dev-memory-adapter.php test-private-path-probe.php test-engram-dev-route.php test-engram-endpoint.php test-engram-offline-transfer.php fixture-engram-trusted-config.php; do
   cp -- "development/0.9.27/engram/$file" "$D/tests/$file"
 done
 cp -- development/0.9.27/engram/engram_local_offline.py "$D/workstation/engram_local_offline.py"
