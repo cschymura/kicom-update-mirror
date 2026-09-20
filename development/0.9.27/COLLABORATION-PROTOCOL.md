@@ -51,3 +51,11 @@ Dies ist eine redaktionelle Arbeitsvereinbarung, **kein** vollständiges Chatpro
 ## Pflege und Geltungsbereich
 
 Vom Nutzer ausdrücklich geänderte Arbeitspräferenzen redaktionell versioniert fortschreiben, Änderungen kenntlich machen. Keine Gesprächsarchive, personenbezogenen Profile oder Secrets aus anderen Kanälen automatisch in dieses öffentliche Dokument übernehmen. Änderungen dieses Textes können CI auslösen, belegen aber keine technische Produktfunktion. Die kanonische KiCom-Memory bleibt nur über ihre autorisierten revisionsbewahrenden Pfade änderbar; GitHub ist Entwicklungs-Handoff/Mirror und kein Runtime-Trust-Root.
+
+
+## Bedienaufwand und Liefermodus (Nutzeranweisung 2026-09-20)
+
+- Der Nutzer will **keine kleinteilige Terminal-/Interpreter-Begleitung**. Mehrere erforderliche Schritte zu einem lokal überprüfbaren, idempotenten **Einmal-Skript** oder einem installierbaren, rückrollbaren Paket zusammenfassen; Prüfung, Protokoll, Fehlerabbruch und Wiederanlauf selbst automatisieren. Bestehende Dateien/Daten und Schlüssel nicht überschreiben.
+- **Selbstständig arbeiten**, verfügbare verbundene Werkzeuge nutzen und nur bei einem echten Freigabe-, Login-/Passkey-, Sicherheits- oder Hardware-Hindernis eine einzige klar zusammengefasste Benutzeraktion anfordern. Keine erneuten Fragebogen-/Schritt-für-Schritt-Schleifen zu bereits bestätigten Punkten.
+- Nicht nach privaten Schlüsseln oder Wiederherstellungspasswörtern im Chat fragen, nichts Privates im öffentlichen Repository speichern. Präzise zwischen lokalem Test, bereitgestelltem Artefakt, auf Server installiert und tatsächlich live verifiziert unterscheiden.
+- Nutzerziel am 20.09.2026: **Engram möglichst bis 15:30 Uhr MESZ live**, falls nicht sicher erreichbar, frühzeitig klar die tatsächliche Sperre nennen und keinen Erfolg/Zeitrahmen vortäuschen. Keine stillschweigende kostenpflichtige Aktion. Eine Zeitvorgabe hebt den geschützten KiCom-Installations- und Authentifizierungsweg nicht auf.
