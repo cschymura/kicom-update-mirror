@@ -64,6 +64,17 @@ final class KiComEngramMirrorSet
         return $real;
     }
 
+    /** Revalidate permissions and symlink components on EVERY mirror operation. */
+    private function assertStorageTopology(): void
+    {
+        clearstatcache(true);
+        foreach ([$this->first, $this->second, $this->manifestDir] as $dir) {
+            if (self::privateDirectory($dir, $this->webroot) !== $dir) {
+                throw new RuntimeException('Private mirror topology changed');
+            }
+        }
+    }
+
     private static function privateFile(string $path): bool
     {
         clearstatcache(true, $path);
@@ -107,6 +118,7 @@ final class KiComEngramMirrorSet
      */
     public function capture(KiComEngramStore $source): array
     {
+        $this->assertStorageTopology();
         $snapshot = $source->backup($this->first, $this->webroot);
         $name = $snapshot['filename'];
         if (!preg_match('/\Aengram-[a-f0-9]{32}\.sqlite\z/D', $name)) {
@@ -169,6 +181,7 @@ final class KiComEngramMirrorSet
      */
     public function inspect(string $manifestName, string $trustedDigest): array
     {
+        $this->assertStorageTopology();
         if (!preg_match('/\Amirror-[a-f0-9]{32}\.json\z/D', $manifestName)
             || !preg_match('/\A[a-f0-9]{64}\z/D', $trustedDigest)) {
             throw new RuntimeException('Manifest identity invalid');
@@ -220,6 +233,9 @@ final class KiComEngramMirrorSet
             throw new RuntimeException('No independently verified snapshot available');
         }
         $destination = self::privateDirectory($emptyPrivateDirectory, $this->webroot);
+        if (scandir($destination) !== ['.', '..']) {
+            throw new RuntimeException('Restore destination must be completely empty');
+        }
         foreach ([$this->first, $this->second, $this->manifestDir] as $protected) {
             if ($destination === $protected
                 || str_starts_with($destination, $protected . DIRECTORY_SEPARATOR)
