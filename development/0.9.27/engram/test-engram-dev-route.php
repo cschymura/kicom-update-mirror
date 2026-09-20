@@ -135,6 +135,7 @@ try {
     routeCheck($router->handle($op, $sid, $token)['code'] === 'DEV_SESSION_REVOKED',
         'revoked DEV session can no longer access private probe');
     echo "KICOM_ENGRAM_DEV_ROUTE_TESTS_PASSED=$routeChecks\n";
+    require __DIR__ . '/test-engram-endpoint.php';
 } finally {
     routeClean($routeRoot);
 }
