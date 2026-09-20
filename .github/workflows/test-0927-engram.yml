@@ -19,7 +19,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: pdo_sqlite,sqlite3,sodium
+          extensions: pdo_sqlite,sqlite3,sodium,zip
           coverage: none
       - uses: actions/setup-python@v5
         with:
@@ -53,5 +53,55 @@ jobs:
         with:
           name: Engram-Hostprobe-REVIEW-DEV
           path: Engram-Hostprobe-REVIEW-DEV.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Build disabled 0.9.27 Engram host-probe CANDIDATE from exact verified R3
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT="$GITHUB_WORKSPACE/KiCom-0.9.27-Engram-Hostprobe-REVIEW-ONLY.zip"
+          python3 development/0.9.27/engram/build_staging_host_probe.py "$OUT"
+          test -s "$OUT"
+          php -l development/0.9.27/engram/KiComEngramDevCandidatePatcher.php
+          unzip -tqq "$OUT"
+          sha256sum "$OUT"
+          mkdir -p /tmp/kicom-engram-r3-review
+          cp -a source/0.9.26-r3/. /tmp/kicom-engram-r3-review/
+          php -d display_errors=0 -r '
+            chdir($argv[1]);
+            require "lib.php";
+            $x=kicomSelfUpdateZipInspect($argv[2]);
+            if(empty($x["ok"])){
+              fwrite(STDERR,"ENGRAM_REVIEW_VERIFIER_DENIED=".($x["code"]??"UNKNOWN")."\n");
+              exit(71);
+            }
+            if(($x["version"]??"")!=="0.9.27"
+              || ($x["genome"]["id"]??"")!=="kicom-0.9.27-g26-engram-probe"
+              || ($x["genome"]["parent"]??"")!=="kicom-0.9.26-g25r3"
+              || (int)($x["genome"]["generation"]??0)!==26
+              || !empty($x["kernel_update"])
+              || ($x["genome"]["mutation_reason"]??"")!=="isolated-dev-engram-synthetic-path-probe-inert-until-trusted-config")exit(72);
+            $risk=kicomSelfUpdateRiskClass($x);
+            if(($risk["class"]??"")!=="red")exit(73);
+            foreach(["recovery.php","index.php","api.php","guardian.php",".htaccess"] as $critical){
+              $original=hash_file("sha256",$argv[1]."/".$critical);
+              $candidate=$x["entries"][$critical]["sha256"]??"";
+              if(!hash_equals($original,$candidate))exit(74);
+            }
+            if(isset($x["entries"]["modules/dev/EngramPrivateUserMemory.php"]))exit(75);
+            foreach(array_keys($x["entries"]) as $p){
+              if(str_starts_with($p,"var/")&&$p!=="var/.htaccess")exit(76);
+            }
+            echo "ENGRAM_STAGING_REVIEW_VERIFIER_OK=1\n";
+            echo "ENGRAM_STAGING_REVIEW_RISK=red\n";
+            echo "ENGRAM_STAGING_REVIEW_KERNEL_UNCHANGED=1\n";
+            echo "ENGRAM_STAGING_REVIEW_PRIVATE_CONFIG_INCLUDED=0\n";
+            echo "ENGRAM_STAGING_REVIEW_INSTALL_ATTEMPTED=0\n";
+          ' /tmp/kicom-engram-r3-review "$OUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KiCom-0927-Engram-Hostprobe-REVIEW-ONLY
+          path: KiCom-0.9.27-Engram-Hostprobe-REVIEW-ONLY.zip
           if-no-files-found: error
           retention-days: 14
