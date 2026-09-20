@@ -199,3 +199,6 @@ require __DIR__ . '/test-engram-concurrency.php';
 
 // Synthetic ephemeral Ed25519 receipt verification of independent immutable manifest anchors.
 require __DIR__ . '/test-engram-anchor.php';
+
+// Synthetic independently signed multi-generation lineage and trusted head audit.
+require __DIR__ . '/test-engram-catalog.php';
