@@ -38,4 +38,20 @@ jobs:
           set -euo pipefail
           php -l development/0.9.27/engram/KiComEngramStore.php
           php -l development/0.9.27/engram/test-engram.php
+          php -l development/0.9.27/engram/KiComEngramSyntheticTransfer.php
+          php -l development/0.9.27/engram/test-engram-offline-transfer.php
+          python3 -m py_compile development/0.9.27/engram/engram_local_offline.py
           php development/0.9.27/engram/test-engram.php
+      - name: Build NON-installable operator review archive (public source + synthetic tests only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash development/0.9.27/engram/make-review-package.sh "$GITHUB_WORKSPACE/Engram-Hostprobe-REVIEW-DEV.zip"
+          unzip -l "$GITHUB_WORKSPACE/Engram-Hostprobe-REVIEW-DEV.zip"
+          sha256sum "$GITHUB_WORKSPACE/Engram-Hostprobe-REVIEW-DEV.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Engram-Hostprobe-REVIEW-DEV
+          path: Engram-Hostprobe-REVIEW-DEV.zip
+          if-no-files-found: error
+          retention-days: 14
