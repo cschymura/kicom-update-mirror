@@ -105,7 +105,8 @@ final class KiComEngramPrivatePathProbe
                 $cursor = $parent;
             }
             $root = realpath($requestedRoot);
-            if ($root === false || !is_dir($root) || in_array($root, $webRoots, true)) {
+            if ($root === false || !is_dir($root) || $root === DIRECTORY_SEPARATOR
+                || in_array($root, $webRoots, true)) {
                 throw new RuntimeException('Webroot is missing or duplicated');
             }
             $webRoots[] = $root;
