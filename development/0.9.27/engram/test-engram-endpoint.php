@@ -29,7 +29,7 @@ $missing = $withoutConfig->handle($operation,$unconfiguredCreds['session_id'],$u
 endpointCheck(($missing['code'] ?? '') === 'DEV_OPERATION_NOT_IMPLEMENTED',
     'real DEV endpoint leaves private probe unregistered without trusted config');
 
-$GLOBALS['engram_fixture_config'] = ['data'=>$routeData,'backups'=>$routeBackups,'webroot'=>$routeWeb];
+$GLOBALS['engram_fixture_config'] = ['data'=>$routeData,'backups'=>$routeBackups,'webroots'=>[$routeWeb]];
 $GLOBALS['engram_fixture_config_reads'] = 0;
 require __DIR__ . '/fixture-engram-trusted-config.php';
 $apiCreds = kicomDevSessions()->issue(['auth_method'=>'passkey','credential_id'=>'synthetic-endpoint']);
@@ -55,7 +55,7 @@ endpointCheck($deniedQuery['code'] === 'DEV_ENGRAM_POST_REQUIRED'
     'actual GET bridge cannot invoke private probe or resolve private config');
 $injected = kicomDevApiDispatch($apiHeaders,json_encode([
     'operation'=>$operation,
-    'payload'=>['data'=>$routeWeb,'backups'=>$routeWeb,'webroot'=>$routeWeb],
+    'payload'=>['data'=>$routeWeb,'backups'=>$routeWeb,'webroots'=>[$routeWeb]],
 ], JSON_THROW_ON_ERROR));
 endpointCheck(($injected['body']['code'] ?? '') === 'ENGRAM_PATH_PROBE_PAYLOAD_FORBIDDEN'
     && $GLOBALS['engram_fixture_config_reads'] === 0,
@@ -73,12 +73,12 @@ endpointCheck(scandir($routeData) === ['.','..'] && scandir($routeBackups) === [
     'first-party endpoint leaves no synthetic private file behind');
 endpointCheck(!str_contains(json_encode($worked, JSON_THROW_ON_ERROR), $routeRoot),
     'first-party endpoint response exposes no absolute filesystem path');
-$GLOBALS['engram_fixture_config'] = ['data'=>$routeWeb,'backups'=>$routeBackups,'webroot'=>$routeWeb];
+$GLOBALS['engram_fixture_config'] = ['data'=>$routeWeb,'backups'=>$routeBackups,'webroots'=>[$routeWeb]];
 $mappingDenied = kicomDevApiDispatch($apiHeaders,$emptyPayload);
 endpointCheck(($mappingDenied['body']['code'] ?? '') === 'ENGRAM_PATH_PROBE_UNAVAILABLE'
     && !str_contains(json_encode($mappingDenied, JSON_THROW_ON_ERROR), $routeRoot),
     'wrong trusted configuration fails closed without path disclosure');
-$GLOBALS['engram_fixture_config'] = ['data'=>$routeData,'backups'=>$routeBackups,'webroot'=>$routeWeb];
+$GLOBALS['engram_fixture_config'] = ['data'=>$routeData,'backups'=>$routeBackups,'webroots'=>[$routeWeb]];
 $missingModule = $routeCandidate . '/KiComEngramPrivatePathProbe.php';
 $hiddenModule = $missingModule . '.disabled';
 if (!rename($missingModule,$hiddenModule)) { throw new RuntimeException('Cannot simulate missing module'); }
