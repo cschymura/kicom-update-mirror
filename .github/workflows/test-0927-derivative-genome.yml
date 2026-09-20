@@ -27,16 +27,24 @@ jobs:
           set -euo pipefail
           echo '6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f  releases/0.9.26/KiCom-0.9.26-R3.zip' | sha256sum -c -
           (cd source/0.9.26-r3 && sha256sum --status -c MANIFEST.sha256)
-      - name: Test derivative genome binding
+      - name: Test signed derivative genome binding
         shell: bash
         run: |
           set -euo pipefail
           php -l development/0.9.27/reproduction/KiComDerivativeGenome.php
           php -l development/0.9.27/reproduction/test-derivative-genome.php
           php development/0.9.27/reproduction/test-derivative-genome.php
-      - name: Re-run existing birth quarantine tests
+      - name: Exercise actual isolated KCL GENOME_STATUS
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash development/0.9.27/reproduction/test-derivative-runtime.sh
+      - name: Re-run existing reproduction quarantine tests
         shell: bash
         run: |
           set -euo pipefail
           php development/0.9.27/reproduction/test-child-lineage.php
           php development/0.9.27/reproduction/test-child-birth-gate.php
+          bash development/0.9.27/reproduction/test-child-host-lineage.sh
+          bash development/0.9.27/reproduction/test-daughter-recovery.sh
+          bash development/0.9.27/reproduction/test-daughter-runtime.sh
