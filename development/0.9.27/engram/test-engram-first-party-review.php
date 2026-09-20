@@ -81,9 +81,9 @@ try {
     $csrf=$m[1]??'';
     $reviewCheck(strlen($csrf)===64,'render creates distinct unpredictable CSRF token');
     $interactive=KiComEngramBrowserReviewPage::decorate(
-        $html,'/engram/review-api.php','/engram/engram-review-client.js'
+        $html,'/api.php?q=ENGRAM_REVIEW','/engram/engram-review-client.js'
     );
-    $reviewCheck(str_contains($interactive,'data-engram-review-api="/engram/review-api.php"')
+    $reviewCheck(str_contains($interactive,'data-engram-review-api="/api.php?q=ENGRAM_REVIEW"')
         && str_contains($interactive,'<script defer src="/engram/engram-review-client.js"></script>')
         && str_contains($interactive,'aria-live="polite"'),
         'review page is wired to same-origin signed-passkey client and accessible status');
@@ -94,7 +94,7 @@ try {
         $html,'https://evil.example/review.php','/engram/engram-review-client.js'
     ),'cross-origin review API URL forbidden in browser page');
     $reviewDeny(static fn()=>KiComEngramBrowserReviewPage::decorate(
-        $html,'/engram/review-api.php','//evil.example/client.js'
+        $html,'/api.php?q=ENGRAM_REVIEW','//evil.example/client.js'
     ),'cross-origin review JS URL forbidden in browser page');
     $post=['review_id'=>$id,'csrf'=>$csrf,'decision'=>'approve_one'];
     $reviewDeny(static fn()=> $flow->confirm($post,['browser_session'=>'browser-a']),
