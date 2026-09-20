@@ -67,6 +67,11 @@ jobs:
             echo "ENGRAM_NATIVE_API_DEFAULT_DENY_FAILED=1"; exit 83
           fi
           echo "ENGRAM_NATIVE_API_DEFAULT_DENY_PASSED=1"
+      - name: Localhost HTTP acceptance through ACTUAL extracted KiCom api.php
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 development/0.9.27/engram/test-engram-native-api-http.py /tmp/kicom-engram-extracted
       - name: Native KiCom protected self-update verifier and strict privacy gate
         shell: bash
         run: |
