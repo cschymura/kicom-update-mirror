@@ -71,6 +71,46 @@ try {
         'missing webroot fails closed');
     assertProbe(KiComEngramPrivatePathProbe::run($data, $backups, $web)['synthetic_rw_backups'],
         'valid private permissions restore probe capability');
+
+    $webTwo = $root . '/second-website';
+    mkdir($webTwo, 0755);
+    $multiple = KiComEngramPrivatePathProbe::runAgainstWebRoots(
+        $data, $backups, [$web, $webTwo]
+    );
+    assertProbe($multiple['configured_webroots_checked'] === 2
+        && $multiple['public_http_exposure_verified'] === false,
+        'all independently configured sibling webroots preflighted');
+    assertProbe(scandir($data) === ['.', '..'] && scandir($backups) === ['.', '..'],
+        'multi-root positive probe cleans synthetic files');
+    denyProbe(static fn() => KiComEngramPrivatePathProbe::runAgainstWebRoots(
+        $data, $backups, []
+    ), 'empty webroot inventory fails closed');
+    denyProbe(static fn() => KiComEngramPrivatePathProbe::runAgainstWebRoots(
+        $data, $backups, [$web, $web]
+    ), 'duplicate canonical webroots denied');
+    denyProbe(static fn() => KiComEngramPrivatePathProbe::runAgainstWebRoots(
+        $data, $backups, [$web, $root . '/unverified-website']
+    ), 'missing additional webroot denied');
+    denyProbe(static fn() => KiComEngramPrivatePathProbe::runAgainstWebRoots(
+        $data, $backups, [$web, $private]
+    ), 'private directory configured as alternate website denied');
+    denyProbe(static fn() => KiComEngramPrivatePathProbe::runAgainstWebRoots(
+        $data, $backups, [$web, $root]
+    ), 'hosting account ancestor mapped as a website denied');
+    $webAlias = $root . '/web-alias';
+    symlink($webTwo, $webAlias);
+    denyProbe(static fn() => KiComEngramPrivatePathProbe::runAgainstWebRoots(
+        $data, $backups, [$web, $webAlias]
+    ), 'symlinked webroot alias denied');
+    denyProbe(static fn() => KiComEngramPrivatePathProbe::runAgainstWebRoots(
+        $data, $backups, [$web, 123]
+    ), 'non-string vhost root denied');
+    denyProbe(static fn() => KiComEngramPrivatePathProbe::runAgainstWebRoots(
+        $data, $backups, array_fill(0, 33, $web)
+    ), 'unbounded webroot inventory denied');
+    assertProbe(scandir($data) === ['.', '..'] && scandir($backups) === ['.', '..'],
+        'all rejected multiroot probes leave private dirs empty');
+
     echo "KICOM_ENGRAM_PATH_PROBE_TESTS_PASSED=$passed\n";
 } finally {
     eraseProbeTree($root);
