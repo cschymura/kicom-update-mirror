@@ -66,6 +66,14 @@ def build(dest: Path) -> dict:
         raw = (BASE / name).read_bytes()
         if not raw.startswith(b"<?php"):
             raise RuntimeError(f"Missing PHP module header: {name}")
+        if name == "KiComEngramWebAuthnApprovalController.php":
+            source_path = b"__DIR__.'/../../../source/0.9.26-r3/modules/dev/PasskeyBridge.php'"
+            deployed_path = b"__DIR__.'/../dev/PasskeyBridge.php'"
+            if raw.count(source_path) != 1:
+                raise RuntimeError("Original PasskeyBridge development path changed; refuse to package")
+            raw = raw.replace(source_path, deployed_path)
+        if b"source/0.9.26-r3/" in raw:
+            raise RuntimeError(f"Development-only source path leaked into deployed module: {name}")
         target = "modules/engram/" + name
         additions[target] = raw
         if target in old_paths:
