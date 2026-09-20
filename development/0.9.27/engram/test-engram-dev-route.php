@@ -38,9 +38,12 @@ mkdir($routeData, 0700);
 mkdir($routeBackups, 0700);
 try {
     $generated = KiComEngramDevCandidatePatcher::generate($routeOriginal, $routeCandidate);
-    routeCheck(count($generated) === 3 && is_file($routeCandidate . '/DevRouter.php')
+    routeCheck(count($generated) === 6 && is_file($routeCandidate . '/DevRouter.php')
         && is_file($routeCandidate . '/DevSession.php')
-        && is_file($routeCandidate . '/DevHttpAdapter.php'),
+        && is_file($routeCandidate . '/DevHttpAdapter.php')
+        && is_file($routeCandidate . '/DevEndpoint.php')
+        && is_file($routeCandidate . '/KiComEngramDevPathHandler.php')
+        && is_file($routeCandidate . '/KiComEngramPrivatePathProbe.php'),
         'original-hash-pinned candidate generated without changing trusted R3');
     routeReject(static fn() => KiComEngramDevCandidatePatcher::generate($routeOriginal, $routeCandidate),
         'candidate output is never silently overwritten');
@@ -49,7 +52,9 @@ try {
     mkdir($tamperedOriginal, 0700);
     mkdir($tamperedOutput, 0700);
     foreach (array_keys($generated) as $name) {
-        copy($routeOriginal . '/' . $name, $tamperedOriginal . '/' . $name);
+        if (is_file($routeOriginal . '/' . $name)) {
+            copy($routeOriginal . '/' . $name, $tamperedOriginal . '/' . $name);
+        }
     }
     file_put_contents($tamperedOriginal . '/DevRouter.php', "\n// synthetic tamper", FILE_APPEND);
     routeReject(static fn() => KiComEngramDevCandidatePatcher::generate($tamperedOriginal, $tamperedOutput),
