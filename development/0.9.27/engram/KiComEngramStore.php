@@ -93,6 +93,12 @@ final class KiComEngramStore
     /** All SQLite main/WAL/SHM files are private, regular and single-link. */
     private function assertPrivateStorageFiles(): void
     {
+        $dir = dirname($this->dbPath);
+        clearstatcache(true, $dir);
+        if (is_link($dir) || !is_dir($dir) || (fileperms($dir) & 0077) !== 0
+            || !is_file($this->dbPath)) {
+            throw new RuntimeException('Private SQLite directory or database changed');
+        }
         foreach ([$this->dbPath, $this->dbPath . '-wal', $this->dbPath . '-shm'] as $file) {
             clearstatcache(true, $file);
             if (is_link($file)) {
