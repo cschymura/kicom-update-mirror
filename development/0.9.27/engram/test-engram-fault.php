@@ -26,7 +26,9 @@ function faultClean(string $path): void
 }
 $expected = [
     'before-first-copy' => [0,0],
+    'during-first-copy' => [1,0],
     'after-first-copy' => [1,0],
+    'during-second-copy' => [2,0],
     'after-second-copy' => [2,0],
     'before-manifest-publish' => [2,0],
     'after-manifest-publish' => [2,1],
@@ -81,6 +83,27 @@ foreach ($expected as $interrupt => $orphanCounts) {
             && $inventory['auto_recovery_permitted'] === false,
             'read-only inventory records untrusted orphan counts at '.$interrupt
         );
+        if (str_starts_with($interrupt, 'during-')) {
+            $firstEntries = array_values(array_filter(
+                glob($root.'/a/engram-*.sqlite') ?: [],
+                static fn(string $file): bool => $file !== $parentA
+            ));
+            $secondEntries = array_values(array_filter(
+                glob($root.'/b/engram-*.sqlite') ?: [],
+                static fn(string $file): bool => $file !== $parentB
+            ));
+            $partial = $interrupt === 'during-first-copy'
+                ? ($firstEntries[0] ?? '')
+                : ($secondEntries[0] ?? '');
+            faultCheck(count($firstEntries) === 1
+                && count($secondEntries) === ($interrupt === 'during-first-copy' ? 0 : 1)
+                && is_file($partial)
+                && filesize($partial) === 512
+                && filesize($partial) < filesize($parentB)
+                && !hash_equals($parentJson['snapshot_sha256'],
+                    (string)hash_file('sha256', $partial)),
+                'interruption leaves exactly one non-recoverable 512-byte partial snapshot at '.$interrupt);
+        }
         faultCheck(
             $mirrors->inspect($parent['manifest'],$parent['manifest_sha256'])['state'] === 'degraded'
             && hash_file('sha256',$parentA) === $oldBadHash
