@@ -52,8 +52,9 @@ final class KiComEngramDevSessionCredentialReader
         }
         $lock = $dir.'/'.$id.'.lock';
         // KiComDevSessionManager::authenticate already creates the lock;
-        // NEVER create a replacement lock from a reader.
-        if (!is_file($lock) || is_link($lock) || (fileperms($lock) & 0077) !== 0) {
+        // NEVER create a replacement lock from a reader. Lock-file mode may
+        // follow the process umask; its containing directory must be 0700.
+        if (!is_file($lock) || is_link($lock)) {
             return [];
         }
         $lockStat = @stat($lock);
