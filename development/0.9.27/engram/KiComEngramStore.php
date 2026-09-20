@@ -259,6 +259,58 @@ final class KiComEngramStore
 
 
     /**
+     * Verify full per-engram revision chain and body hashes. SQLite quick_check
+     * cannot detect modified logical content or broken append-only lineage.
+     * Explicit bounded offline audit; no revision body or source reference is
+     * ever returned by this method. Runs against the CONSISTENT snapshot when
+     * creating a backup, not the possibly changing live WAL database.
+     */
+    private static function auditRevisionChain(PDO $db): int
+    {
+        $q = $db->query('SELECT subject,namespace,id,revision,kind,body,
+            source_kind,source_ref,entry_state,previous_hash,revision_hash
+            FROM engram_revisions ORDER BY subject,namespace,id,revision');
+        $previousKey = null;
+        $previousRevision = 0;
+        $previousHash = str_repeat('0', 64);
+        $previousState = '';
+        $count = 0;
+        while (($row = $q->fetch(PDO::FETCH_ASSOC)) !== false) {
+            if (++$count > 100000) {
+                throw new RuntimeException('Engram revision audit bounded limit exceeded');
+            }
+            $key = $row['subject'] . "\x1f" . $row['namespace'] . "\x1f" . $row['id'];
+            if ($key !== $previousKey) {
+                $previousKey = $key;
+                $previousRevision = 0;
+                $previousHash = str_repeat('0', 64);
+                $previousState = '';
+            }
+            if ((int)$row['revision'] !== $previousRevision + 1
+                || !is_string($row['previous_hash'])
+                || !hash_equals($previousHash, $row['previous_hash'])
+                || $previousState === 'withdrawn'
+                || !in_array($row['entry_state'], ['active', 'withdrawn'], true)
+                || !is_string($row['revision_hash'])
+                || !hash_equals($row['revision_hash'], self::digest($row))) {
+                throw new RuntimeException('Engram revision chain integrity check failed');
+            }
+            $previousRevision = (int)$row['revision'];
+            $previousHash = $row['revision_hash'];
+            $previousState = $row['entry_state'];
+        }
+        return $count;
+    }
+
+    /** Read-only, bounded explicit revision-chain audit. No private data returned. */
+    public function auditHistory(): array
+    {
+        $this->assertPrivateStorageFiles();
+        return ['revision_chain_valid' => true,
+            'revision_count' => self::auditRevisionChain($this->db)];
+    }
+
+    /**
      * DEV-only offline private snapshot. SQLite VACUUM INTO takes a consistent
      * transaction-level copy including committed WAL content; do NOT copy the
      * live .sqlite file alone. Backup files contain ALL historical revisions,
@@ -289,7 +341,7 @@ final class KiComEngramStore
             if ($snapshot->query('PRAGMA quick_check')->fetchColumn() !== 'ok') {
                 throw new RuntimeException('Backup integrity check failed');
             }
-            $rows = (int)$snapshot->query('SELECT COUNT(*) FROM engram_revisions')->fetchColumn();
+            $rows = self::auditRevisionChain($snapshot);
             unset($snapshot);
             $hash = hash_file('sha256', $path);
             if ($hash === false) {
@@ -339,7 +391,7 @@ final class KiComEngramStore
         if ($probe->query('PRAGMA quick_check')->fetchColumn() !== 'ok') {
             throw new RuntimeException('Backup quick_check failed');
         }
-        $rows = (int)$probe->query('SELECT COUNT(*) FROM engram_revisions')->fetchColumn();
+        $rows = self::auditRevisionChain($probe);
         unset($probe);
         $final = $destination . DIRECTORY_SEPARATOR . 'engrams.sqlite';
         foreach ([$final, $final . '-wal', $final . '-shm'] as $occupied) {
@@ -376,8 +428,9 @@ final class KiComEngramStore
             }
             unlink($temporary);
             $restored = new self($destination, $publicDocumentRoot);
-            if ($restored->health()['quick_check'] !== 'ok') {
-                throw new RuntimeException('Restored DB health check failed');
+            if ($restored->health()['quick_check'] !== 'ok'
+                || $restored->auditHistory()['revision_count'] !== $rows) {
+                throw new RuntimeException('Restored DB health or revision audit failed');
             }
             unset($restored);
             return ['sha256' => $expectedSha256, 'revision_count' => $rows, 'restored' => true];
