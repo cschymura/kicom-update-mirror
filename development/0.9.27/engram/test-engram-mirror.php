@@ -125,6 +125,26 @@ try {
     mirrorReject(static fn()=> $raid->recover(
         $created['manifest'],$created['manifest_sha256'],$a),
         'recovery cannot overwrite a mirror directory');
+
+    // Post-initialization permission downgrade must be denied for EVERY API.
+    chmod($b,0755);
+    mirrorReject(static fn()=> $raid->inspect($created['manifest'],$created['manifest_sha256']),
+        'active mirror inspection denies downgraded directory permissions');
+    mirrorReject(static fn()=> $raid->capture($source),
+        'active mirror capture denies downgraded directory permissions');
+    chmod($b,0700);
+    chmod($manifest,0755);
+    mirrorReject(static fn()=> $raid->inspect($created['manifest'],$created['manifest_sha256']),
+        'active mirror denies downgraded manifest directory permissions');
+    chmod($manifest,0700);
+    $marker = $base.'/restore-d/keep-existing-synthetic-file.txt';
+    file_put_contents($marker,'synthetic pre-existing data');
+    mirrorReject(static fn()=> $raid->recover(
+        $created['manifest'],$created['manifest_sha256'],$base.'/restore-d'),
+        'recovery requires an entirely empty destination, not only absent database files');
+    mirrorCheck(file_get_contents($marker) === 'synthetic pre-existing data',
+        'rejected restore leaves pre-existing destination file untouched');
+
     echo "KICOM_ENGRAM_MIRROR_TESTS_PASSED=$mirrorTests\n";
 } finally {
     unset($raid,$source,$restoredStore,$reopened);
