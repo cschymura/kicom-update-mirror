@@ -43,6 +43,7 @@ MEMORY_MODULES = [
     "KiComEngramWebAuthnReviewHttpAdapter.php",
     "KiComEngramPrivatePathProbe.php",
     "KiComEngramDevPathHandler.php",
+    "KiComEngramNativeMemoryRoute.php",
 ]
 ASSET = "engram-review-client.js"
 
@@ -56,6 +57,52 @@ def build(dest: Path) -> dict:
     with tempfile.TemporaryDirectory(prefix="kicom-engram-disabled-") as tmp:
         host_probe.patch_candidate(files, Path(tmp) / "candidate")
     host_probe.patch_version(files)
+    # Integrate ONLY a narrowly scoped branch in the existing native-allowlisted
+    # api.php. Without a separately preloaded, trusted host runtime callback it
+    # returns 404 BEFORE reading request body or constructing private storage.
+    api = files["api.php"]
+    anchor = b"header('Content-Type: text/plain; charset=utf-8');"
+    if api.count(anchor) != 1:
+        raise RuntimeError("KiCom api.php trust-boundary anchor changed")
+    dispatch = b"""/* Engram native memory: no host-injected private trust => 404; no DEV bearer override. */
+if (strtoupper((string)($_GET['q']??'')) === 'ENGRAM_MEMORY') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store, private');
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('Referrer-Policy: no-referrer');
+    header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
+    if (!function_exists('kicomEngramServerRuntime')) {
+        http_response_code(404);
+        echo '{"ok":false,"code":"ENGRAM_MEMORY_UNAVAILABLE"}';
+        exit;
+    }
+    try {
+        // The ONLY accepted runtime comes from a separately reviewed, trusted
+        // PHP server bootstrap, not $_GET/$_POST/$_SERVER or GitHub/Slack.
+        $runtime=kicomEngramServerRuntime();
+        if (!is_array($runtime) || ($runtime['enabled']??null)!==true) {
+            throw new RuntimeException('ENGRAM_DISABLED');
+        }
+        require_once __DIR__.'/modules/engram/KiComEngramNativeMemoryRoute.php';
+        $body=file_get_contents('php://input',false,null,0,16385);
+        if (!is_string($body)) throw new RuntimeException('ENGRAM_BODY_UNAVAILABLE');
+        $response=KiComEngramNativeMemoryRoute::handle($_SERVER,$body,$runtime);
+        foreach (($response['headers']??[]) as $key=>$value) {
+            if (is_string($key) && is_string($value)) header($key.': '.$value);
+        }
+        http_response_code((int)($response['http_status']??503));
+        echo json_encode($response['body']??['ok'=>false,'code'=>'ENGRAM_UNAVAILABLE'],
+            JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR);
+    } catch (Throwable $error) {
+        http_response_code(404);
+        echo '{"ok":false,"code":"ENGRAM_MEMORY_UNAVAILABLE"}';
+    }
+    exit;
+}
+
+"""
+    files["api.php"] = api.replace(anchor, dispatch+anchor, 1)
     module_manifest = json.loads(files["genome/modules.json"])
     old_paths = {m["path"] for m in module_manifest["modules"]}
     if any(name.startswith("modules/engram/") for name in files):
@@ -127,7 +174,7 @@ def build(dest: Path) -> dict:
             })
     if "lib.php" not in changed or "genome/modules.json" not in changed:
         raise RuntimeError("Version or module manifest not advanced")
-    for critical in ("index.php", "api.php", "guardian.php", "recovery.php", ".htaccess"):
+    for critical in ("index.php", "guardian.php", "recovery.php", ".htaccess"):
         if files[critical] != (R3 / critical).read_bytes():
             raise RuntimeError("Critical production source unexpectedly modified")
     if len(set(files)) != len(files):
@@ -142,6 +189,8 @@ def build(dest: Path) -> dict:
         "changed_paths": changed + ["genome/genome.json"],
         "memory_source_modules_included": len(MEMORY_MODULES),
         "private_browser_route_enabled": False,
+        "native_memory_api_branch_registered": True,
+        "native_memory_api_default_http_status": 404,
         "private_memory_read_write_enabled": False,
         "live_connector_included": False,
         "private_host_config_included": False,
