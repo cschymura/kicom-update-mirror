@@ -15,12 +15,13 @@ trap 'rm -rf -- "$TMP"' EXIT
 D="$TMP/Engram-Hostprobe-REVIEW-DEV"
 mkdir -p "$D/source" "$D/tests" "$D/workstation" "$D/baseline-r3"
 cp -- development/0.9.27/engram/HOST-PROBE-UND-LOKALES-BACKUP-REVIEW.md "$D/README-REVIEW.md"
-for file in KiComEngramStore.php KiComEngramIngestionGate.php KiComEngramAuthenticatedBridge.php KiComEngramDevMemoryAdapter.php KiComEngramVerifiedCredentialResolver.php KiComEngramDevSessionCredentialReader.php KiComEngramPrivateOwnerRegistry.php KiComEngramPrivateConsentLedger.php KiComEngramFirstPartyReview.php KiComEngramWebAuthnApprovalController.php KiComEngramWebAuthnReviewHttpAdapter.php KiComEngramPrivatePathProbe.php KiComEngramDevPathHandler.php KiComEngramDevCandidatePatcher.php KiComEngramSyntheticTransfer.php; do
+for file in KiComEngramStore.php KiComEngramIngestionGate.php KiComEngramAuthenticatedBridge.php KiComEngramDevMemoryAdapter.php KiComEngramVerifiedCredentialResolver.php KiComEngramDevSessionCredentialReader.php KiComEngramPrivateOwnerRegistry.php KiComEngramPrivateConsentLedger.php KiComEngramFirstPartyReview.php KiComEngramWebAuthnApprovalController.php KiComEngramWebAuthnReviewHttpAdapter.php KiComEngramBrowserReviewPage.php KiComEngramPrivatePathProbe.php KiComEngramDevPathHandler.php KiComEngramDevCandidatePatcher.php KiComEngramSyntheticTransfer.php; do
   cp -- "development/0.9.27/engram/$file" "$D/source/$file"
 done
 for file in test-engram-authenticated-bridge.php test-engram-dev-memory-adapter.php test-engram-verified-credential-resolver.php test-engram-dev-session-credential-reader.php test-engram-private-owner-registry.php test-engram-private-consent-ledger.php test-engram-integrated-private-memory.php test-engram-first-party-review.php test-engram-webauthn-approval.php test-private-path-probe.php test-engram-dev-route.php test-engram-endpoint.php test-engram-offline-transfer.php fixture-engram-trusted-config.php; do
   cp -- "development/0.9.27/engram/$file" "$D/tests/$file"
 done
+cp -- development/0.9.27/engram/engram-review-client.js "$D/source/engram-review-client.js"
 cp -- development/0.9.27/engram/engram_local_offline.py "$D/workstation/engram_local_offline.py"
 for file in DevSession.php DevRouter.php DevHttpAdapter.php DevEndpoint.php; do
   cp -- "source/0.9.26-r3/modules/dev/$file" "$D/baseline-r3/$file"
