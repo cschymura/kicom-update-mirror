@@ -13,6 +13,7 @@ final class KiComEngramDevCandidatePatcher
     private const SOURCE_HASHES = [
         'DevSession.php' => '72e1c750de8eeccc1b2144d4869308a0f6a1e9de07ce882a6d3b8604eaf28163',
         'DevRouter.php' => '2937be48505121c12a7f110fdf77c8ac6d4805b2e811b25431ba915c3e0b1b09',
+        'DevHttpAdapter.php' => '77b489a68e201f0e023432d6542dac0bdfbf0827d39c54c94c857390642c8983',
     ];
 
     private static function replaceOnce(string $text, string $needle, string $replacement): string
