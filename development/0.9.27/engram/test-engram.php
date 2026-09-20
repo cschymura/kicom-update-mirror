@@ -194,6 +194,9 @@ require __DIR__ . '/test-engram-dev-memory-adapter.php';
 // DEV identity resolver: server-owned passkey credential fingerprint to private-memory subject.
 require __DIR__ . '/test-engram-verified-credential-resolver.php';
 
+// Actual KiCom DEV session JSON credential reader and cross-session synthetic memory retrieval.
+require __DIR__ . '/test-engram-dev-session-credential-reader.php';
+
 
 
 // Synthetic-only immutable RAID-1-inspired mirror/recovery with externally pinned manifest.
