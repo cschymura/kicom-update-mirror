@@ -19,7 +19,7 @@ final class KiComEngramWebAuthnReviewHttpAdapter
         callable $trustedBrowserSession,
         string $expectedOrigin='https://kicom.rurtalbahn.info'
     ) {
-        if (!preg_match('~\\Ahttps://[a-z0-9.-]+\\z/D',$expectedOrigin)) {
+        if (!preg_match('#\\Ahttps://[a-z0-9.-]+\\z#D',$expectedOrigin)) {
             throw new RuntimeException('ENGRAM_REVIEW_ORIGIN_INVALID');
         }
         $this->approval=$approval;
