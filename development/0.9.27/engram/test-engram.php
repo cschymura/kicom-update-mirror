@@ -83,6 +83,30 @@ try {
     symlink($private . '/engrams.sqlite', $insecure . '/engrams.sqlite');
     rejects(static fn() => new KiComEngramStore($insecure, $web), 'database symlink rejected');
     check(($store->health()['quick_check'] ?? null) === 'ok', 'database remains healthy after negative tests');
+
+    // Synthetic consistency test: backup includes the latest committed row.
+    $backups = $root . '/backups';
+    $restore = $root . '/restore';
+    mkdir($backups, 0700);
+    mkdir($restore, 0700);
+    $store->create('subject-a', 'project', 'technical',
+        'Synthetic: latest committed record.', 'synthetic_test', 'fixture://backup');
+    rejects(static fn() => $store->backup($web, $web), 'backup inside webroot denied');
+    $snapshot = $store->backup($backups, $web);
+    $source = $backups . '/' . $snapshot['filename'];
+    check($snapshot['revision_count'] >= 4, 'backup contains all committed revisions');
+    check((fileperms($source) & 0077) === 0, 'backup permissions private');
+    $result = KiComEngramStore::restore($source, $restore, $web, $snapshot['sha256']);
+    check($result['restored'] === true, 'consistent private restore');
+    $reopened = new KiComEngramStore($restore, $web);
+    check(count($reopened->search('subject-a', 'project', 'latest committed record')) === 1,
+        'restored content matches latest commit');
+    rejects(static fn() => KiComEngramStore::restore($source, $restore, $web, $snapshot['sha256']),
+        'existing database cannot be overwritten');
+    rejects(static fn() => KiComEngramStore::restore($source, $root . '/private', $web, str_repeat('0', 64)),
+        'mismatched independent digest rejected');
+    unset($reopened);
+
     echo "KICOM_ENGRAM_TESTS_PASSED=$checks\n";
 } finally {
     unset($store);
