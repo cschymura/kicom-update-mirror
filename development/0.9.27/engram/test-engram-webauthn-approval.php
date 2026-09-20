@@ -8,6 +8,7 @@ if (!class_exists('KiComDevSessionManager',false)) {
     require_once __DIR__.'/../../../source/0.9.26-r3/modules/dev/DevSession.php';
 }
 require_once __DIR__.'/KiComEngramWebAuthnApprovalController.php';
+require_once __DIR__.'/KiComEngramWebAuthnReviewHttpAdapter.php';
 require_once __DIR__.'/KiComEngramDevMemoryAdapter.php';
 
 $webAuthnChecks=0;
@@ -221,6 +222,72 @@ try {
     $recalled=$newAdapter->handle($newHeaders,$read);
     $checkWebAuthn(($recalled['body']['records'][0]['body']??null)===$entry['body'],
         'fresh independent KiCom DEV session retrieves previously human-passkey-reviewed memory');
+
+    // First-party transport: same-origin POST + signed NEW challenge.
+    $http=new KiComEngramWebAuthnReviewHttpAdapter(
+        $controller,
+        static function(array $server):?array {
+            return match($server['SERVER_TEST_COOKIE']??null) {
+                'server-cookie-a'=>['server_cookie'=>'server-cookie-a'],
+                'server-cookie-b'=>['server_cookie'=>'server-cookie-b'],
+                default=>null
+            };
+        },
+        $origin
+    );
+    $httpServer=[
+        'REQUEST_METHOD'=>'POST','HTTPS'=>'on',
+        'HTTP_ORIGIN'=>$origin,'CONTENT_TYPE'=>'application/json',
+        'SERVER_TEST_COOKIE'=>'server-cookie-a'
+    ];
+    $secondEntry=$entry;
+    $secondEntry['body']='Synthetic HTTP consent remembers a signed violet train.';
+    $secondEntry['source_ref']='summary:actual-http-webauthn-review';
+    $review2=$controller->stage($browserA,$secondEntry);
+    $html2=$controller->render($review2,$browserA);
+    preg_match('/name="csrf" value="([a-f0-9]{64})"/',$html2,$match2);
+    $csrf2=$match2[1]??'';
+    $beginJson=json_encode(['operation'=>'ENGRAM_REVIEW_BEGIN','payload'=>[
+        'review_id'=>$review2,'csrf'=>$csrf2
+    ]],JSON_THROW_ON_ERROR);
+    $checkWebAuthn($http->handle(['REQUEST_METHOD'=>'GET']+$httpServer,$beginJson)['http_status']===405,
+        'first-party JSON route refuses GET');
+    $checkWebAuthn($http->handle(['HTTP_ORIGIN'=>'https://evil.example']+$httpServer,$beginJson)['http_status']===403,
+        'first-party JSON route refuses foreign Origin');
+    $checkWebAuthn($http->handle(['SERVER_TEST_COOKIE'=>'unknown']+$httpServer,$beginJson)['http_status']===401,
+        'first-party JSON route denies missing authenticated browser');
+    $forged=json_encode(['operation'=>'ENGRAM_REVIEW_BEGIN','payload'=>[
+        'review_id'=>$review2,'csrf'=>$csrf2,'subject'=>'synthetic-a'
+    ]],JSON_THROW_ON_ERROR);
+    $checkWebAuthn($http->handle($httpServer,$forged)['http_status']===400,
+        'HTTP-supplied subject cannot become owner authority');
+    $httpStarted=$http->handle($httpServer,$beginJson);
+    $challenge=$httpStarted['body'];
+    $checkWebAuthn($httpStarted['http_status']===200
+        && ($challenge['publicKey']['userVerification']??null)==='required'
+        && $httpStarted['headers']['Cache-Control']==='no-store, private',
+        'authenticated same-origin transport returns signed WebAuthn challenge');
+    $assertion2=$sign($challenge,$a,2);
+    $confirmJson=json_encode(['operation'=>'ENGRAM_REVIEW_CONFIRM','payload'=>[
+        'review_id'=>$review2,'csrf'=>$csrf2,
+        'challenge_id'=>$challenge['challenge_id'],'assertion'=>$assertion2
+    ]],JSON_THROW_ON_ERROR);
+    $checkWebAuthn($http->handle(['SERVER_TEST_COOKIE'=>'server-cookie-b']+$httpServer,$confirmJson)['http_status']===403,
+        'foreign browser cannot confirm signed review of another owner');
+    $confirmed=$http->handle($httpServer,$confirmJson);
+    $checkWebAuthn($confirmed['http_status']===200
+        && ($confirmed['body']['code']??null)==='ENGRAM_REVIEW_APPROVED',
+        'first-party transport completes real synthetic P-256 signed consent');
+    $checkWebAuthn($http->handle($httpServer,$confirmJson)['http_status']===403,
+        'signed review confirmation cannot be replayed');
+    $write2=json_encode(['operation'=>'ENGRAM_REMEMBER','payload'=>$secondEntry],JSON_THROW_ON_ERROR);
+    $checkWebAuthn(($adapter->handle($headers,$write2)['body']['code']??null)==='ENGRAM_REMEMBER_OK',
+        'HTTP-confirmed signed consent inserts ONLY its exact second memory');
+    $read2=json_encode(['operation'=>'ENGRAM_RECALL','payload'=>[
+        'namespace'=>'project','query'=>'violet train','limit'=>4
+    ]],JSON_THROW_ON_ERROR);
+    $checkWebAuthn(($newAdapter->handle($newHeaders,$read2)['body']['records'][0]['body']??null)===$secondEntry['body'],
+        'new authenticated session recovers private HTTP-reviewed memory');
 
     echo "KICOM_ENGRAM_REAL_WEBAUTHN_APPROVAL_TESTS_PASSED=$webAuthnChecks\n";
 } finally {
