@@ -145,7 +145,7 @@ try {
         'oversized request rejected');
     $check($adapter->handle($newHeaders, '{}')['http_status'] === 400,
         'missing operation rejected');
-    $check($adapter->handle($newHeaders, json_encode(['operation'=>'ENGRAM_INSTALL','payload'=>new stdClass()], JSON_THROW_ON_ERROR))['http_status'] === 403,
+    $check($adapter->handle($newHeaders, json_encode(['operation'=>'ENGRAM_INSTALL','payload'=>['ignored'=>'synthetic']], JSON_THROW_ON_ERROR))['http_status'] === 403,
         'forbidden installation operation cannot route through memory bridge');
     $check($newAdapter()->handle($newHeaders, $recall)['body']['count'] === 1,
         'negative requests leave original synthetic memory available');
