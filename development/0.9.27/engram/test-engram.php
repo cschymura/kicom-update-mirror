@@ -187,3 +187,6 @@ require __DIR__ . '/test-engram-ingestion.php';
 
 // Synthetic-only immutable RAID-1-inspired mirror/recovery with externally pinned manifest.
 require __DIR__ . '/test-engram-mirror.php';
+
+// Deterministic interrupted-repair checkpoints and read-only orphan inventory.
+require __DIR__ . '/test-engram-fault.php';
