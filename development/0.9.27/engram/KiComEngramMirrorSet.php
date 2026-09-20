@@ -359,6 +359,59 @@ final class KiComEngramMirrorSet
     }
 
     /**
+     * A bounded READ-ONLY orphan inventory. Caller supplies an independently
+     * trusted, complete inventory of anchored manifest/digest pairs. A missing
+     * item is listed as unanchored, NEVER auto-selected for recovery or deleted.
+     * Counts only; no filenames, absolute paths or memory bytes in the result.
+     *
+     * This is an explicit operator-review helper, not a retention/purge policy.
+     */
+    public function inventoryUnanchoredArtifacts(array $trustedAnchors): array
+    {
+        $this->assertStorageTopology();
+        if (count($trustedAnchors) > 256) {
+            throw new RuntimeException('Anchor inventory exceeds DEV bound');
+        }
+        $knownManifests = [];
+        $knownSnapshots = [];
+        foreach ($trustedAnchors as $anchor) {
+            if (!is_array($anchor) || array_keys($anchor) !== ['manifest', 'sha256']
+                || !is_string($anchor['manifest']) || !is_string($anchor['sha256'])) {
+                throw new RuntimeException('Independent anchor inventory malformed');
+            }
+            if (isset($knownManifests[$anchor['manifest']])) {
+                throw new RuntimeException('Duplicate independently trusted manifest');
+            }
+            $verified = $this->inspect($anchor['manifest'], $anchor['sha256']);
+            $knownManifests[$anchor['manifest']] = true;
+            $knownSnapshots[$verified['snapshot']] = true;
+        }
+        $unknownManifests = 0;
+        $unknownMirrorFiles = 0;
+        foreach ([$this->manifestDir, $this->first, $this->second] as $index => $directory) {
+            $entries = scandir($directory);
+            if ($entries === false || count($entries) > 10000) {
+                throw new RuntimeException('Orphan directory scan unavailable or exceeds DEV bound');
+            }
+            foreach ($entries as $name) {
+                if ($name === '.' || $name === '..') continue;
+                if ($index === 0) {
+                    if (!isset($knownManifests[$name])) ++$unknownManifests;
+                } elseif (!isset($knownSnapshots[$name])) {
+                    ++$unknownMirrorFiles;
+                }
+            }
+        }
+        return [
+            'known_generations' => count($knownManifests),
+            'unanchored_manifest_files' => $unknownManifests,
+            'unanchored_mirror_files' => $unknownMirrorFiles,
+            'operator_review_required' => $unknownManifests + $unknownMirrorFiles > 0,
+            'auto_recovery_permitted' => false,
+        ];
+    }
+
+    /**
      * Recover into an already provisioned EMPTY directory; does not alter
      * live database, mirror files, damaged copy, or historical generation.
      */
