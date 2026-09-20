@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once __DIR__.'/KiComEngramWebAuthnApprovalController.php';
 require_once __DIR__.'/KiComEngramWebAuthnReviewHttpAdapter.php';
 require_once __DIR__.'/KiComEngramBrowserReviewPage.php';
+require_once __DIR__.'/KiComEngramPrivatePathProbe.php';
 
 /**
  * First-party adapter for KiCom's EXISTING password-protected admin.php
