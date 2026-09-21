@@ -156,6 +156,8 @@ final class KiComEngramMcpProtocol
                 'content'=>[['type'=>'text','text'=>$text]],
                 'isError'=>false,
             ]);
+        } catch (JsonException) {
+            return self::fault(-32700,'Parse error',null);
         } catch (Throwable) {
             return self::fault(-32603,'Internal error',null);
         }
