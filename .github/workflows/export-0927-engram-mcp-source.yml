@@ -1,0 +1,38 @@
+name: Export reviewed Mirage MCP sources for native packaging
+on:
+  push:
+    branches: [work/kicom-0.9.27-pam]
+    paths:
+      - '.github/workflows/export-0927-engram-mcp-source.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify immutable original R3 package and source
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f  releases/0.9.26/KiCom-0.9.26-R3.zip' | sha256sum -c -
+          (cd source/0.9.26-r3 && sha256sum --status -c MANIFEST.sha256)
+      - name: Export exact reviewed source paths with a portable SHA manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p export/modules/engram
+          for file in KiComEngramMcpFirstPartyBridge.php KiComEngramMcpBearerVerifier.php KiComEngramMcpHttpTransport.php KiComEngramMcpProtocol.php KiComEngramMcpRuntimeGate.php KiComEngramMcpJsonAdapter.php KiComEngramMcpController.php KiComEngramMcpContract.php; do
+            cp "development/0.9.27/engram/$file" "export/modules/engram/$file"
+          done
+          (cd export && sha256sum modules/engram/*.php > SOURCE-MANIFEST.sha256)
+          echo "${GITHUB_SHA}" > export/GIT_COMMIT.txt
+          cat export/SOURCE-MANIFEST.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mirage-mcp-native-source
+          path: export/
+          if-no-files-found: error
+          retention-days: 7
