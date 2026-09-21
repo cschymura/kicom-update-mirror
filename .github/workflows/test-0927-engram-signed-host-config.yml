@@ -4,6 +4,8 @@ on:
     branches: [work/kicom-0.9.27-pam]
     paths:
       - 'development/0.9.27/engram/KiComEngramSharedHostAdminConfig.php'
+      - 'development/0.9.27/engram/KiComEngramSharedHostAdminHttp.php'
+      - 'development/0.9.27/engram/mirage-host-policy-client.js'
       - 'development/0.9.27/engram/test-engram-signed-shared-host-config.php'
       - '.github/workflows/test-0927-engram-signed-host-config.yml'
   workflow_dispatch:
@@ -31,7 +33,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for file in KiComEngramSharedHostAdminConfig.php KiComEngramHostingPolicy.php KiComEngramPrivateOwnerRegistry.php KiComEngramOAuthHttp.php test-engram-signed-shared-host-config.php; do
+          for file in KiComEngramSharedHostAdminConfig.php KiComEngramSharedHostAdminHttp.php KiComEngramHostingPolicy.php KiComEngramPrivateOwnerRegistry.php KiComEngramOAuthHttp.php test-engram-signed-shared-host-config.php; do
             php -l "development/0.9.27/engram/$file"
           done
+          node --check development/0.9.27/engram/mirage-host-policy-client.js
           php development/0.9.27/engram/test-engram-signed-shared-host-config.php
