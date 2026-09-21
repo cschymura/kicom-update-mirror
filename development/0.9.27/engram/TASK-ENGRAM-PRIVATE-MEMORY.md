@@ -24,3 +24,9 @@ Public GitHub holds **only** code, this task, synthetic test fixtures and proof 
 ## Relationship to KiCom
 
 This task is an ADDITION to the current 0.9.27 daughter/membrane work, not permission to interrupt it or to weaken current production controls. Existing protected KiCom 0.9.26/g25r3 remains unchanged unless its own authorization and verification flow expressly allows a later release. Nightly tasks may pick up this milestone after reading the latest checkpoint, but do not mark an item complete without actual executable tests and pinned CI SHA.
+
+## 2026-09-21 continuation: DEV-47 -> DEV-48
+
+DEV-47 read-only HTTPS/Bearer/MCP synthetic CI: 29/29 passed, run https://github.com/cschymura/kicom-update-mirror/actions/runs/35579780736 at commit `599deedbf3a02415f7672200954b5ba290b5236f`. This does **not** mean a live connector or real private memory recall was tested.
+
+**Read `DEV-48-HOST-INTEGRATION-CHECKPOINT.md` before implementing an actual HTTP route.** Live KiCom is now **0.9.31**, while public GitHub `main` is still 0.9.26 R3 and canonical PROJECT_STATE/NEXT lag behind. Do not use an older source tree or install a downgrade. Fetch authenticated trusted 0.9.31 source first, then stage an inactive default route and integrate the actual KiCom owner/activation/guardian interfaces; follow regular verifier, backup, rollback, and distinct protected deployment/connector authorization boundaries. GitHub remains public code-only.
