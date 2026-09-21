@@ -27,7 +27,7 @@ final class KiComEngramActivationTransaction
             $q=$db->prepare("UPDATE activation_state SET state='active' WHERE singleton=1 AND state='pending' AND approval_nonce=?");$q->execute([$nonce]);
             if($q->rowCount()!==1) throw new RuntimeException('Atomic pending-to-active transition failed');
             $db->exec('COMMIT');$begun=false;
-            return ['activated'=>true,'status'=>'SYNTHETIC_ACTIVATION_TRANSACTION_COMMITTED','owner_binding'=>$ready['owner_binding'],'host_evidence_id'=>$ready['host_evidence_id']];
+            return ['activated'=>true,'status'=>'SYNTHETIC_ACTIVATION_TRANSACTION_COMMITTED','hosting_mode'=>$ready['hosting_mode'],'owner_binding'=>$ready['owner_binding'],'host_evidence_id'=>$ready['host_evidence_id']];
         } catch(Throwable $e) {
             if($begun){try{$db->exec('ROLLBACK');}catch(Throwable $rollback){throw new RuntimeException('Activation failed and rollback failed',0,$e);}}
             throw $e;
@@ -44,7 +44,10 @@ final class KiComEngramActivationTransaction
     private static function assertApproval(array $a,array $ready,DateTimeImmutable $nowUtc):void{
         $expected=['schema','approved','purpose','owner_binding','host_evidence_id','approval_nonce','approved_at_utc'];$actual=array_keys($a);sort($actual,SORT_STRING);sort($expected,SORT_STRING);
         if($actual!==$expected)throw new RuntimeException('Unknown or missing operator approval field');
-        if($a['schema']!=='mirage-activation-approval/v1'||$a['approved']!==true||$a['purpose']!=='activate-private-engram')throw new RuntimeException('Explicit operator activation approval missing');
+        $purpose=($ready['hosting_mode']??null)==='operator_accepted_shared_host'
+            ? 'activate-private-engram-shared-host' : 'activate-private-engram';
+        if($a['schema']!=='mirage-activation-approval/v1'||$a['approved']!==true||$a['purpose']!==$purpose)
+            throw new RuntimeException('Explicit operator activation approval missing for selected hosting mode');
         if(!is_string($a['owner_binding'])||!hash_equals($ready['owner_binding'],$a['owner_binding'])||!is_string($a['host_evidence_id'])||!hash_equals($ready['host_evidence_id'],$a['host_evidence_id']))throw new RuntimeException('Operator approval scope mismatch');
         if(!is_string($a['approval_nonce'])||!preg_match('/\A[a-f0-9]{64}\z/D',$a['approval_nonce']))throw new RuntimeException('Invalid approval nonce');
         $v=$a['approved_at_utc'];if(!is_string($v)||!preg_match('/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/D',$v))throw new RuntimeException('Invalid approval timestamp');
