@@ -24,7 +24,8 @@ final class KiComEngramOAuthTransactions
         self::sqlite($db);
         $db->exec('CREATE TABLE IF NOT EXISTS mirage_oauth_codes (
             code_hash TEXT PRIMARY KEY, request_hash TEXT NOT NULL UNIQUE,
-            client_id TEXT NOT NULL, redirect_uri TEXT NOT NULL,
+            client_id TEXT NOT NULL, connector_id TEXT NOT NULL,
+            host_evidence_id TEXT NOT NULL, redirect_uri TEXT NOT NULL,
             resource TEXT NOT NULL, state TEXT NOT NULL,
             pkce_challenge TEXT NOT NULL, owner_binding TEXT NOT NULL,
             admin_session_hash TEXT NOT NULL, issued_at INTEGER NOT NULL,
@@ -32,6 +33,7 @@ final class KiComEngramOAuthTransactions
             approved_fingerprint TEXT NOT NULL DEFAULT "", consumed INTEGER NOT NULL DEFAULT 0)');
         $db->exec('CREATE TABLE IF NOT EXISTS mirage_oauth_tokens (
             token_hash TEXT PRIMARY KEY, client_id TEXT NOT NULL,
+            connector_id TEXT NOT NULL, host_evidence_id TEXT NOT NULL,
             resource TEXT NOT NULL, scope TEXT NOT NULL,
             owner_binding TEXT NOT NULL, credential_fingerprint TEXT NOT NULL,
             issued_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
@@ -65,12 +67,14 @@ final class KiComEngramOAuthTransactions
         $requestId = self::secret();
         $code = self::secret();
         $q=$db->prepare('INSERT INTO mirage_oauth_codes
-          (code_hash,request_hash,client_id,redirect_uri,resource,state,
-           pkce_challenge,owner_binding,admin_session_hash,issued_at,expires_at)
-          VALUES(?,?,?,?,?,?,?,"",?,?,?)');
+          (code_hash,request_hash,client_id,connector_id,host_evidence_id,
+           redirect_uri,resource,state,pkce_challenge,owner_binding,
+           admin_session_hash,issued_at,expires_at)
+          VALUES(?,?,?,?,?,?,?,?,?,"",?,?,?)');
         $q->execute([
           hash('sha256',$code),hash('sha256',$requestId),
-          $p['client_id'],$p['redirect_uri'],self::RESOURCE,$p['state'],
+          $p['client_id'],$trustedClient['connector_id'],$trustedClient['host_evidence_id'],
+          $p['redirect_uri'],self::RESOURCE,$p['state'],
           $p['code_challenge'],hash('sha256',$adminSessionId),
           $now,$now+300
         ]);
@@ -99,7 +103,7 @@ final class KiComEngramOAuthTransactions
             $q=$db->prepare('SELECT * FROM mirage_oauth_codes WHERE request_hash=?');
             $q->execute([hash('sha256',$requestId)]);
             $row=$q->fetch(PDO::FETCH_ASSOC);
-            if (!$row || $row['consent_at']!=='0' || $row['consumed']!=='0'
+            if (!$row || (int)$row['consent_at']!==0 || (int)$row['consumed']!==0
                 || (int)$row['expires_at']<=$now || (int)$row['issued_at']>$now
                 || !hash_equals($row['admin_session_hash'],hash('sha256',$adminSessionId))) self::denied();
             // Refuse a stale or revoked owner at EACH approval. No owner or
@@ -142,7 +146,7 @@ final class KiComEngramOAuthTransactions
         try{
             $q=$db->prepare('SELECT * FROM mirage_oauth_codes WHERE request_hash=?');
             $q->execute([hash('sha256',$requestId)]);$r=$q->fetch(PDO::FETCH_ASSOC);
-            if(!$r || (int)$r['consent_at']<=0 || $r['consumed']!=='0'
+            if(!$r || (int)$r['consent_at']<=0 || (int)$r['consumed']!==0
                 || (int)$r['expires_at']<=$now)self::denied();
             $code=self::secret();
             $q=$db->prepare('UPDATE mirage_oauth_codes SET code_hash=?,
@@ -170,7 +174,7 @@ final class KiComEngramOAuthTransactions
             $q=$db->prepare('SELECT * FROM mirage_oauth_codes WHERE code_hash=?');
             $q->execute([hash('sha256',$p['code'])]);$r=$q->fetch(PDO::FETCH_ASSOC);
             $c=rtrim(strtr(base64_encode(hash('sha256',$p['code_verifier'],true)),'+/','-_'),'=');
-            if(!$r || $r['consumed']!=='2'||(int)$r['expires_at']<=$now
+            if(!$r || (int)$r['consumed']!==2||(int)$r['expires_at']<=$now
                 || $r['client_id']!==$client['client_id']
                 || $r['redirect_uri']!==$client['redirect_uri']
                 || $r['resource']!==self::RESOURCE
@@ -182,10 +186,11 @@ final class KiComEngramOAuthTransactions
             if($q->rowCount()!==1)self::denied();
             $token=self::secret();
             $q=$db->prepare('INSERT INTO mirage_oauth_tokens
-                (token_hash,client_id,resource,scope,owner_binding,
-                credential_fingerprint,issued_at,expires_at)
-                VALUES(?,?,?,?,?,?,?,?)');
-            $q->execute([hash('sha256',$token),$r['client_id'],self::RESOURCE,
+                (token_hash,client_id,connector_id,host_evidence_id,resource,scope,
+                 owner_binding,credential_fingerprint,issued_at,expires_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?)');
+            $q->execute([hash('sha256',$token),$r['client_id'],
+                $r['connector_id'],$r['host_evidence_id'],self::RESOURCE,
                 self::SCOPE,$r['owner_binding'],$r['approved_fingerprint'],$now,$now+3600]);
             $db->exec('COMMIT');
             return ['access_token'=>$token,'token_type'=>'Bearer',
@@ -207,9 +212,10 @@ final class KiComEngramOAuthTransactions
             || $row['resource']!==self::RESOURCE || $row['scope']!==self::SCOPE
             || !self::hex64($row['credential_fingerprint'])
             || !self::hex64($row['owner_binding']))return null;
-        return ['authenticated'=>true,'connector_id'=>$row['client_id'],
+        return ['authenticated'=>true,'connector_id'=>$row['connector_id'],
             'credential_fingerprint'=>$row['credential_fingerprint'],
-            'owner_binding'=>$row['owner_binding']];
+            'owner_binding'=>$row['owner_binding'],
+            'host_evidence_id'=>$row['host_evidence_id']];
     }
 
     public static function revoke(PDO $db,string $token):void
@@ -222,11 +228,14 @@ final class KiComEngramOAuthTransactions
 
     private static function client(array $client):void
     {
-        self::keys($client,['client_id','redirect_uri']);
+        self::keys($client,['client_id','connector_id','host_evidence_id','redirect_uri']);
         if(!is_string($client['client_id'])
             || !preg_match('#\Ahttps://chatgpt\.com/oauth/(?:[a-zA-Z0-9_-]+/)?client\.json\z#D',$client['client_id'])
             || !is_string($client['redirect_uri'])
             || !preg_match('#\Ahttps://chatgpt\.com/[^?#]{1,160}\z#D',$client['redirect_uri']))self::denied();
+        if(!is_string($client['connector_id'])
+            || !preg_match('/\A[a-z0-9][a-z0-9._:-]{2,63}\z/D',$client['connector_id'])
+            || !self::hex64($client['host_evidence_id']))self::denied();
         // These values must be pinned by operator after confirming the exact
         // ChatGPT plugin connection; do not accept arbitrary client documents.
     }
