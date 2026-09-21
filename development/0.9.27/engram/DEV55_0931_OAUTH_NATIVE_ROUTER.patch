@@ -1,0 +1,180 @@
+--- a/api.php
++++ b/api.php
+@@ -4,6 +4,63 @@
+ require_once __DIR__ . '/guardian.php';
+ kicomImmuneGuardianMaybe(false,true);
+ require_once __DIR__ . '/lib.php';
++
++/* Mirage DEV-55: first-party OAuth discovery/token routes, default OFF. */
++if (in_array(strtoupper((string)($_GET['q']??'')), [
++    'ENGRAM_OAUTH_RESOURCE_METADATA', 'ENGRAM_OAUTH_SERVER_METADATA',
++    'ENGRAM_OAUTH_TOKEN'
++], true)) {
++    header('Cache-Control: no-store, private');
++    header('X-Content-Type-Options: nosniff');
++    header('X-Frame-Options: DENY');
++    header('Referrer-Policy: no-referrer');
++    header("Content-Security-Policy: default-src 'none'; frame-ancestors 'none'");
++    try {
++        $runtime=kicomEngramServerRuntime();
++        if (!is_array($runtime) || ($runtime['oauth_enabled']??null)!==true)
++            throw new RuntimeException('OAUTH_UNAVAILABLE');
++        require_once __DIR__.'/modules/engram/KiComEngramOAuthHttp.php';
++        $op=strtoupper((string)$_GET['q']);
++        if ($op==='ENGRAM_OAUTH_RESOURCE_METADATA') {
++            $result=KiComEngramOAuthHttp::discovery($_SERVER,$runtime,'protected_resource');
++        } elseif ($op==='ENGRAM_OAUTH_SERVER_METADATA') {
++            $result=KiComEngramOAuthHttp::discovery($_SERVER,$runtime,'authorization_server');
++        } else {
++            if (($runtime['data_dir']??'')!==dirname(__DIR__).'/engram-private/data'
++                || !KiComEngramOAuthHttp::available($runtime))
++                throw new RuntimeException('OAUTH_UNAVAILABLE');
++            $file=$runtime['data_dir'].'/mirage-oauth.sqlite';
++            clearstatcache(true,$file);
++            $st=@lstat($file);
++            if (!is_array($st) || ($st['mode']&0170000)!==0100000
++                || ($st['mode']&0077)!==0 || ($st['nlink']??0)!==1
++                || ($st['size']??0)<=0 || ($st['size']??PHP_INT_MAX)>10485760
++                || is_link($file)) throw new RuntimeException('OAUTH_STORAGE_UNAVAILABLE');
++            $db=new PDO('sqlite:'.$file,null,null,[
++                PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT=>2
++            ]);
++            $body=file_get_contents('php://input',false,null,0,2049);
++            if (!is_string($body)||strlen($body)>2048)
++                throw new RuntimeException('OAUTH_REQUEST_UNAVAILABLE');
++            $result=KiComEngramOAuthHttp::token(
++                $_SERVER,$body,$runtime,(array)($runtime['oauth_client']??[]),$db,time()
++            );
++        }
++        foreach (($result['headers']??[]) as $key=>$value) {
++            if (in_array($key,['Cache-Control','Content-Type','X-Content-Type-Options',
++                    'X-Frame-Options','Referrer-Policy'],true)
++                && is_string($value) && !str_contains($value,"\r")
++                && !str_contains($value,"\n")) header($key.': '.$value);
++        }
++        $status=$result['http_status']??404;
++        http_response_code(is_int($status)&&in_array($status,[200,400,404],true)?$status:404);
++        $output=$result['body']??'';
++        echo is_string($output) && strlen($output)<=16384 ? $output : '';
++    } catch (Throwable) {
++        http_response_code(404);
++    }
++    exit;
++}
+ 
+ /* Mirage DEV-48: First-party MCP POST route, default OFF. The only authority
+  * is the operator-owned private host config from kicomEngramServerRuntime().
+@@ -23,24 +80,26 @@
+         if (!is_array($runtime) || ($runtime['enabled']??null)!==true
+             || ($runtime['operator_approved']??null)!==true
+             || ($runtime['host_isolation_verified']??null)!==true
+-            || ($runtime['mcp_connector_enabled']??null)!==true)
++            || ($runtime['mcp_connector_enabled']??null)!==true
++            || ($runtime['oauth_enabled']??null)!==true)
+             throw new RuntimeException('MCP_UNAVAILABLE');
+-        require_once __DIR__.'/modules/engram/KiComEngramMcpFirstPartyBridge.php';
++        require_once __DIR__.'/modules/engram/KiComEngramOAuthMcpHostBridge.php';
+         $body=file_get_contents('php://input',false,null,0,8193);
+         if (!is_string($body) || strlen($body)>8192)
+             throw new RuntimeException('MCP_REQUEST_UNAVAILABLE');
+-        $result=KiComEngramMcpFirstPartyBridge::handle(
++        $result=KiComEngramOAuthMcpHostBridge::handle(
+             $_SERVER,$body,$runtime,__DIR__,time()
+         );
+         // Only a small fixed set of HTTP response fields can be emitted.
+         foreach (($result['headers']??[]) as $key=>$value) {
+             if (in_array($key,['Cache-Control','Content-Type','X-Content-Type-Options',
+-                    'X-Frame-Options','MCP-Protocol-Version','Vary'],true)
++                    'X-Frame-Options','MCP-Protocol-Version','Vary',
++                    'WWW-Authenticate','Referrer-Policy'],true)
+                 && is_string($value) && !str_contains($value,"\r")
+                 && !str_contains($value,"\n")) header($key.': '.$value);
+         }
+         $status=$result['http_status']??404;
+-        http_response_code(is_int($status)&&in_array($status,[200,202,404],true)?$status:404);
++        http_response_code(is_int($status)&&in_array($status,[200,202,401,404],true)?$status:404);
+         $output=$result['body']??'';
+         if (!is_string($output) || strlen($output)>16384) $output='';
+         echo $output;
+--- a/admin.php
++++ b/admin.php
+@@ -41,6 +41,68 @@
+     if(password_verify((string)($_POST['password']??''),(string)($config['password_hash']??''))){$_SESSION['admin']=true;session_regenerate_id(true);}else$err='Anmeldung fehlgeschlagen.';
+ }
+ if(isset($_GET['logout'])){session_destroy();header('Location: admin.php');exit;}
++
++/* Mirage DEV-55: original KiCom admin-session OAuth read approval. */
++if (isset($_GET['engram_oauth'])) {
++    header('Cache-Control: no-store, private');
++    header('X-Content-Type-Options: nosniff');
++    header('X-Frame-Options: DENY');
++    header('Referrer-Policy: no-referrer');
++    try {
++        $runtime=kicomEngramServerRuntime();
++        if (!is_array($runtime)||($runtime['oauth_enabled']??null)!==true
++            || empty($_SESSION['admin']) || ($_SERVER['HTTPS']??null)!=='on')
++            throw new RuntimeException('OAUTH_UNAVAILABLE');
++        $web=realpath(__DIR__);
++        $dir=dirname($web).'/engram-private/data';
++        if (($runtime['data_dir']??null)!==$dir
++            || ($runtime['web_root']??null)!==$web)
++            throw new RuntimeException('OAUTH_UNAVAILABLE');
++        $file=$dir.'/mirage-oauth.sqlite';
++        clearstatcache(true,$file);
++        $st=@lstat($file);
++        if (!is_array($st)||($st['mode']&0170000)!==0100000
++            || ($st['mode']&0077)!==0 || ($st['nlink']??0)!==1
++            || ($st['size']??0)<=0 || ($st['size']??PHP_INT_MAX)>10485760
++            || is_link($file)) throw new RuntimeException('OAUTH_STORAGE_UNAVAILABLE');
++        require_once __DIR__.'/modules/dev/PasskeyBridge.php';
++        require_once __DIR__.'/modules/engram/KiComEngramOAuthAuthorizeHttp.php';
++        require_once __DIR__.'/modules/engram/KiComEngramPrivateOwnerRegistry.php';
++        $passkeys=new KiComPasskeyBridge(
++            (string)$runtime['passkey_store'],(string)$runtime['rp_id'],
++            (string)$runtime['expected_origin'],'KiCom'
++        );
++        $owners=new KiComEngramPrivateOwnerRegistry(
++            (string)$runtime['owner_registry'],__DIR__
++        );
++        $oauthDb=new PDO('sqlite:'.$file,null,null,[
++            PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_TIMEOUT=>2
++        ]);
++        $raw='';
++        if (($_SERVER['REQUEST_METHOD']??'')==='POST') {
++            $raw=file_get_contents('php://input',false,null,0,16385);
++            if (!is_string($raw)||strlen($raw)>16384)
++                throw new RuntimeException('OAUTH_REQUEST_UNAVAILABLE');
++        }
++        $result=KiComEngramOAuthAuthorizeHttp::handle(
++            $_SERVER,$_GET,$raw,$_SESSION,session_id(),csrf(),$runtime,
++            (array)($runtime['oauth_client']??[]),$oauthDb,$passkeys,$owners,time()
++        );
++        foreach (($result['headers']??[]) as $key=>$value) {
++            if (in_array($key,['Cache-Control','Content-Type','X-Content-Type-Options',
++                    'X-Frame-Options','Referrer-Policy','Content-Security-Policy'],true)
++                && is_string($value)&&!str_contains($value,"\r")
++                && !str_contains($value,"\n")) header($key.': '.$value);
++        }
++        $status=$result['http_status']??404;
++        http_response_code(is_int($status)&&in_array($status,[200,403,404],true)?$status:404);
++        $output=$result['body']??'';
++        echo is_string($output)&&strlen($output)<=16384 ? $output : '';
++    } catch (Throwable) {
++        http_response_code(404);
++    }
++    exit;
++}
+ 
+ /* Mirage DEV-45: privileged read-only server-evidence inventory.
+  * No client-provided path, no host setup write and no activation. */
+--- a/.htaccess
++++ b/.htaccess
+@@ -25,6 +25,8 @@
+ # KiCom 0.9.26 trusted DEV backend bridge.
+ <IfModule mod_rewrite.c>
+   RewriteEngine On
++  RewriteRule ^\.well-known/oauth-protected-resource$ api.php?q=ENGRAM_OAUTH_RESOURCE_METADATA [L,QSD]
++  RewriteRule ^\.well-known/oauth-authorization-server$ api.php?q=ENGRAM_OAUTH_SERVER_METADATA [L,QSD]
+   RewriteRule ^dev/dev-auth\.php$ api.php?q=DEV_AUTH [L,QSA]
+   RewriteRule ^dev/dev-api\.php$ api.php?q=DEV_API [L,QSA]
+   RewriteRule ^dev/dev-bridge\.php$ index.php?q=DEV_BRIDGE [L,QSA]
