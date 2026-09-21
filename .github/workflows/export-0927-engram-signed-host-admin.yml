@@ -1,0 +1,45 @@
+name: Mirage native KiCom shared-host admin source handoff
+on:
+  push:
+    branches: [work/kicom-0.9.27-pam]
+    paths:
+      - '.github/workflows/export-0927-engram-signed-host-admin.yml'
+      - 'development/0.9.27/engram/KiComEngramSharedHostAdminConfig.php'
+      - 'development/0.9.27/engram/KiComEngramSharedHostAdminHttp.php'
+      - 'development/0.9.27/engram/mirage-host-policy-client.js'
+      - 'development/0.9.27/engram/DEV63_0933_ORIGINAL_ADMIN_SHARED_HOST_POLICY.patch'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original signed-admin suite on this exact GitHub revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l development/0.9.27/engram/KiComEngramSharedHostAdminConfig.php
+          php -l development/0.9.27/engram/KiComEngramSharedHostAdminHttp.php
+          node --check development/0.9.27/engram/mirage-host-policy-client.js
+          php development/0.9.27/engram/test-engram-signed-shared-host-config.php
+      - name: Produce immutable individual source checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd development/0.9.27/engram
+          sha256sum KiComEngramSharedHostAdminConfig.php KiComEngramSharedHostAdminHttp.php mirage-host-policy-client.js DEV63_0933_ORIGINAL_ADMIN_SHARED_HOST_POLICY.patch > DEV63-SOURCE-CHECKSUMS.sha256
+          sha256sum --status -c DEV63-SOURCE-CHECKSUMS.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mirage-dev63-exact-first-party-host-admin
+          path: |
+            development/0.9.27/engram/KiComEngramSharedHostAdminConfig.php
+            development/0.9.27/engram/KiComEngramSharedHostAdminHttp.php
+            development/0.9.27/engram/mirage-host-policy-client.js
+            development/0.9.27/engram/DEV63_0933_ORIGINAL_ADMIN_SHARED_HOST_POLICY.patch
+            development/0.9.27/engram/DEV63-SOURCE-CHECKSUMS.sha256
+          retention-days: 7
+          if-no-files-found: error
