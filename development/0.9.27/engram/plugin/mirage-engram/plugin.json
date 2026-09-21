@@ -1,0 +1,6 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "mirage-engram",
+  "version": "0.1.0",
+  "description": "Private, user-authorized, read-only project memory from the KiCom Engram MCP server."
+}
