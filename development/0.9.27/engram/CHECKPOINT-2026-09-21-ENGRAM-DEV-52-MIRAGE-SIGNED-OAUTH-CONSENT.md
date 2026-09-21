@@ -14,7 +14,7 @@ Earlier CI runs 35588187889 and 35588290589 FAILED due to the synthetic test's P
 
 Final tested code/test/workflow HEAD **`9bb9aa06fd8b98f3993c0b1d9c7091fa944e6baf`**: GitHub Actions run **35588381825**, job **106296952669**, conclusion **SUCCESS**. Original R3 zip/source and 0.9.31 PasskeyBridge git blob verified; five PHP files lint clean; **30/30 OAuth transaction and 18/18 genuine synthetic P-256 signed consent tests passed**. Run: https://github.com/cschymura/kicom-update-mirror/actions/runs/35588381825 .
 
-Additional CSRF-to-real-PHP-session guard implemented immediately thereafter as commit `d5af869e854dc31868a430510340e553043b5a45`; **this extra guard must be separately CI-confirmed before claiming that exact new commit green**, because the 35588381825 runner tested the preceding SHA.
+Additional CSRF-to-real-PHP-session guard implemented thereafter at commit `d5af869e854dc31868a430510340e553043b5a45`; **independently retested and GREEN**: GitHub Actions run **35588532126**, exact tested SHA `d5af869e854dc31868a430510340e553043b5a45`, conclusion `success`. The preceding run 35588381825 remains a separately recorded GREEN for its earlier SHA.
 
 ## Exact remaining blocker
 
