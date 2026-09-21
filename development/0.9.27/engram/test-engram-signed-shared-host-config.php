@@ -82,9 +82,11 @@ try{
  );
  ok63(($passkeys->ready()['ok']??null)===true,
   'original KiCom WebAuthn P-256 PasskeyBridge ready');
- deny63(fn()=>KiComEngramSharedHostAdminConfig::begin(
-  $web,['admin'=>false,'csrf'=>$csrf],$sid,$csrf,$csrf,$passkeys,$now),
-  'anonymous admin cannot begin shared-host policy attestation');
+ $anon=['admin'=>false,'csrf'=>$csrf];
+ deny63(function()use(&$anon,$web,$sid,$csrf,$passkeys,$now){
+  KiComEngramSharedHostAdminConfig::begin(
+   $web,$anon,$sid,$csrf,$csrf,$passkeys,$now);
+ },'anonymous admin cannot begin shared-host policy attestation');
  deny63(fn()=>KiComEngramSharedHostAdminConfig::begin(
   $web,$session,$sid,$csrf,str_repeat('0',48),$passkeys,$now),
   'foreign CSRF cannot begin operator policy attestation');
