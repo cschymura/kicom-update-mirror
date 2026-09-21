@@ -85,15 +85,18 @@ try{
  $anon=['admin'=>false,'csrf'=>$csrf];
  deny63(function()use(&$anon,$web,$sid,$csrf,$passkeys,$now){
   KiComEngramSharedHostAdminConfig::begin(
-   $web,$anon,$sid,$csrf,$csrf,$passkeys,$now);
+   $web,$anon,$sid,$csrf,$csrf,true,$passkeys,$now);
  },'anonymous admin cannot begin shared-host policy attestation');
  deny63(fn()=>KiComEngramSharedHostAdminConfig::begin(
   $web,$session,$sid,$csrf,str_repeat('0',48),$passkeys,$now),
   'foreign CSRF cannot begin operator policy attestation');
+ deny63(fn()=>KiComEngramSharedHostAdminConfig::begin(
+  $web,$session,$sid,$csrf,$csrf,false,$passkeys,$now),
+  'unencrypted HTTP cannot initiate original owner policy attestation');
  ok63(hash_file('sha256',$config)===$originalCfg,
   'GET-equivalent challenge preparation never mutates existing protected config');
  $start=KiComEngramSharedHostAdminConfig::begin(
-  $web,$session,$sid,$csrf,$csrf,$passkeys,$now
+  $web,$session,$sid,$csrf,$csrf,true,$passkeys,$now
  );
  ok63(($start['publicKey']['userVerification']??null)==='required'
   &&!empty($start['publicKey']['allowCredentials'])
@@ -117,28 +120,35 @@ try{
  $invalid['response']['signature']=KiComPasskeyBridge::b64uEncode(random_bytes(64));
  deny63(function()use(&$session,$web,$sid,$csrf,$start,$invalid,$passkeys,$now){
   KiComEngramSharedHostAdminConfig::confirm(
-   $web,$session,$sid,$csrf,$csrf,$start['confirmation'],
+   $web,$session,$sid,$csrf,$csrf,true,$start['confirmation'],
    $start['challenge_id'],$invalid,$passkeys,$now+1);
  },'invalid P-256 signature denied without changing private config');
  ok63(hash_file('sha256',$config)===$originalCfg,
   'failed original passkey signature preserves original config byte-for-byte');
  deny63(function()use(&$session,$web,$sid,$csrf,$start,$sign,$key,$rawId,$passkeys,$now){
   KiComEngramSharedHostAdminConfig::confirm(
-   $web,$session,$sid,$csrf,$csrf,$start['confirmation'],
+   $web,$session,$sid,$csrf,$csrf,true,$start['confirmation'],
    $start['challenge_id'],$sign($start,$key,$rawId,1),$passkeys,$now+1);
  },'failed signature consumes browser challenge; no replay');
- $start=KiComEngramSharedHostAdminConfig::begin($web,$session,$sid,$csrf,$csrf,$passkeys,$now+2);
+ $start=KiComEngramSharedHostAdminConfig::begin($web,$session,$sid,$csrf,$csrf,true,$passkeys,$now+2);
  deny63(function()use(&$session,$web,$sid,$csrf,$start,$sign,$key,$rawId,$passkeys,$now){
   KiComEngramSharedHostAdminConfig::confirm(
-   $web,$session,$sid,$csrf,$csrf,'SOMETHING ELSE',
+   $web,$session,$sid,$csrf,$csrf,true,'SOMETHING ELSE',
    $start['challenge_id'],$sign($start,$key,$rawId,1),$passkeys,$now+3);
  },'explicit exact operator acceptance cannot be inferred from arbitrary confirmation');
  ok63(hash_file('sha256',$config)===$originalCfg,
   'refusal leaves exact original setup-pending config unchanged');
- $start=KiComEngramSharedHostAdminConfig::begin($web,$session,$sid,$csrf,$csrf,$passkeys,$now+4);
+ $start=KiComEngramSharedHostAdminConfig::begin($web,$session,$sid,$csrf,$csrf,true,$passkeys,$now+4);
+ deny63(function()use(&$session,$web,$sid,$csrf,$start,$sign,$key,$rawId,$passkeys,$now){
+  KiComEngramSharedHostAdminConfig::confirm(
+   $web,$session,$sid,$csrf,$csrf,false,$start['confirmation'],
+   $start['challenge_id'],$sign($start,$key,$rawId,1),$passkeys,$now+5);
+ },'unencrypted HTTP cannot confirm signed owner policy attestation');
+ // Begin a new original challenge after the rejected unencrypted request.
+ $start=KiComEngramSharedHostAdminConfig::begin($web,$session,$sid,$csrf,$csrf,true,$passkeys,$now+4);
  $signed=$sign($start,$key,$rawId,1);
  $approved=KiComEngramSharedHostAdminConfig::confirm(
-  $web,$session,$sid,$csrf,$csrf,$start['confirmation'],
+  $web,$session,$sid,$csrf,$csrf,true,$start['confirmation'],
   $start['challenge_id'],$signed,$passkeys,$now+5
  );
  $new=json_decode(file_get_contents($config),true,32,JSON_THROW_ON_ERROR);
@@ -170,11 +180,11 @@ try{
   &&hash_file('sha256',$passkeyFile)!=='',
   'operator policy transition preserves prior owner registry and memory');
  deny63(fn()=>KiComEngramSharedHostAdminConfig::begin(
-  $web,$session,$sid,$csrf,$csrf,$passkeys,$now+6),
+  $web,$session,$sid,$csrf,$csrf,true,$passkeys,$now+6),
   'already reviewed host config is not silently rewritten');
  deny63(function()use(&$session,$web,$sid,$csrf,$start,$signed,$passkeys,$now){
   KiComEngramSharedHostAdminConfig::confirm(
-   $web,$session,$sid,$csrf,$csrf,$start['confirmation'],
+   $web,$session,$sid,$csrf,$csrf,true,$start['confirmation'],
    $start['challenge_id'],$signed,$passkeys,$now+6);
  },'already used browser attestation cannot mutate reviewed host policy');
  echo "KICOM_ENGRAM_SIGNED_SHARED_HOST_CONFIG_TESTS_PASSED=$checks\n";
