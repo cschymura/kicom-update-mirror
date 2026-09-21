@@ -40,7 +40,7 @@ $lookup=static fn(string $f):?array=>$f===$fp?$owner:null;
 $start=KiComEngramOAuthTransactions::begin($db,$p,$client,$session,$now);
 t51(isset($start['request_id'])&&strlen($start['request_id'])===43,
  'fresh opaque pending OAuth request, code still withheld');
-denied51(fn()=>KiComEngramOAuthTransactions::issueApprovedCode($db,$start['request_id'],$now),
+denied51(fn()=>KiComEngramOAuthTransactions::issueApprovedCode($db,$start['request_id'],$session,$fp,$now),
  'authorization code cannot be issued before explicit approved consent');
 denied51(fn()=>KiComEngramOAuthTransactions::approve(
  $db,$start['request_id'],$session,$fp,$lookup,false,$now),
@@ -58,10 +58,16 @@ t51($ok['approved']===true&&$ok['redirect_uri']===$client['redirect_uri']
 denied51(fn()=>KiComEngramOAuthTransactions::approve(
  $db,$start['request_id'],$session,$fp,$lookup,true,$now+11),
  'consent cannot be replayed');
-$issued=KiComEngramOAuthTransactions::issueApprovedCode($db,$start['request_id'],$now+12);
+denied51(fn()=>KiComEngramOAuthTransactions::issueApprovedCode(
+ $db,$start['request_id'],str_repeat('b',48),$fp,$now+12),
+ 'stolen pending request cannot issue code from foreign admin session');
+denied51(fn()=>KiComEngramOAuthTransactions::issueApprovedCode(
+ $db,$start['request_id'],$session,hash('sha256','other-passkey'),$now+12),
+ 'stolen request cannot issue code with different passkey owner');
+$issued=KiComEngramOAuthTransactions::issueApprovedCode($db,$start['request_id'],$session,$fp,$now+12);
 t51(strlen($issued['code'])===43&&$issued['state']===$p['state']
     &&$issued['redirect_uri']===$client['redirect_uri'],'one-time code issued for pinned callback');
-denied51(fn()=>KiComEngramOAuthTransactions::issueApprovedCode($db,$start['request_id'],$now+12),
+denied51(fn()=>KiComEngramOAuthTransactions::issueApprovedCode($db,$start['request_id'],$session,$fp,$now+12),
  'authorization code cannot be emitted twice');
 $exchange=[
  'grant_type'=>'authorization_code','code'=>$issued['code'],
