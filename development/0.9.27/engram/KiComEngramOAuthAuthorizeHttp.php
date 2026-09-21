@@ -98,6 +98,21 @@ final class KiComEngramOAuthAuthorizeHttp
                     'publicKey'=>$started['publicKey'],
                 ]);
             }
+            if ($step==='cancel' && self::keys($p,['step','csrf','request_id'])) {
+                $cancelled=KiComEngramOAuthTransactions::cancel(
+                    $privateOAuthDb,$requestId,$originalSessionId,$now
+                );
+                if (!is_string($cancelled['redirect_uri']??null)
+                    || !is_string($pinnedClient['redirect_uri']??null)
+                    || !hash_equals($pinnedClient['redirect_uri'],$cancelled['redirect_uri'])
+                    || !is_string($cancelled['state']??null))return self::denied();
+                $params=['error'=>'access_denied','state'=>$cancelled['state']];
+                if (KiComEngramOAuthHttp::stableClientReady($trustedRuntime))
+                    $params['iss']=KiComEngramOAuthHttp::ISSUER;
+                return self::json(200,['ok'=>true,
+                    'redirect_to'=>$pinnedClient['redirect_uri'].'?'
+                        .http_build_query($params,'','&',PHP_QUERY_RFC3986)]);
+            }
             if ($step==='confirm' && self::keys($p,[
                 'step','csrf','request_id','challenge_id','assertion','consent'
             ]) && $p['consent']===true && is_string($p['challenge_id'])
@@ -115,10 +130,11 @@ final class KiComEngramOAuthAuthorizeHttp
                     || !is_string($issued['code']??null)
                     || !is_string($issued['state']??null))
                     return self::denied();
+                $params=['code'=>$issued['code'],'state'=>$issued['state']];
+                if (KiComEngramOAuthHttp::stableClientReady($trustedRuntime))
+                    $params['iss']=KiComEngramOAuthHttp::ISSUER;
                 $redirect=$pinnedClient['redirect_uri']
-                    .'?'.http_build_query([
-                        'code'=>$issued['code'],'state'=>$issued['state']
-                    ],'','&',PHP_QUERY_RFC3986);
+                    .'?'.http_build_query($params,'','&',PHP_QUERY_RFC3986);
                 return self::json(200,[
                     'ok'=>true,'redirect_to'=>$redirect
                 ]);
@@ -152,7 +168,8 @@ final class KiComEngramOAuthAuthorizeHttp
             .'<p><button type="button" id="mirage-oauth-consent-button" disabled>'
             .'Mit KiCom-Passkey freigeben</button></p>'
             .'<p id="mirage-oauth-consent-status" role="status"></p>'
-            .'<p><a href="admin.php">Abbrechen</a></p></main>'
+            .'<p><button type="button" id="mirage-oauth-cancel-button">'
+            .'Verbindung nicht erlauben</button></p></main>'
             .'<script src="assets/mirage-oauth-client.js" defer></script></body></html>';
     }
 
