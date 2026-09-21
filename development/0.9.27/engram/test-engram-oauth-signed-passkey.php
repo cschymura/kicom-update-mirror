@@ -284,6 +284,103 @@ try{
     KiComEngramOAuthTransactions::verify($db,$access['access_token'],$now+22)
       ['credential_fingerprint']===$fingerprint,
     'real original signed admin consent -> HTTP redirect -> PKCE exchange -> exact owner token');
+
+  // DEV-56: supported stable callback profile. The client_id and redirect
+  // below are documented OpenAI constants, not a guessed per-plugin callback.
+  $stableClient=[
+    'client_id'=>KiComEngramOAuthHttp::STABLE_CHATGPT_CLIENT,
+    'redirect_uri'=>KiComEngramOAuthHttp::STABLE_CHATGPT_CALLBACK,
+    'connector_id'=>'mirage-stable-test',
+    'host_evidence_id'=>hash('sha256','synthetic stable host')
+  ];
+  $stableHost=$host;
+  $stableHost['oauth_issuer_response_supported']=true;
+  $stableHost['oauth_client']=$stableClient;
+  $stableRequest=$request;
+  $stableRequest['client_id']=$stableClient['client_id'];
+  $stableRequest['redirect_uri']=$stableClient['redirect_uri'];
+  $stableRequest['state']=KiComPasskeyBridge::b64uEncode(random_bytes(24));
+  $stableQuery=['engram_oauth'=>'1']+$stableRequest;
+  $stableHandler=static function(
+    array $http,array $query,string $wire,array &$currentSession
+  )use($sid,$csrf,$stableHost,$stableClient,$db,$bridge,$registry,$now):array{
+    return KiComEngramOAuthAuthorizeHttp::handle(
+      $http,$query,$wire,$currentSession,$sid,$csrf,$stableHost,
+      $stableClient,$db,$bridge,$registry,$now+30
+    );
+  };
+  $stablePage=$stableHandler($httpsGet,$stableQuery,'',$session);
+  ok52($stablePage['http_status']===200 &&
+    str_contains($stablePage['body'],'mirage-oauth-cancel-button'),
+    'stable profile shows explicit, first-party authorization cancellation button');
+  preg_match('/data-request-id="([A-Za-z0-9_-]{43})"/',$stablePage['body'],$stableMatch);
+  $stableId=$stableMatch[1]??'';
+  $stablePost=static function(array $payload,array &$currentSession)use(
+      $stableHandler,$httpsPost,$stableId
+  ):array{
+    return $stableHandler($httpsPost,[],
+      json_encode(['request_id'=>$stableId]+$payload,JSON_THROW_ON_ERROR),
+      $currentSession);
+  };
+  $stableStart=$stablePost(['step'=>'challenge','csrf'=>$csrf],$session);
+  $stableOptions=json_decode($stableStart['body'],true,16,JSON_THROW_ON_ERROR);
+  ok52($stableStart['http_status']===200 &&
+    !empty($stableOptions['publicKey']['allowCredentials']),
+    'stable callback still requires the original registered KiCom passkey');
+  $stableConfirm=$stablePost(['step'=>'confirm','csrf'=>$csrf,
+    'challenge_id'=>$stableOptions['challenge_id'],
+    'assertion'=>$sign($stableOptions,$privateKey,$rawId,3),
+    'consent'=>true],$session);
+  $stableAnswer=json_decode($stableConfirm['body'],true,16,JSON_THROW_ON_ERROR);
+  $stableUrl=parse_url($stableAnswer['redirect_to']??'');
+  parse_str($stableUrl['query']??'',$stableArgs);
+  ok52($stableConfirm['http_status']===200
+    && str_starts_with($stableAnswer['redirect_to'],
+      KiComEngramOAuthHttp::STABLE_CHATGPT_CALLBACK.'?')
+    && ($stableArgs['iss']??null)===KiComEngramOAuthHttp::ISSUER
+    && ($stableArgs['state']??null)===$stableRequest['state']
+    && strlen($stableArgs['code']??'')===43,
+    'signed original KiCom passkey returns stable callback with correct RFC9207 issuer/state/code');
+  $stableExchange=KiComEngramOAuthTransactions::exchange($db,[
+    'grant_type'=>'authorization_code','code'=>$stableArgs['code'],
+    'code_verifier'=>$verifier,'redirect_uri'=>$stableClient['redirect_uri'],
+    'client_id'=>$stableClient['client_id'],'resource'=>$stableRequest['resource']
+  ],$stableClient,$now+31);
+  ok52(strlen($stableExchange['access_token'])===43,
+    'issuer-bound stable callback authorization code exchanges via PKCE');
+
+  // An explicit refusal must terminate a separate pending request and
+  // return error + state + iss; no passkey required to DECLINE a grant.
+  $declineRequest=$stableRequest;
+  $declineRequest['state']=KiComPasskeyBridge::b64uEncode(random_bytes(20));
+  $declinePage=$stableHandler(
+    $httpsGet,['engram_oauth'=>'1']+$declineRequest,'',$session
+  );
+  preg_match('/data-request-id="([A-Za-z0-9_-]{43})"/',$declinePage['body'],$declineMatch);
+  $declineId=$declineMatch[1]??'';
+  $declinePayload=[
+    'request_id'=>$declineId,'step'=>'cancel','csrf'=>$csrf
+  ];
+  $declineAnswer=$stableHandler($httpsPost,[],
+    json_encode($declinePayload,JSON_THROW_ON_ERROR),$session);
+  $declineJson=json_decode($declineAnswer['body'],true,16,JSON_THROW_ON_ERROR);
+  $declineUrl=parse_url($declineJson['redirect_to']??'');
+  parse_str($declineUrl['query']??'',$declineArgs);
+  ok52($declineAnswer['http_status']===200
+    && str_starts_with($declineJson['redirect_to'],
+       KiComEngramOAuthHttp::STABLE_CHATGPT_CALLBACK.'?')
+    && ($declineArgs['error']??null)==='access_denied'
+    && ($declineArgs['iss']??null)===KiComEngramOAuthHttp::ISSUER
+    && ($declineArgs['state']??null)===$declineRequest['state']
+    && !isset($declineArgs['code']),
+    'explicit denial returns pinned stable callback with OAuth error, original state and issuer but no code');
+  $repeatDecline=$stableHandler($httpsPost,[],
+    json_encode($declinePayload,JSON_THROW_ON_ERROR),$session);
+  ok52($repeatDecline['http_status']===403,
+    'one-use OAuth cancellation cannot be replayed to produce another callback');
+  rejectTx52(fn()=>KiComEngramOAuthTransactions::issueApprovedCode(
+    $db,$declineId,$sid,$fingerprint,$now+32),
+    'declined pending request can never issue an OAuth code');
   echo "KICOM_ENGRAM_OAUTH_SIGNED_PASSKEY_TESTS_PASSED=$checks\n";
 }finally{
   unset($bridge,$registry,$db);
