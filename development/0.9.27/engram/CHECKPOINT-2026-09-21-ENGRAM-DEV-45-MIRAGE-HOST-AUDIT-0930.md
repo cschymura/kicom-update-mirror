@@ -1,0 +1,24 @@
+# Mirage Engram DEV-45 — native KiCom 0.9.30 first-party read-only host audit
+
+Date: 2026-09-21. Base branch checkpoint DEV-44 `ff99ed59f7c7fb90d11cfabb0350f9e08f166bf0`. Before code change, GitHub branch HEAD and Slack DM were checked and a 30-minute DEV-45 claim was posted.
+
+## Concrete implementation and durable sources
+
+- Added EXACT-source `development/0.9.27/engram/KiComEngramHostAudit.php` and `test-engram-host-audit.php`; confirmed exact Git blob hashes of local packaged source: module `bbc22beb26bfdbe5cea3c8e8f5c1c2dde07e47c2`, test `5db8141d96bb40c0ec19b82bfa85cb674373e5bc`.
+- CI workflow `.github/workflows/test-0927-engram-host-audit.yml`; source+test+workflow SHA **`20dbe9f147f74ed72ed252cc0301334c6c3df52c`**. GitHub Actions run **35577017813**, conclusion **success**, exact SHA checkout. Immutable original 0.9.26-R3 release+source baseline verified. 16/16 PHP synthetic privacy / file permissions / symlink / no mutation / no false isolation evidence assertions passed.
+- Built complete native **0.9.30** release from exact byte-verified prior `KiCom-0.9.29-Mirage-Engram-LIVE-TEST-INACTIVE.zip` (SHA256 `f8781b0ba098749c32c30e80aa1bcfe8209b00e7bde5290d2be7ab4d78a34720`). New full archive `KiCom-0.9.30-Mirage-Host-Audit-INACTIVE.zip`, SHA256 **`cb23764c9f49e2f1ed6afb06ff4baa4eba98cf4823c42c7a44c7f34d3cb48bb1`**, 228929 bytes / 55 files. The artifact lives ONLY in the current ChatGPT conversation attachment, NOT GitHub/auto-update feed, and was NOT installed. Accompanying source/build/verifier bundle SHA256 `707c245cea6ad575dbefcc716f975f2b38b5c94dd7bf26f08afbf7e5178caadf` is also a conversation attachment; only the exact host-audit module/test and CI workflow were committed to GitHub.
+- Exact changed native archive paths: `admin.php`, `lib.php` (version only), `genome/genome.json`, `genome/modules.json`, `MANIFEST.sha256`, and added `modules/engram/KiComEngramHostAudit.php`. Original `api.php`, `guardian.php`, `recovery.php`, `index.php` and all security `.htaccess` files unchanged.
+- First-party admin GET `admin.php?engram_host_audit=1`, original password admin session, HTTPS and GET required. No new public/unauthenticated diagnostic file or externally exposed MCP endpoint. Only fixed status codes; no absolute paths, filenames of adjacent apps, UID, sensitive config/registry content, tokens, passkeys, or private memories. Audit is strictly READ ONLY: no database writes, backup actions, permission mutations or Engram activation.
+- The ORIGINAL KiCom 0.9.29 native verifier **accepted** the completed 0.9.30 release against an isolated exact-parent install fixture: version and genome parent/generation valid, recovery kernel unchanged; risk class **RED**, requiring real human admin approval. All 37 PHP files lint clean, manifest and changed-file allowlist pass; native verifier rejected tampered PHP, missing module and foreign parent (including rehashed manifest).
+
+## Real versus synthetic and precise remaining blocker
+
+**Real accepted prior operator input:** KiCom 0.9.29 live synthetic SQLite roundtrip OK and existing enrolled signed passkey/owner binding. **New synthetic tests only:** native 0.9.30 packaging and read-only audit on local dummy host directory; 0.9.30 has not been installed and its actual All-inkl report was not obtained. The report deliberately stays `HOST_EVIDENCE_INCOMPLETE_API_INACTIVE`; file modes and visible sibling directory do NOT prove virtual host/alias/default-host inventory, PHP UID/open_basedir cross-app isolation or actual backup-and-restore. The key UI label `personal_memory=not_assessed` avoids claiming actual server activation state from a read-only audit.
+
+DEV-37 through DEV-44 activation/MCP components remain DEV-only; they are NOT activated/deployed by 0.9.30. An actual supported authenticated remote MCP protocol endpoint, connected ChatGPT app and independent new-chat recall remain missing. This is NOT a ready private memory system.
+
+## Next executor actions
+
+1. Preserve SHA integrity; only if Christoph chooses, install the exact native 0.9.30 ZIP through the existing KiCom admin self-update (from 0.9.29, RED human approval); inspect `admin.php?engram_host_audit=1` while logged in. Do not upload source bundle.
+2. Obtain authorized direct host-capable evidence for vhost alias/UID/open_basedir and backups; don't claim the new limited read-only report alone is complete. Resolve same-UID sibling access by actual isolation or an expressly scoped, synthetic-only proof deployment.
+3. Integrate the DEV-37..44 components with **real** owner binding and a complete supported MCP HTTP/OAuth interface, preserving exact per-record consent for any writes. Build native follow-up update only after full package and security tests; any production activation requires separate concrete operator approval. Minimize manual operator steps; do not ask Christoph to repeat proven SQLite/passkey tests.
