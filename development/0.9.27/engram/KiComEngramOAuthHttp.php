@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/KiComEngramOAuthTransactions.php';
+require_once __DIR__.'/KiComEngramHostingPolicy.php';
 
 /**
  * DEV-53: first-party OAuth discovery, bearer challenge and token HTTP facade.
@@ -47,10 +48,11 @@ final class KiComEngramOAuthHttp
     public static function available(array $trustedHost):bool
     {
         foreach([
-            'enabled','operator_approved','host_isolation_verified',
+            'enabled','operator_approved',
             'review_enabled','mcp_connector_enabled','oauth_enabled'
         ] as $flag)if(($trustedHost[$flag]??null)!==true)return false;
-        return ($trustedHost['runtime_source']??null)==='server-only-reviewed'
+        return KiComEngramHostingPolicy::permits($trustedHost)
+            &&($trustedHost['runtime_source']??null)==='server-only-reviewed'
             &&($trustedHost['private_memory_scope']??null)==='dev-verified-owner'
             &&($trustedHost['expected_origin']??null)===self::ISSUER
             &&($trustedHost['rp_id']??null)==='kicom.rurtalbahn.info';
