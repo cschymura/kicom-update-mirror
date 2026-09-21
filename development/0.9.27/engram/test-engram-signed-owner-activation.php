@@ -308,12 +308,57 @@ try{
  ok63(hash_file('sha256',$config)===$cfgBeforeActivation,
    'refused memory activation retains disabled original host configuration');
 
- $started=KiComEngramSignedOwnerActivation::begin(
-   $web,$session,$sid,$csrf,$csrf,true,$passkeys,$now+12);
+ // Prove the signed activation reaches the actual first-party admin JSON
+ // handler; not just an isolated class invoked by the test runner.
+ require_once __DIR__.'/KiComEngramOwnerActivationHttp.php';
+ $get=['HTTPS'=>'on','HTTP_HOST'=>'kicom.rurtalbahn.info','REQUEST_METHOD'=>'GET'];
+ $post=['HTTPS'=>'on','HTTP_HOST'=>'kicom.rurtalbahn.info',
+   'REQUEST_METHOD'=>'POST','CONTENT_TYPE'=>'application/json',
+   'HTTP_ORIGIN'=>'https://kicom.rurtalbahn.info'];
+ $invoke=static function(array $srv,string $wire)use(
+     &$session,$sid,$csrf,$web,$passkeys,$now
+ ):array{
+     return KiComEngramOwnerActivationHttp::handle(
+       $srv,$wire,$session,$sid,$csrf,$web,$passkeys,$now+12
+     );
+ };
+ $anonymous=['admin'=>false,'csrf'=>$csrf];
+ ok63(KiComEngramOwnerActivationHttp::handle(
+   $get,'',$anonymous,$sid,$csrf,$web,$passkeys,$now+12)['http_status']===404,
+   'anonymous browser cannot reach live-equivalent owner-activation page');
+ $http=$get;$http['HTTPS']='off';
+ ok63($invoke($http,'')['http_status']===404,
+   'unencrypted HTTP cannot load first-party owner activation');
+ $page=$invoke($get,'');
+ ok63($page['http_status']===200
+   &&str_contains($page['body'],'id="mirage-activation"')
+   &&str_contains($page['body'],'mirage-owner-activation-client.js')
+   &&str_contains($page['body'],'eigenständige Freigabe'),
+   'authenticated original KiCom admin shows separate activation and Passkey consent');
+ $json=static fn(array $obj):string=>json_encode($obj,JSON_THROW_ON_ERROR);
+ $request=['step'=>'begin','csrf'=>$csrf];
+ $foreign=$post;$foreign['HTTP_ORIGIN']='https://attacker.invalid';
+ ok63($invoke($foreign,$json($request))['http_status']===404,
+   'foreign origin cannot begin private owner activation');
+ ok63($invoke($post,$json(['step'=>'begin','csrf'=>str_repeat('0',48)]))['http_status']===403,
+   'owner activation requires original KiCom PHP session CSRF');
+ $begun=$invoke($post,$json($request));
+ $started=json_decode($begun['body'],true,16,JSON_THROW_ON_ERROR);
+ ok63($begun['http_status']===200
+   &&($started['ok']??null)===true
+   &&($started['publicKey']['userVerification']??null)==='required',
+   'first-party JSON challenge is a fresh registered original KiCom Passkey request');
  $goodProof=$sign($started,$key,$rawId,2);
- $result=KiComEngramSignedOwnerActivation::confirm(
-   $web,$session,$sid,$csrf,$csrf,true,$started['confirmation'],
-   $started['challenge_id'],$goodProof,$passkeys,$now+13);
+ $confirm=['step'=>'confirm','csrf'=>$csrf,
+   'confirmation'=>$started['confirmation'],
+   'challenge_id'=>$started['challenge_id'],'assertion'=>$goodProof];
+ $extra=$confirm;$extra['owner_binding']='forged-browser-identity';
+ ok63($invoke($post,$json($extra))['http_status']===403,
+   'request-provided owner-binding cannot authorize activation');
+ $done=$invoke($post,$json($confirm));
+ $result=json_decode($done['body'],true,16,JSON_THROW_ON_ERROR);
+ ok63($done['http_status']===200 &&($result['ok']??null)===true,
+   'real first-party original KiCom signed owner approval activates private OAuth+MCP');
  ok63($result['ok']===true
     &&$result['code']==='PRIVATE_ENGRAM_OAUTH_MCP_READ_ACTIVATED'
     &&$result['memory_read_enabled']===true
@@ -341,11 +386,8 @@ try{
  ok63(hash_file('sha256',$legacy)===$memoryBeforeActivation
    &&hash_file('sha256',$registry)===$originalOwner,
    'activating OAuth/MCP never changes existing private memory or owner registry');
- deny64(function()use(&$session,$web,$sid,$csrf,$started,$goodProof,$passkeys,$now){
-   KiComEngramSignedOwnerActivation::confirm(
-      $web,$session,$sid,$csrf,$csrf,true,$started['confirmation'],
-      $started['challenge_id'],$goodProof,$passkeys,$now+14);
- },'same signed browser activation cannot be replayed');
+ ok63($invoke($post,$json($confirm))['http_status']===403,
+   'one-use signed browser activation cannot be replayed through real admin HTTP');
  deny64(fn()=>KiComEngramSignedOwnerActivation::begin(
     $web,$session,$sid,$csrf,$csrf,true,$passkeys,$now+14),
    'already activated host cannot silently reenter activation wizard');
