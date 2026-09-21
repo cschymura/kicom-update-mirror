@@ -207,7 +207,7 @@ final class KiComEngramSharedHostAdminConfig
         $lock=$root.'/.mirage-host-policy.lock';
         if(is_link($lock))self::deny();
         $oldMask=umask(0077);
-        $handle=null;$temporary=null;
+        $handle=null;$temporary=null;$backup=null;$committed=false;
         try{
             $handle=@fopen($lock,'c');
             if($handle===false||!flock($handle,LOCK_EX))self::deny();
@@ -227,10 +227,25 @@ final class KiComEngramSharedHostAdminConfig
             $old=@file_get_contents($path);
             if(!is_string($old)||!hash_equals(hash('sha256',$old),$expectedHash))
                 self::deny();
+            // Save the ORIGINAL operator-owned protected file before the
+            // atomic swap. Do not overwrite existing backup snapshots.
+            $backup=$root.'/backups/engram-host-before-shared-'
+                .gmdate('Ymd\\THis\\Z').'-'.bin2hex(random_bytes(6)).'.json';
+            $b=@fopen($backup,'x+b');
+            if($b===false)self::deny();
+            try {
+                if(!@chmod($backup,0600)
+                    || @fwrite($b,$old)!==strlen($old)
+                    || !@fflush($b))self::deny();
+            }finally{fclose($b);}
+            $stored=@file_get_contents($backup);
+            if(!is_string($stored)||!hash_equals($stored,$old))self::deny();
             if(!@rename($temporary,$path))self::deny();
+            $committed=true;
             $temporary=null;
         }finally{
             if($temporary!==null)@unlink($temporary);
+            if(!$committed && $backup!==null)@unlink($backup);
             if(is_resource($handle)){@flock($handle,LOCK_UN);@fclose($handle);}
             umask($oldMask);
         }
