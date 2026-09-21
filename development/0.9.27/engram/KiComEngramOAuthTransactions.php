@@ -138,16 +138,24 @@ final class KiComEngramOAuthTransactions
      * never in a browser field. This method creates the code only AFTER
      * approval so it can be included once in a pinned redirect.
      */
-    public static function issueApprovedCode(PDO $db,string $requestId,int $now):array
+    public static function issueApprovedCode(
+        PDO $db,string $requestId,string $adminSessionId,
+        string $verifiedFingerprint,int $now
+    ):array
     {
         self::sqlite($db);
-        if(!self::secretFormat($requestId))self::denied();
+        if(!self::secretFormat($requestId) || strlen($adminSessionId)<24
+            || !self::hex64($verifiedFingerprint))self::denied();
         $db->exec('BEGIN IMMEDIATE');
         try{
             $q=$db->prepare('SELECT * FROM mirage_oauth_codes WHERE request_hash=?');
             $q->execute([hash('sha256',$requestId)]);$r=$q->fetch(PDO::FETCH_ASSOC);
             if(!$r || (int)$r['consent_at']<=0 || (int)$r['consumed']!==0
-                || (int)$r['expires_at']<=$now)self::denied();
+                || (int)$r['expires_at']<=$now || (int)$r['issued_at']>$now
+                || !hash_equals($r['admin_session_hash'],hash('sha256',$adminSessionId))
+                || !is_string($r['approved_fingerprint'])
+                || !hash_equals($r['approved_fingerprint'],$verifiedFingerprint)
+                || !hash_equals($r['owner_binding'],hash('sha256',"mirage-owner\0".$verifiedFingerprint)))self::denied();
             $code=self::secret();
             $q=$db->prepare('UPDATE mirage_oauth_codes SET code_hash=?,
               consumed=2 WHERE request_hash=? AND consumed=0');
