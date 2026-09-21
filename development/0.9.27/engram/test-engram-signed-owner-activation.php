@@ -391,6 +391,102 @@ try{
  deny64(fn()=>KiComEngramSignedOwnerActivation::begin(
     $web,$session,$sid,$csrf,$csrf,true,$passkeys,$now+14),
    'already activated host cannot silently reenter activation wizard');
+ // DEV-64 final synthetic operational proof with THREE separate authentic
+ // original KiCom signings: host policy, memory activation and per-client
+ // OAuth consent. The resulting short-lived bearer must retrieve the
+ // EXISTING memory created before either server activation.
+ require_once __DIR__.'/KiComEngramOAuthPasskeyConsent.php';
+ require_once __DIR__.'/KiComEngramOAuthMcpHostBridge.php';
+ $oauthDb=new PDO('sqlite:'.$oauthFile,null,null,[
+   PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION
+ ]);
+ $trustedClient=$activeCfg['oauth_client'];
+ $verifier=rtrim(strtr(base64_encode(random_bytes(48)),'+/','-_'),'=');
+ $codeChallenge=rtrim(strtr(base64_encode(hash('sha256',$verifier,true)),'+/','-_'),'=');
+ $params=[
+   'client_id'=>$trustedClient['client_id'],
+   'redirect_uri'=>$trustedClient['redirect_uri'],
+   'response_type'=>'code',
+   'scope'=>'engram.read',
+   'resource'=>KiComEngramOAuthHttp::RESOURCE,
+   'state'=>KiComPasskeyBridge::b64uEncode(random_bytes(24)),
+   'code_challenge'=>$codeChallenge,'code_challenge_method'=>'S256'
+ ];
+ $request=KiComEngramOAuthTransactions::begin(
+   $oauthDb,$params,$trustedClient,$sid,$now+15
+ );
+ ok63(strlen($request['request_id']??'')===43,
+   'fresh exact pinned ChatGPT public-client OAuth request waits for separate signed owner consent');
+ $owners=new KiComEngramPrivateOwnerRegistry($registry,$web);
+ $oauthChallenge=KiComEngramOAuthPasskeyConsent::begin(
+   $oauthDb,$request['request_id'],$session,$sid,$csrf,$csrf,
+   true,$passkeys,$now+16
+ );
+ ok63(($oauthChallenge['publicKey']['userVerification']??null)==='required',
+   'per-client OAuth memory read consent still requires fresh ORIGINAL KiCom registered Passkey');
+ $oauthAssertion=$sign($oauthChallenge,$key,$rawId,3);
+ $code=KiComEngramOAuthPasskeyConsent::confirm(
+   $oauthDb,$request['request_id'],$session,$sid,$csrf,$csrf,
+   true,$oauthChallenge['challenge_id'],$oauthAssertion,true,
+   $passkeys,$owners,$now+17
+ );
+ ok63(strlen($code['code']??'')===43
+    &&$code['redirect_uri']===$trustedClient['redirect_uri'],
+   'separate signed original owner approves only exact pinned client, scope and callback');
+ $exchange=[
+   'grant_type'=>'authorization_code','code'=>$code['code'],
+   'code_verifier'=>$verifier,
+   'redirect_uri'=>$trustedClient['redirect_uri'],
+   'client_id'=>$trustedClient['client_id'],
+   'resource'=>KiComEngramOAuthHttp::RESOURCE
+ ];
+ $token=KiComEngramOAuthTransactions::exchange(
+   $oauthDb,$exchange,$trustedClient,$now+18
+ );
+ ok63(strlen($token['access_token']??'')===43
+   &&$token['scope']==='engram.read',
+   'approved real original KiCom WebAuthn code exchanges into owner-scoped read-only OAuth token');
+ $http=[
+   'HTTPS'=>'on','HTTP_HOST'=>'kicom.rurtalbahn.info',
+   'REQUEST_METHOD'=>'POST','CONTENT_TYPE'=>'application/json',
+   'HTTP_ACCEPT'=>'application/json, text/event-stream',
+   'HTTP_MCP_PROTOCOL_VERSION'=>'2025-06-18',
+   'HTTP_AUTHORIZATION'=>'Bearer '.$token['access_token']
+ ];
+ $rpc=static fn(int $id,string $method,array $args=[]):string=>
+   json_encode(['jsonrpc'=>'2.0','id'=>$id,'method'=>$method,'params'=>$args],
+     JSON_UNESCAPED_SLASHES|JSON_THROW_ON_ERROR);
+ $handle=static fn(array $requestHttp,string $wire,array $trustedRuntime):array=>
+   KiComEngramOAuthMcpHostBridge::handle(
+     $requestHttp,$wire,$trustedRuntime,$web,$now+19
+   );
+ $search=$rpc(41,'tools/call',[
+   'name'=>'engram_search','arguments'=>[
+     'query'=>'SYNTHETIC memory for independent connector test','limit'=>2
+   ]
+ ]);
+ $recalled=$handle($http,$search,$activeCfg);
+ $mcp=json_decode($recalled['body'],true,24,JSON_THROW_ON_ERROR);
+ $returned=json_decode($mcp['result']['content'][0]['text'],true,24,JSON_THROW_ON_ERROR);
+ ok63($recalled['http_status']===200
+   &&($mcp['result']['isError']??null)===false
+   &&count($returned)===1
+   &&($returned[0]['body']??null)==='SYNTHETIC memory for independent connector test',
+   'FULL SIGNED HOST + SIGNED ACTIVATION + SIGNED OAUTH -> real private MCP SQLite memory recall');
+ ok63($returned[0]['source_kind']==='synthetic_test'
+    &&!isset($returned[0]['owner_binding'])
+    &&!isset($returned[0]['host_evidence_id']),
+   'read-only MCP search returns only artificial memory projection, never private configuration');
+ $unauthorized=$http;unset($unauthorized['HTTP_AUTHORIZATION']);
+ ok63($handle($unauthorized,$search,$activeCfg)['http_status']===401,
+   'missing bearer still demands OAuth even after separately signed owner activation');
+ $off=$activeCfg;$off['oauth_enabled']=false;
+ ok63($handle($http,$search,$off)['http_status']===404,
+   'operator can disable OAuth regardless of a previously signed access token');
+ KiComEngramOAuthTransactions::revoke($oauthDb,$token['access_token']);
+ ok63($handle($http,$search,$activeCfg)['http_status']===401,
+   'revoked short-lived OAuth token immediately loses private memory access');
+ unset($oauthDb,$owners);
  echo "KICOM_ENGRAM_SIGNED_OWNER_ACTIVATION_TESTS_PASSED=$checks\n";
 }finally{
  unset($passkeys,$key);
