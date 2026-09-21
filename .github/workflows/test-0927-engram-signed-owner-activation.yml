@@ -5,6 +5,7 @@ on:
     paths:
       - 'development/0.9.27/engram/KiComEngramSignedOwnerActivation.php'
       - 'development/0.9.27/engram/KiComEngramOwnerActivationHttp.php'
+      - 'development/0.9.27/engram/KiComEngramSyntheticMcpSampleHttp.php'
       - 'development/0.9.27/engram/mirage-owner-activation-client.js'
       - 'development/0.9.27/engram/test-engram-signed-owner-activation.php'
       - '.github/workflows/test-0927-engram-signed-owner-activation.yml'
@@ -33,7 +34,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for file in KiComEngramSignedOwnerActivation.php KiComEngramOwnerActivationHttp.php KiComEngramActivationTransaction.php KiComEngramActivationReadinessGate.php KiComEngramSharedHostAdminConfig.php KiComEngramOAuthHttp.php test-engram-signed-owner-activation.php; do
+          for file in KiComEngramSignedOwnerActivation.php KiComEngramOwnerActivationHttp.php KiComEngramSyntheticMcpSampleHttp.php KiComEngramActivationTransaction.php KiComEngramActivationReadinessGate.php KiComEngramSharedHostAdminConfig.php KiComEngramOAuthHttp.php test-engram-signed-owner-activation.php; do
             php -l "development/0.9.27/engram/$file"
           done
           node --check development/0.9.27/engram/mirage-owner-activation-client.js
