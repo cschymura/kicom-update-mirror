@@ -1,0 +1,38 @@
+name: KiCom Engram host evidence adapter
+on:
+  push:
+    branches: [work/kicom-0.9.27-pam]
+    paths:
+      - 'development/0.9.27/engram/KiComEngramHostEvidenceAdapter.php'
+      - 'development/0.9.27/engram/KiComEngramHostIsolationGate.php'
+      - 'development/0.9.27/engram/test-engram-host-evidence-adapter.php'
+      - '.github/workflows/test-0927-engram-host-evidence-adapter.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-evidence-adapter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+      - name: Verify immutable R3 baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f  releases/0.9.26/KiCom-0.9.26-R3.zip' | sha256sum -c -
+          (cd source/0.9.26-r3 && sha256sum --status -c MANIFEST.sha256)
+      - name: Lint and execute host evidence adapter tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l development/0.9.27/engram/KiComEngramHostIsolationGate.php
+          php -l development/0.9.27/engram/KiComEngramHostEvidenceAdapter.php
+          php -l development/0.9.27/engram/test-engram-host-evidence-adapter.php
+          php development/0.9.27/engram/test-engram-host-evidence-adapter.php
