@@ -22,10 +22,25 @@ final class KiComEngramActivationReadinessGate
         if ($maxEvidenceAgeSeconds < 60 || $maxEvidenceAgeSeconds > 3600) {
             throw new InvalidArgumentException('Evidence age policy out of bounds');
         }
-        self::assertExactKeys($hostEvidence, ['eligible','status','evidence_id','checked_at_utc']);
+        // Distinct evidence shapes: acceptance of shared-host risk does not
+        // fabricate a completed PHP-UID/vhost-isolation audit.
+        $shared=($hostEvidence['status']??null)==='SHARED_HOST_RISK_EXPLICITLY_ACCEPTED_API_STILL_INACTIVE';
+        self::assertExactKeys($hostEvidence,$shared
+            ? ['eligible','status','evidence_id','checked_at_utc',
+               'hosting_policy_mode','hosting_policy_owner',
+               'known_limitation','operator_accepts_shared_host_risk']
+            : ['eligible','status','evidence_id','checked_at_utc']);
         self::assertExactKeys($ownerEvidence, ['schema','verified','owner_binding','host_evidence_id','checked_at_utc','private_api_inactive','mcp_connector_connected']);
-        if (($hostEvidence['eligible'] ?? null) !== true
-            || ($hostEvidence['status'] ?? null) !== 'HOST_ISOLATION_EVIDENCE_COMPLETE_API_STILL_INACTIVE') {
+        if (($hostEvidence['eligible']??null)!==true) {
+            throw new RuntimeException('Host policy evidence not eligible');
+        }
+        if ($shared) {
+            if (($hostEvidence['hosting_policy_mode']??null)!=='shared-host-explicit-operator-acceptance/v1'
+                || ($hostEvidence['hosting_policy_owner']??null)!=='mirage-owner'
+                || ($hostEvidence['known_limitation']??null)!=='shared-php-uid-not-verified'
+                || ($hostEvidence['operator_accepts_shared_host_risk']??null)!==true)
+                throw new RuntimeException('Shared-host operator policy not accepted');
+        } elseif (($hostEvidence['status']??null)!=='HOST_ISOLATION_EVIDENCE_COMPLETE_API_STILL_INACTIVE') {
             throw new RuntimeException('Host isolation evidence not eligible');
         }
         $hostId = $hostEvidence['evidence_id'] ?? null;
@@ -53,7 +68,10 @@ final class KiComEngramActivationReadinessGate
         self::assertFreshUtc($ownerEvidence['checked_at_utc'] ?? null, $nowUtc, $maxEvidenceAgeSeconds, 'owner');
         return [
             'ready' => true,
-            'status' => 'AUTHENTICATED_ACTIVATION_READY_API_STILL_INACTIVE',
+            'status' => $shared
+                ? 'AUTHENTICATED_SHARED_HOST_ACCEPTED_API_STILL_INACTIVE'
+                : 'AUTHENTICATED_ACTIVATION_READY_API_STILL_INACTIVE',
+            'hosting_mode' => $shared ? 'operator_accepted_shared_host' : 'verified_isolation',
             'owner_binding' => $ownerBinding,
             'host_evidence_id' => $hostId,
         ];
