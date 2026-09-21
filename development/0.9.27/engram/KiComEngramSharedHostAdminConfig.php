@@ -24,8 +24,9 @@ final class KiComEngramSharedHostAdminConfig
 
     public static function begin(
         string $webRoot,array &$session,string $sessionId,string $csrf,
-        string $postedCsrf,KiComPasskeyBridge $passkeys,int $now
+        string $postedCsrf,bool $https,KiComPasskeyBridge $passkeys,int $now
     ):array {
+        if(!$https)self::deny();
         self::admin($session,$sessionId,$csrf,$postedCsrf);
         unset($session['mirage_host_policy_pending']);
         try {
@@ -66,9 +67,10 @@ final class KiComEngramSharedHostAdminConfig
 
     public static function confirm(
         string $webRoot,array &$session,string $sessionId,string $csrf,
-        string $postedCsrf,string $confirmation,string $challengeId,
+        string $postedCsrf,bool $https,string $confirmation,string $challengeId,
         array $assertion,KiComPasskeyBridge $passkeys,int $now
     ):array {
+        if(!$https)self::deny();
         self::admin($session,$sessionId,$csrf,$postedCsrf);
         $pending=$session['mirage_host_policy_pending']??null;
         unset($session['mirage_host_policy_pending']);
