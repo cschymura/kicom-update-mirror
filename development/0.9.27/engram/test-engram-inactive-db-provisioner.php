@@ -44,10 +44,10 @@ try {
         'host_isolation_verified'=>false,'mcp_connector_enabled'=>false,
         'oauth_enabled'=>false,
         'web_root'=>$web,'data_dir'=>$data,'owner_registry'=>$ownerFile,
+        'runtime_source'=>'setup-pending'
     ];
     file_put_contents($ownerFile,'{"schema":1,"owners":{}}');
-    file_put_contents($configFile,json_encode(['schema'=>1,'web_root'=>$web,
-        'enabled'=>false,'runtime_source'=>'setup-pending'],JSON_THROW_ON_ERROR));
+    file_put_contents($configFile,json_encode(['schema'=>1]+$runtime,JSON_THROW_ON_ERROR));
     chmod($ownerFile,0600);chmod($configFile,0600);
     file_put_contents($memory,'synthetic PREEXISTING user engram file -- do not open');
     chmod($memory,0600);
@@ -60,6 +60,17 @@ try {
             $web,$currentSession,$sessionId,$csrf,$submitted,
             $confirmation,$policy,$https
         );
+    check58(KiComEngramInactiveDbProvisioner::loadInactiveRuntime($web)===$runtime,
+        'trusted admin loader can read genuine setup-pending host config without activating it');
+    $actualActive=$runtime;$actualActive['enabled']=true;
+    file_put_contents($configFile,json_encode(['schema'=>1]+$actualActive,JSON_THROW_ON_ERROR));
+    chmod($configFile,0600);
+    reject58(fn()=>$prepare($admin,$runtime,$csrf,
+        'INAKTIVE ENGRAM DATENBANKEN VORBEREITEN',true),
+        'INACTIVE_PRIVATE_SCAFFOLD_REQUIRED',
+        'falsely inactive caller claim cannot override real active private host file');
+    file_put_contents($configFile,json_encode(['schema'=>1]+$runtime,JSON_THROW_ON_ERROR));
+    chmod($configFile,0600);
     reject58(fn()=>$prepare(['admin'=>false,'csrf'=>$csrf],$runtime,$csrf,
         'INAKTIVE ENGRAM DATENBANKEN VORBEREITEN',true),
         'ADMIN_APPROVAL_REQUIRED','anonymous cannot initialize private DB');
