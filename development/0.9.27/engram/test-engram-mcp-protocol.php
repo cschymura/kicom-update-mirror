@@ -94,7 +94,7 @@ try{
   'owner lacking read right cannot search');
 
  $cases=[
-  ['{bad',-32600,'malformed JSON'],
+  ['{bad',-32700,'malformed JSON parse error'],
   ['[]',-32600,'JSON array request'],
   [str_repeat('x',8193),-32600,'oversized JSON request'],
   [$req(6,'does/not/exist',[]),-32601,'unknown MCP method'],
