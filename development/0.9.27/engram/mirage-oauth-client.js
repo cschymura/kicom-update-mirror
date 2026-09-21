@@ -9,6 +9,7 @@
   const consent=document.getElementById("mirage-oauth-consent-check");
   const button=document.getElementById("mirage-oauth-consent-button");
   const status=document.getElementById("mirage-oauth-consent-status");
+  const cancel=document.getElementById("mirage-oauth-cancel-button");
   if (!(consent instanceof HTMLInputElement) ||
       !(button instanceof HTMLButtonElement) || !status) return;
   const csrf=root.dataset.csrf || "";
@@ -43,6 +44,22 @@
   };
   consent.addEventListener("change",()=>{
     button.disabled=!consent.checked;
+  });
+  if (cancel instanceof HTMLButtonElement) cancel.addEventListener("click",async()=>{
+    if(cancel.disabled)return;
+    cancel.disabled=true;
+    button.disabled=true;
+    status.textContent="Verbindung wird abgelehnt …";
+    try {
+      const result=await send({step:"cancel"});
+      if(typeof result.redirect_to!=="string")throw Error("redirect missing");
+      const url=new URL(result.redirect_to);
+      if(url.protocol!=="https:" || url.hostname!=="chatgpt.com"
+         || url.searchParams.get("error")!=="access_denied")throw Error("redirect denied");
+      window.location.assign(url.href);
+    }catch(_error){
+      status.textContent="Ablehnung nicht übermittelt. Bitte diese Seite schließen.";
+    }
   });
   button.addEventListener("click",async()=>{
     if(!consent.checked || button.disabled) return;
