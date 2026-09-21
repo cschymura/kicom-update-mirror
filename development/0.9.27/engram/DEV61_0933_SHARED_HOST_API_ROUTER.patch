@@ -1,0 +1,14 @@
+--- a/api.php
++++ b/api.php
+@@ -77,10 +77,11 @@
+         if (!function_exists('kicomEngramServerRuntime'))
+             throw new RuntimeException('MCP_UNAVAILABLE');
+         $runtime = kicomEngramServerRuntime();
++        require_once __DIR__.'/modules/engram/KiComEngramHostingPolicy.php';
+         if (!is_array($runtime) || ($runtime['enabled']??null)!==true
+             || ($runtime['operator_approved']??null)!==true
+-            || ($runtime['host_isolation_verified']??null)!==true
++            || !KiComEngramHostingPolicy::permits($runtime)
+             || ($runtime['mcp_connector_enabled']??null)!==true
+             || ($runtime['oauth_enabled']??null)!==true)
+             throw new RuntimeException('MCP_UNAVAILABLE');
