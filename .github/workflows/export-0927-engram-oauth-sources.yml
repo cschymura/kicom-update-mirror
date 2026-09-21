@@ -4,6 +4,10 @@ on:
     branches: [work/kicom-0.9.27-pam]
     paths:
       - '.github/workflows/export-0927-engram-oauth-sources.yml'
+      - 'development/0.9.27/engram/KiComEngramOAuthHttp.php'
+      - 'development/0.9.27/engram/KiComEngramOAuthTransactions.php'
+      - 'development/0.9.27/engram/KiComEngramOAuthAuthorizeHttp.php'
+      - 'development/0.9.27/engram/mirage-oauth-client.js'
   workflow_dispatch:
 permissions:
   contents: read
@@ -25,7 +29,7 @@ jobs:
           sha256sum development/0.9.27/engram/KiComEngramOAuth*.php development/0.9.27/engram/mirage-oauth-client.js > development/0.9.27/engram/OAUTH-SOURCE-CHECKSUMS.sha256
       - uses: actions/upload-artifact@v4
         with:
-          name: mirage-dev55-exact-oauth-source
+          name: mirage-dev57-exact-oauth-source
           path: |
             development/0.9.27/engram/KiComEngramOAuthTransactions.php
             development/0.9.27/engram/KiComEngramOAuthHttp.php
