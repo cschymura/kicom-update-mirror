@@ -1,0 +1,54 @@
+name: Mirage complete DEV64 native 0.9.33 exact source export
+on:
+  push:
+    branches: [work/kicom-0.9.27-pam]
+    paths:
+      - '.github/workflows/export-0927-engram-dev64-complete-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  complete-native-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite,sqlite3,openssl,sodium
+          coverage: none
+      - name: Verify exact original KiCom signed-owner activation and OAuth to MCP recall
+        shell: bash
+        run: |
+          set -euo pipefail
+          php development/0.9.27/engram/test-engram-signed-owner-activation.php
+      - name: Source SHA manifest and syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd development/0.9.27/engram
+          for source in KiComEngramHostingPolicy.php KiComEngramMcpRuntimeGate.php KiComEngramOAuthHttp.php KiComEngramActivationReadinessGate.php KiComEngramActivationTransaction.php KiComEngramSharedHostAdminConfig.php KiComEngramSharedHostAdminHttp.php KiComEngramSignedOwnerActivation.php KiComEngramOwnerActivationHttp.php; do php -l "$source"; done
+          for source in mirage-host-policy-client.js mirage-owner-activation-client.js; do node --check "$source"; done
+          sha256sum KiComEngramHostingPolicy.php KiComEngramMcpRuntimeGate.php KiComEngramOAuthHttp.php KiComEngramActivationReadinessGate.php KiComEngramActivationTransaction.php KiComEngramSharedHostAdminConfig.php KiComEngramSharedHostAdminHttp.php KiComEngramSignedOwnerActivation.php KiComEngramOwnerActivationHttp.php mirage-host-policy-client.js mirage-owner-activation-client.js DEV63_0933_ORIGINAL_ADMIN_SHARED_HOST_POLICY.patch DEV64_0933_ORIGINAL_ADMIN_OWNER_ACTIVATION.patch > DEV64-COMPLETE-SOURCE-CHECKSUMS.sha256
+          sha256sum --status -c DEV64-COMPLETE-SOURCE-CHECKSUMS.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mirage-dev64-complete-native-source
+          path: |
+            development/0.9.27/engram/KiComEngramHostingPolicy.php
+            development/0.9.27/engram/KiComEngramMcpRuntimeGate.php
+            development/0.9.27/engram/KiComEngramOAuthHttp.php
+            development/0.9.27/engram/KiComEngramActivationReadinessGate.php
+            development/0.9.27/engram/KiComEngramActivationTransaction.php
+            development/0.9.27/engram/KiComEngramSharedHostAdminConfig.php
+            development/0.9.27/engram/KiComEngramSharedHostAdminHttp.php
+            development/0.9.27/engram/KiComEngramSignedOwnerActivation.php
+            development/0.9.27/engram/KiComEngramOwnerActivationHttp.php
+            development/0.9.27/engram/mirage-host-policy-client.js
+            development/0.9.27/engram/mirage-owner-activation-client.js
+            development/0.9.27/engram/DEV63_0933_ORIGINAL_ADMIN_SHARED_HOST_POLICY.patch
+            development/0.9.27/engram/DEV64_0933_ORIGINAL_ADMIN_OWNER_ACTIVATION.patch
+            development/0.9.27/engram/DEV64-COMPLETE-SOURCE-CHECKSUMS.sha256
+          retention-days: 7
+          if-no-files-found: error
