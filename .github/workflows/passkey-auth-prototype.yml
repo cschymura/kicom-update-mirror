@@ -1,0 +1,57 @@
+name: Passkey auth prototype checks
+
+on:
+  pull_request:
+    paths:
+      - 'experimental/passkey-auth/**'
+      - '.github/workflows/passkey-auth-prototype.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure PHP CLI
+        shell: bash
+        run: |
+          if ! command -v php >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y php-cli php-common
+          fi
+          php -v
+
+      - name: Require crypto extensions
+        run: >-
+          php -r '$missing=[]; foreach (["openssl","sodium"] as $e) if (!extension_loaded($e)) $missing[]=$e;
+          if ($missing) { fwrite(STDERR,"Missing extensions: ".implode(",",$missing)."\n"); exit(1); }
+          echo "openssl+sodium available\n";'
+
+      - name: PHP syntax checks
+        run: |
+          php -l experimental/passkey-auth/PasskeyBridge.php
+          php -l experimental/passkey-auth/selftest.php
+
+      - name: Reject obvious network or shell primitives
+        shell: bash
+        run: |
+          if grep -nE '\b(exec|shell_exec|system|passthru|proc_open|popen)\s*\(' experimental/passkey-auth/PasskeyBridge.php; then
+            echo 'Forbidden shell primitive found' >&2
+            exit 1
+          fi
+          if grep -nE '\b(curl_init|fsockopen|pfsockopen)\s*\(' experimental/passkey-auth/PasskeyBridge.php; then
+            echo 'Unexpected network primitive found in verifier module' >&2
+            exit 1
+          fi
+          if grep -nE 'file_get_contents.*https?://' experimental/passkey-auth/PasskeyBridge.php; then
+            echo 'Unexpected remote file read found in verifier module' >&2
+            exit 1
+          fi
+
+      - name: Synthetic WebAuthn + sealed handoff selftest
+        run: php experimental/passkey-auth/selftest.php
