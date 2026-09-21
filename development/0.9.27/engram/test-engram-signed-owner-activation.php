@@ -391,6 +391,50 @@ try{
  deny64(fn()=>KiComEngramSignedOwnerActivation::begin(
     $web,$session,$sid,$csrf,$csrf,true,$passkeys,$now+14),
    'already activated host cannot silently reenter activation wizard');
+ // The old setup-test row is scoped to synthetic-admin-preflight/diagnostic
+ // and is INACCESSIBLE via real owner-bound project MCP. The operator needs
+ // an explicit reproducible artificial sample belonging to mirage-owner/project.
+ require_once __DIR__.'/KiComEngramSyntheticMcpSampleHttp.php';
+ $GLOBALS['mirage_test_sample_webroot']=$web;
+ if(!function_exists('kicomEngramServerRuntime')){
+   function kicomEngramServerRuntime():array{
+     $root=$GLOBALS['mirage_test_sample_webroot'];
+     $path=dirname($root).'/engram-private/engram-host.json';
+     $host=json_decode(file_get_contents($path),true,24,JSON_THROW_ON_ERROR);
+     unset($host['schema']);return $host;
+   }
+ }
+ $sampleServer=['HTTPS'=>'on','HTTP_HOST'=>'kicom.rurtalbahn.info',
+    'REQUEST_METHOD'=>'POST','HTTP_ORIGIN'=>'https://kicom.rurtalbahn.info'];
+ $sampleQuery=['engram_sample'=>'1'];
+ $sampleForm=['csrf'=>$csrf,'confirmation'=>'KUENSTLICHEN ENGRAM TESTEINTRAG ANLEGEN'];
+ $sample=static fn(array $server,array $form,array $policy):array=>
+   KiComEngramSyntheticMcpSampleHttp::handle(
+      $server,$sampleQuery,$form,$session,$sid,$csrf,$web,$policy
+   );
+ $bad=$sampleForm;$bad['csrf']=str_repeat('0',strlen($csrf));
+ ok63($sample($sampleServer,$bad,$activeCfg)['http_status']===403,
+   'invalid original KiCom admin CSRF cannot add artificial memory');
+ $inactive=$activeCfg;$inactive['enabled']=false;
+ ok63($sample($sampleServer,$sampleForm,$inactive)['http_status']===404,
+   'disabling Engram prevents artificial owner sample writes');
+ $addedSample=$sample($sampleServer,$sampleForm,$activeCfg);
+ ok63($addedSample['http_status']===200
+    &&str_contains($addedSample['body'],'künstliche Testeintrag wurde'),
+   'original admin explicitly creates one artificial record for active owner/project MCP');
+ $store=new KiComEngramStore($private.'/data',$web);
+ $sampleRows=$store->search('mirage-owner','project','MIRAGE ENGRAM CONNECTOR TEST',2);
+ ok63(count($sampleRows)===1
+    &&($sampleRows[0]['body']??null)==='MIRAGE ENGRAM CONNECTOR TEST GRUENE LOKOMOTIVE 2026'
+    &&($sampleRows[0]['source_kind']??null)==='synthetic_test',
+   'artificial admin sample has exact fixed searchable body and synthetic provenance');
+ unset($store);
+ ok63($sample($sampleServer,$sampleForm,$activeCfg)['http_status']===200,
+   'repeated authorized admin synthetic sample remains idempotent');
+ $store=new KiComEngramStore($private.'/data',$web);
+ ok63(count($store->search('mirage-owner','project','MIRAGE ENGRAM CONNECTOR TEST',3))===1,
+   'repeated artificial admin sample did not create duplicate memories');
+ unset($store);
  // DEV-64 final synthetic operational proof with THREE separate authentic
  // original KiCom signings: host policy, memory activation and per-client
  // OAuth consent. The resulting short-lived bearer must retrieve the
@@ -462,7 +506,7 @@ try{
    );
  $search=$rpc(41,'tools/call',[
    'name'=>'engram_search','arguments'=>[
-     'query'=>'SYNTHETIC memory for independent connector test','limit'=>2
+     'query'=>'MIRAGE ENGRAM CONNECTOR TEST','limit'=>2
    ]
  ]);
  $recalled=$handle($http,$search,$activeCfg);
@@ -471,7 +515,7 @@ try{
  ok63($recalled['http_status']===200
    &&($mcp['result']['isError']??null)===false
    &&count($returned)===1
-   &&($returned[0]['body']??null)==='SYNTHETIC memory for independent connector test',
+   &&($returned[0]['body']??null)==='MIRAGE ENGRAM CONNECTOR TEST GRUENE LOKOMOTIVE 2026',
    'FULL SIGNED HOST + SIGNED ACTIVATION + SIGNED OAUTH -> real private MCP SQLite memory recall');
  ok63($returned[0]['source_kind']==='synthetic_test'
     &&!isset($returned[0]['owner_binding'])
