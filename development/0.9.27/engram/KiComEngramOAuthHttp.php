@@ -21,6 +21,20 @@ final class KiComEngramOAuthHttp
     public const AUTH_METADATA=self::ISSUER.'/.well-known/oauth-authorization-server';
     public const AUTH_ENDPOINT=self::ISSUER.'/admin.php?engram_oauth=1';
     public const TOKEN_ENDPOINT=self::ISSUER.'/api.php?q=ENGRAM_OAUTH_TOKEN';
+    /** Documented stable OpenAI callback, available only with RFC 9207 iss. */
+    public const STABLE_CHATGPT_CLIENT='https://chatgpt.com/oauth/client.json';
+    public const STABLE_CHATGPT_CALLBACK='https://chatgpt.com/connector_platform_oauth_redirect';
+
+    public static function stableClientReady(array $trustedHost): bool
+    {
+        $client=$trustedHost['oauth_client']??null;
+        return self::available($trustedHost)
+            && ($trustedHost['oauth_issuer_response_supported']??null)===true
+            && is_array($client)
+            && ($client['client_id']??null)===self::STABLE_CHATGPT_CLIENT
+            && ($client['redirect_uri']??null)===self::STABLE_CHATGPT_CALLBACK;
+    }
+
 
     private const HEADERS=[
         'Cache-Control'=>'no-store, private',
@@ -69,6 +83,9 @@ final class KiComEngramOAuthHttp
                 // advertise CIMD until actual HTTPS client document
                 // validation is implemented; no dynamic registration.
                 'client_id_metadata_document_supported'=>false,
+                // Advertise RFC 9207 only when the exact stable callback is
+                // pinned and both approved and cancelled redirects emit iss.
+                'authorization_response_iss_parameter_supported'=>self::stableClientReady($trustedHost),
             ];
         }else return self::result(404,'');
         return self::json(200,$data);
