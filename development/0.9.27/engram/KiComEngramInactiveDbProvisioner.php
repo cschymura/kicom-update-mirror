@@ -18,6 +18,44 @@ final class KiComEngramInactiveDbProvisioner
         'mirage-oauth.sqlite'=>'oauth',
     ];
 
+    /**
+     * The original KiCom runtime loader rejects setup-pending configurations,
+     * correctly for public APIs. This separate admin-only loader accepts ONLY
+     * a real, existing, private and INACTIVE setup-pending host configuration.
+     * It does not promote setup-pending to server-only-reviewed.
+     */
+    public static function loadInactiveRuntime(string $trustedWebRoot):array
+    {
+        $web=realpath($trustedWebRoot);
+        if(!is_string($web)||$web==='/'||is_link($trustedWebRoot))
+            self::deny('TRUSTED_WEB_ROOT_UNAVAILABLE');
+        $private=dirname($web).'/engram-private';
+        $config=$private.'/engram-host.json';
+        if(!self::privateDir($private)||realpath($private)!==$private
+            || !self::privateFile($config,16384))
+            self::deny('INACTIVE_PRIVATE_SCAFFOLD_REQUIRED');
+        $raw=@file_get_contents($config,false,null,0,16385);
+        if(!is_string($raw)||strlen($raw)>16384)
+            self::deny('INACTIVE_PRIVATE_SCAFFOLD_REQUIRED');
+        try{$doc=json_decode($raw,true,16,JSON_THROW_ON_ERROR);}
+        catch(Throwable){self::deny('INACTIVE_PRIVATE_SCAFFOLD_REQUIRED');}
+        if(!is_array($doc)||array_is_list($doc)
+            || ($doc['schema']??null)!==1
+            || ($doc['web_root']??null)!==$web
+            || ($doc['data_dir']??null)!==$private.'/data'
+            || ($doc['owner_registry']??null)!==$private.'/owners/engram-owners.json'
+            || !in_array(($doc['runtime_source']??null),
+                ['setup-pending','server-only-reviewed'],true)
+            || ($doc['enabled']??null)!==false)
+            self::deny('INACTIVE_PRIVATE_SCAFFOLD_REQUIRED');
+        foreach(['operator_approved','oauth_enabled','mcp_connector_enabled',
+                 'host_isolation_verified'] as $flag)
+            if(($doc[$flag]??null)===true)
+                self::deny('INACTIVE_PRIVATE_SCAFFOLD_REQUIRED');
+        unset($doc['schema']);
+        return $doc;
+    }
+
     public static function prepare(
         string $trustedWebRoot,array $originalSession,string $sessionId,
         string $expectedCsrf,string $submittedCsrf,
@@ -31,6 +69,11 @@ final class KiComEngramInactiveDbProvisioner
             || !hash_equals('INAKTIVE ENGRAM DATENBANKEN VORBEREITEN',$confirmation))
             self::deny('ADMIN_APPROVAL_REQUIRED');
 
+        // Reject a caller-supplied 'inactive' claim if the actual private
+        // host configuration is active, missing, or has changed.
+        $actual=self::loadInactiveRuntime($trustedWebRoot);
+        if ($serverRuntime!==$actual)
+            self::deny('INACTIVE_PRIVATE_SCAFFOLD_REQUIRED');
         $web=realpath($trustedWebRoot);
         if (!is_string($web) || $web==='/' || is_link($trustedWebRoot))
             self::deny('TRUSTED_WEB_ROOT_UNAVAILABLE');
