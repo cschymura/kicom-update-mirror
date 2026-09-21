@@ -1,0 +1,59 @@
+--- a/admin.php
++++ b/admin.php
+@@ -42,6 +42,63 @@
+ if(isset($_GET['logout'])){session_destroy();header('Location: admin.php');exit;}
+ 
++/* Mirage DEV-64: explicit separate ORIGINAL KiCom admin/Passkey owner approval.
++ * Unlike accepting the hosting model, this is the ONLY action which can
++ * activate the existing private SQLite state and OAuth/MCP read-only route.
++ * No path, owner, approval or host flags are read from browser JSON. */
++if (isset($_GET['engram_activate'])) {
++    header('Cache-Control: no-store, private');
++    header('X-Content-Type-Options: nosniff');
++    header('X-Frame-Options: DENY');
++    header('Referrer-Policy: no-referrer');
++    try {
++        if ($_GET['engram_activate']!=='1'
++            || empty($_SESSION['admin'])
++            || ($_SERVER['HTTPS']??null)!=='on'
++            || ($_SERVER['HTTP_HOST']??null)!=='kicom.rurtalbahn.info')
++            throw new RuntimeException('ENGRAM_ACTIVATION_ADMIN_UNAVAILABLE');
++        require_once __DIR__.'/modules/dev/PasskeyBridge.php';
++        require_once __DIR__.'/modules/engram/KiComEngramOwnerActivationHttp.php';
++        $passkeys=new KiComPasskeyBridge(
++            __DIR__.'/var/dev_zone/passkeys','kicom.rurtalbahn.info',
++            'https://kicom.rurtalbahn.info','KiCom'
++        );
++        $raw='';
++        if (($_SERVER['REQUEST_METHOD']??null)==='POST') {
++            $raw=file_get_contents('php://input',false,null,0,16385);
++            if (!is_string($raw)||strlen($raw)>16384)
++                throw new RuntimeException('ENGRAM_ACTIVATION_ADMIN_UNAVAILABLE');
++        }
++        $result=KiComEngramOwnerActivationHttp::handle(
++            $_SERVER,$raw,$_SESSION,session_id(),csrf(),
++            __DIR__,$passkeys,time()
++        );
++        foreach(($result['headers']??[]) as $name=>$value) {
++            if(in_array($name,['Cache-Control','Content-Type',
++                    'X-Content-Type-Options','X-Frame-Options',
++                    'Referrer-Policy','Content-Security-Policy'],true)
++                && is_string($value)&&!str_contains($value,"\r")
++                &&!str_contains($value,"\n"))header($name.': '.$value);
++        }
++        $status=$result['http_status']??404;
++        http_response_code(is_int($status)&&in_array($status,[200,403,404],true)?$status:404);
++        $body=$result['body']??'';
++        echo is_string($body)&&strlen($body)<=16384?$body:'';
++    }catch(Throwable){http_response_code(404);}
++    exit;
++}
++
+ /* Mirage DEV-55: original KiCom admin-session OAuth read approval. */
+@@ -296,6 +353,7 @@
+     echo '<p><a href="admin.php?engram_db_setup=1">Private OAuth- und Aktivierungsdatenbanken vorbereiten</a></p>';
++    echo '<p><a href="admin.php?engram_activate=1">Privaten Engram-Lesezugriff mit KiCom-Passkey aktivieren</a></p>';
+     echo '<p>Vor Aktivierung fehlen weiterhin die echte Host-Isolationsprüfung, '
+@@ -673,6 +731,6 @@
+-<section><h2>Mirage Engram</h2><p><a href="admin.php?engram_host_audit=1">Hostprüfung (nur lesend)</a></p><p><a href="admin.php?engram_setup=1">Private Speicherstruktur prüfen und vorbereiten</a></p><p>Die Einrichtung bleibt bis zur eigenständigen Benutzer- und Host-Freigabe deaktiviert.</p></section>
++<section><h2>Mirage Engram</h2><p><a href="admin.php?engram_host_audit=1">Hostprüfung (nur lesend)</a></p><p><a href="admin.php?engram_setup=1">Private Speicherstruktur prüfen und vorbereiten</a></p><p><a href="admin.php?engram_host_policy=1">Hosting-Betriebsentscheidung mit KiCom-Passkey bestätigen</a></p><p><a href="admin.php?engram_activate=1">Engram-Lesezugriff mit KiCom-Passkey aktivieren</a></p><p>Die Einrichtung bleibt bis zur eigenständigen Benutzer- und Hosting-Freigabe deaktiviert.</p></section>
