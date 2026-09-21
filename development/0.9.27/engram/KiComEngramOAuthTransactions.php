@@ -232,7 +232,7 @@ final class KiComEngramOAuthTransactions
         if(!is_string($client['client_id'])
             || !preg_match('#\Ahttps://chatgpt\.com/oauth/(?:[a-zA-Z0-9_-]+/)?client\.json\z#D',$client['client_id'])
             || !is_string($client['redirect_uri'])
-            || !preg_match('#\Ahttps://chatgpt\.com/[^?#]{1,160}\z#D',$client['redirect_uri']))self::denied();
+            || !preg_match('%\Ahttps://chatgpt\.com/[^?#]{1,160}\z%D',$client['redirect_uri']))self::denied();
         if(!is_string($client['connector_id'])
             || !preg_match('/\A[a-z0-9][a-z0-9._:-]{2,63}\z/D',$client['connector_id'])
             || !self::hex64($client['host_evidence_id']))self::denied();
