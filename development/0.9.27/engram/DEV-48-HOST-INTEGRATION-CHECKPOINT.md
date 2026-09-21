@@ -26,3 +26,22 @@ This file contains only architecture/status and synthetic-test references. No pr
 ## Next concrete input / blocker
 
 The verified 0.9.31 source and trusted KiCom runtime binding interfaces are not present in the available public mirror and could not be read without an authenticated KiCom source session. **Do not guess or downgrade.** Once an authenticated source snapshot is available, prepare a 0.9.31-derived inactive staging patch against those exact files and run regression tests before an installation proposal.
+
+## 2026-09-21 CORRECTION — actual 0.9.31 original artifact recovered (supersedes source/route blocker above)
+
+The above host-source blocker is **resolved**. An original `KiCom-0.9.31-Mirage-MCP-Route-INACTIVE.zip` package was recovered from the operator's own private file library (NOT published to GitHub) and independently checked against the package digest already recorded in the contemporaneous `INSTALLATION-UND-STATUS.md`:
+
+`9ad279b4bd084b13b8eba9327851440721c78f2894d1664d017fb72be21591c3`
+
+- Exact original 0.9.31 ZIP contained 63 package paths. `MANIFEST.sha256` verified each extracted path; all 45 PHP files passed syntax lint under PHP 8.4.
+- Actual `api.php` **already implements** early `ENGRAM_MCP` route, and `modules/engram/KiComEngramMcpFirstPartyBridge.php` already binds native private registry and activation state. The eight Engram MCP modules are present in `genome/modules.json` with `enabled=false`. Do **NOT** propose another copy of this same route or a 0.9.31 update/downgrade.
+- Against a disposable localhost-only extraction, independent synthetic unauthenticated MCP `tools/list` POST tests returned HTTP 404 with 0 response bytes both without bearer and with a synthetic invalid bearer. This proves only fail-closed behavior when the host configuration is absent, not external host isolation or live connector readiness.
+- The operator has already installed 0.9.31 successfully (also corroborated by first-party live BOOTSTRAP and CHAT_UPDATE_STATUS). Original installation notes predate that installation; do not repeat their 0.9.29 -> 0.9.31 upgrade instructions.
+
+### Current true blocker: server trust-bound activation, NOT missing PHP route/source
+
+Inspect the authenticated KiCom admin's built-in read-only `admin.php?engram_host_audit=1` status (never disclose host paths, private config or registry). It deliberately reports `HOST_EVIDENCE_INCOMPLETE_API_INACTIVE` even for restricted directories: it cannot independently prove vhost alias mappings, per-app PHP UID separation and successful independent backup restore. A readable sibling directory is a warning, not conclusive proof of its vhost identity. Separate operator-approved host evidence and enforceable isolation must be established before setting `enabled`, `operator_approved`, `host_isolation_verified`, `review_enabled` or `mcp_connector_enabled` in the protected host-only configuration.
+
+Only after that: verify existing passkey-bound owner and current activation registry, implement separately approved short-lived bearer issuance and revocation (DEV-47 intentionally has *no* token issuer), configure ChatGPT's external MCP connector explicitly, and test retrieval from an independent new conversation with synthetic approved records first. No live access or server activation was performed during this checkpoint.
+
+**Do not equate `genome/modules.json.enabled=false` with proof that PHP can never be required by trusted internal dispatch; runtime flags plus owner/activation/token checks are the real action boundaries.** A route appearing in source does not mean its protected operations are active.
