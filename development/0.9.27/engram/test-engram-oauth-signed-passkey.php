@@ -16,6 +16,12 @@ function reject52(callable $f,string $name):void{
   }
   throw new RuntimeException('FAIL '.$name);
 }
+function rejectTx52(callable $f,string $name):void{
+  try{$f();}catch(RuntimeException $e){
+    ok52($e->getMessage()==='MIRAGE_OAUTH_REQUEST_DENIED',$name);return;
+  }
+  throw new RuntimeException('FAIL '.$name);
+}
 function purge52(string $p):void{
   if(is_link($p)||is_file($p)){@unlink($p);return;}
   if(!is_dir($p))return;
@@ -122,7 +128,7 @@ try{
     $db,$requestId,$session,$sid,$csrf,$csrf,true,$started['challenge_id'],
     $sign($started,$privateKey,$rawId),true,$bridge,$registry,$now+1); }, 
     'failed original signature burns the browser OAuth challenge');
-  reject52(fn()=>KiComEngramOAuthTransactions::issueApprovedCode(
+  rejectTx52(fn()=>KiComEngramOAuthTransactions::issueApprovedCode(
     $db,$requestId,$sid,$fingerprint,$now+1),
     'invalid signature never creates OAuth authorization code');
   $second=KiComEngramOAuthPasskeyConsent::begin(
@@ -157,7 +163,7 @@ try{
     $db,$requestId,$session,$sid,$csrf,$csrf,true,$fourth['challenge_id'],
     $sign($fourth,$privateKey,$rawId),true,$bridge,$registry,$now+8),
     'same signed challenge cannot issue another code');
-  reject52(fn()=>KiComEngramOAuthTransactions::issueApprovedCode(
+  rejectTx52(fn()=>KiComEngramOAuthTransactions::issueApprovedCode(
     $db,$requestId,$sid,$fingerprint,$now+8),
     'original OAuth code cannot be emitted twice');
   $exchange=KiComEngramOAuthTransactions::exchange($db,[
