@@ -88,7 +88,7 @@ try{
    $web,$anon,$sid,$csrf,$csrf,true,$passkeys,$now);
  },'anonymous admin cannot begin shared-host policy attestation');
  deny63(fn()=>KiComEngramSharedHostAdminConfig::begin(
-  $web,$session,$sid,$csrf,str_repeat('0',48),$passkeys,$now),
+  $web,$session,$sid,$csrf,str_repeat('0',48),true,$passkeys,$now),
   'foreign CSRF cannot begin operator policy attestation');
  deny63(fn()=>KiComEngramSharedHostAdminConfig::begin(
   $web,$session,$sid,$csrf,$csrf,false,$passkeys,$now),
