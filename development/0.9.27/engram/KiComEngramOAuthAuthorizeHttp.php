@@ -44,7 +44,7 @@ final class KiComEngramOAuthAuthorizeHttp
             // OAuth request. Client id, callback, scope and resource must be
             // separately pinned to operator-owned server configuration.
             try {
-                if (array_keys($query)===['engram_oauth','request_id']
+                if (self::keys($query,['engram_oauth','request_id'])
                     && $query['engram_oauth']==='1'
                     && is_string($query['request_id'])) {
                     $review=KiComEngramOAuthPasskeyConsent::review(
