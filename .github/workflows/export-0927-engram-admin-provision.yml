@@ -1,0 +1,39 @@
+name: Mirage export exact admin provisioning modules
+on:
+  push:
+    branches: [work/kicom-0.9.27-pam]
+    paths:
+      - '.github/workflows/export-0927-engram-admin-provision.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite,sqlite3
+      - name: Verify and export exact PHP bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for x in KiComEngramAdminDbProvisionHttp.php KiComEngramInactiveDbProvisioner.php KiComEngramOAuthTransactions.php KiComEngramActivationTransaction.php KiComEngramActivationReadinessGate.php; do
+            php -l "development/0.9.27/engram/$x"
+          done
+          (cd development/0.9.27/engram && sha256sum KiComEngramAdminDbProvisionHttp.php KiComEngramInactiveDbProvisioner.php KiComEngramOAuthTransactions.php KiComEngramActivationTransaction.php KiComEngramActivationReadinessGate.php > ADMIN-DB-SOURCE-CHECKSUMS.sha256)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mirage-dev60-admin-provision-exact-source
+          path: |
+            development/0.9.27/engram/KiComEngramAdminDbProvisionHttp.php
+            development/0.9.27/engram/KiComEngramInactiveDbProvisioner.php
+            development/0.9.27/engram/KiComEngramOAuthTransactions.php
+            development/0.9.27/engram/KiComEngramActivationTransaction.php
+            development/0.9.27/engram/KiComEngramActivationReadinessGate.php
+            development/0.9.27/engram/ADMIN-DB-SOURCE-CHECKSUMS.sha256
+          retention-days: 7
+          if-no-files-found: error
