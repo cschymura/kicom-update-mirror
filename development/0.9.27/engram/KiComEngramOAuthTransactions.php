@@ -84,6 +84,30 @@ final class KiComEngramOAuthTransactions
     }
 
     /**
+     * Read-only, session-bound review summary. Never return the authorization
+     * code, PKCE challenge, session hash, owner fingerprint or host paths.
+     * The original KiCom session has already been authenticated by caller.
+     */
+    public static function pending(
+        PDO $db,string $requestId,string $adminSessionId,int $now
+    ): array {
+        self::sqlite($db);
+        if(!self::secretFormat($requestId) || strlen($adminSessionId)<24)self::denied();
+        $q=$db->prepare('SELECT client_id,redirect_uri,resource,state,expires_at,
+              issued_at,consumed,consent_at,admin_session_hash
+              FROM mirage_oauth_codes WHERE request_hash=?');
+        $q->execute([hash('sha256',$requestId)]);
+        $r=$q->fetch(PDO::FETCH_ASSOC);
+        if(!$r || (int)$r['consumed']!==0 || (int)$r['consent_at']!==0
+            || (int)$r['issued_at']>$now || (int)$r['expires_at']<=$now
+            || !hash_equals((string)$r['admin_session_hash'],hash('sha256',$adminSessionId)))
+            self::denied();
+        return ['client_id'=>$r['client_id'],'redirect_uri'=>$r['redirect_uri'],
+            'resource'=>$r['resource'],'scope'=>self::SCOPE,
+            'expires_at'=>(int)$r['expires_at']];
+    }
+
+    /**
      * This is an INTERNAL integration boundary, NOT a client-callable bool.
      * $verifiedFingerprint MUST be the result of the ORIGINAL KiCom's fresh
      * signed WebAuthn verification for the same original admin PHP session.
