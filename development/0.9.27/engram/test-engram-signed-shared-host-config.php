@@ -194,6 +194,11 @@ try{
   'original signed WebAuthn and operator acceptance commit via real admin JSON facade');
  ok63($call($post,$wire($confirmation))['http_status']===403,
   'replayed signed first-party browser approval cannot alter existing host policy');
+ $backups=glob($private.'/backups/engram-host-before-shared-*.json')?:[];
+ ok63(count($backups)===1
+  &&hash_file('sha256',$backups[0])===$originalCfg
+  &&(fileperms($backups[0])&0077)===0,
+  'atomic policy promotion retains one original private 0600 rollback snapshot');
  $new=json_decode(file_get_contents($config),true,32,JSON_THROW_ON_ERROR);
  ok63($approved['ok']===true
   &&$approved['code']==='SHARED_HOST_POLICY_PREPARED_INACTIVE',
