@@ -7,6 +7,9 @@ on:
       - 'development/0.9.27/engram/KiComEngramOAuthHttp.php'
       - 'development/0.9.27/engram/KiComEngramMcpRuntimeGate.php'
       - 'development/0.9.27/engram/test-engram-shared-host-policy.php'
+      - 'development/0.9.27/engram/KiComEngramActivationReadinessGate.php'
+      - 'development/0.9.27/engram/KiComEngramActivationTransaction.php'
+      - 'development/0.9.27/engram/test-engram-shared-host-activation.php'
       - '.github/workflows/test-0927-engram-shared-host-policy.yml'
   workflow_dispatch:
 permissions:
@@ -32,9 +35,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for f in KiComEngramHostingPolicy.php KiComEngramOAuthHttp.php KiComEngramMcpRuntimeGate.php test-engram-shared-host-policy.php; do
+          for f in KiComEngramHostingPolicy.php KiComEngramOAuthHttp.php KiComEngramMcpRuntimeGate.php test-engram-shared-host-policy.php KiComEngramActivationReadinessGate.php KiComEngramActivationTransaction.php test-engram-shared-host-activation.php; do
             php -l "development/0.9.27/engram/$f"
           done
           php development/0.9.27/engram/test-engram-shared-host-policy.php
+          php development/0.9.27/engram/test-engram-shared-host-activation.php
+          php development/0.9.27/engram/test-engram-activation-readiness.php
+          php development/0.9.27/engram/test-engram-activation-transaction.php
           php development/0.9.27/engram/test-engram-oauth-http.php
           php development/0.9.27/engram/test-engram-mcp-protocol.php
