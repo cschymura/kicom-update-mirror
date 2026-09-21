@@ -94,6 +94,36 @@ final class KiComEngramMcpRuntimeGate
         ];
     }
 
+    /**
+     * Private in-process entrypoint. The trusted factory is invoked ONLY after
+     * checking live runtime policy, activation, connector and owner revocation.
+     * This function is not a public MCP route or an authenticator.
+     */
+    public static function dispatch(
+        string $wire,
+        array $runtime,
+        PDO $activationDb,
+        callable $lookupOwner,
+        array $verifiedConnector,
+        int $now,
+        callable $adapterFactory
+    ): string {
+        try {
+            $identity = self::authorize($runtime, $activationDb, $lookupOwner, $verifiedConnector);
+            if ($wire === '' || strlen($wire) > 2048) self::deny();
+            $parsed = json_decode($wire, true, 16, JSON_THROW_ON_ERROR);
+            // The actual owner registry allows ONLY the project namespace.
+            if (!is_array($parsed) || array_is_list($parsed)
+                || ($parsed['namespace'] ?? null) !== 'project') self::deny();
+            $adapter = $adapterFactory($identity);
+            if (!$adapter instanceof KiComEngramMcpJsonAdapter) self::deny();
+            return $adapter->handle($wire, $identity, $now);
+        } catch (Throwable) {
+            // The connector cannot infer which particular boundary failed.
+            return '{"ok":false,"error":"REQUEST_DENIED"}';
+        }
+    }
+
     private static function hex64(mixed $v): bool
     {
         return is_string($v) && preg_match('/\A[a-f0-9]{64}\z/D', $v) === 1;
