@@ -1,0 +1,40 @@
+name: KiCom Engram explicitly accepted shared hosting policy
+on:
+  push:
+    branches: [work/kicom-0.9.27-pam]
+    paths:
+      - 'development/0.9.27/engram/KiComEngramHostingPolicy.php'
+      - 'development/0.9.27/engram/KiComEngramOAuthHttp.php'
+      - 'development/0.9.27/engram/KiComEngramMcpRuntimeGate.php'
+      - 'development/0.9.27/engram/test-engram-shared-host-policy.php'
+      - '.github/workflows/test-0927-engram-shared-host-policy.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hosting-decision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite,sqlite3,openssl
+          coverage: none
+      - name: Verify immutable KiCom source and release baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f  releases/0.9.26/KiCom-0.9.26-R3.zip' | sha256sum -c -
+          (cd source/0.9.26-r3 && sha256sum --status -c MANIFEST.sha256)
+      - name: Lint and test explicit hosting acceptance with live-equivalent owner and activation gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in KiComEngramHostingPolicy.php KiComEngramOAuthHttp.php KiComEngramMcpRuntimeGate.php test-engram-shared-host-policy.php; do
+            php -l "development/0.9.27/engram/$f"
+          done
+          php development/0.9.27/engram/test-engram-shared-host-policy.php
+          php development/0.9.27/engram/test-engram-oauth-http.php
+          php development/0.9.27/engram/test-engram-mcp-protocol.php
