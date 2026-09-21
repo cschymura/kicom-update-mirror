@@ -98,7 +98,7 @@
          echo $output;
 --- a/admin.php
 +++ b/admin.php
-@@ -41,6 +41,68 @@
+@@ -41,6 +41,109 @@
      if(password_verify((string)($_POST['password']??''),(string)($config['password_hash']??''))){$_SESSION['admin']=true;session_regenerate_id(true);}else$err='Anmeldung fehlgeschlagen.';
  }
  if(isset($_GET['logout'])){session_destroy();header('Location: admin.php');exit;}
@@ -112,8 +112,49 @@
 +    try {
 +        $runtime=kicomEngramServerRuntime();
 +        if (!is_array($runtime)||($runtime['oauth_enabled']??null)!==true
-+            || empty($_SESSION['admin']) || ($_SERVER['HTTPS']??null)!=='on')
++            || ($_SERVER['HTTPS']??null)!=='on'
++            || ($_SERVER['HTTP_HOST']??null)!=='kicom.rurtalbahn.info')
 +            throw new RuntimeException('OAUTH_UNAVAILABLE');
++        // ChatGPT opens the authorization URL in a NEW browser session.
++        // Preserve the ORIGINAL KiCom password-login path before demanding a
++        // signed Passkey. Never mint a token/capability from password alone.
++        if (empty($_SESSION['admin']) || isset($_POST['login'])) {
++            $client=(array)($runtime['oauth_client']??[]);
++            $clientId=$_GET['client_id']??null;
++            $callback=$_GET['redirect_uri']??null;
++            $rawUri=(string)($_SERVER['REQUEST_URI']??'');
++            if ($config===null || ($_GET['engram_oauth']??null)!=='1'
++                || !is_string($clientId) || !is_string($callback)
++                || !is_string($client['client_id']??null)
++                || !is_string($client['redirect_uri']??null)
++                || !hash_equals($client['client_id'],$clientId)
++                || !hash_equals($client['redirect_uri'],$callback)
++                || strlen($rawUri)>2048
++                || basename((string)parse_url($rawUri,PHP_URL_PATH))!=='admin.php')
++                throw new RuntimeException('OAUTH_LOGIN_UNAVAILABLE');
++            // Existing admin.php has already verified $_POST[login] and
++            // regenerated session_id() above this block. Redirect to GET
++            // so no password or login form values reach the consent flow.
++            if (!empty($_SESSION['admin'])) {
++                header('Location: '.$rawUri,true,303);
++                exit;
++            }
++            header('Content-Type: text/html; charset=utf-8');
++            http_response_code(200);
++            echo '<!doctype html><html lang="de"><head><meta charset="utf-8">'
++                .'<meta name="viewport" content="width=device-width,initial-scale=1">'
++                .'<title>KiCom – Anmeldung für Mirage Engram</title>'
++                .'<link rel="stylesheet" href="assets/control-plane.css"></head><body><main>'
++                .'<h1>KiCom – Anmeldung</h1>'
++                .'<p>Zur Verbindung mit ChatGPT zunächst mit deinem bestehenden KiCom-Adminpasswort anmelden.</p>'
++                .'<form method="post" action="'.h($rawUri).'">'
++                .'<input type="hidden" name="login" value="1">'
++                .'<label>Passwort <input type="password" name="password" required autofocus autocomplete="current-password"></label>'
++                .'<button type="submit">Anmelden</button></form>'
++                .'<p>Die eigentliche Speicherfreigabe erfolgt danach separat per KiCom-Passkey.</p>'
++                .'</main></body></html>';
++            exit;
++        }
 +        $web=realpath(__DIR__);
 +        $dir=dirname($web).'/engram-private/data';
 +        if (($runtime['data_dir']??null)!==$dir
