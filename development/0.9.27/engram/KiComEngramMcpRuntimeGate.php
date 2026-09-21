@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/KiComEngramHostingPolicy.php';
 
 /**
  * DEV-44: server-side, fail-closed MCP runtime authorization boundary.
@@ -28,10 +29,11 @@ final class KiComEngramMcpRuntimeGate
         ]);
         // This exact server-side policy is an explicit, separately reviewed
         // *future* config extension; the current scaffold does not supply it.
-        foreach (['enabled','operator_approved','host_isolation_verified',
+        foreach (['enabled','operator_approved',
                   'review_enabled','mcp_connector_enabled'] as $flag) {
             if (($runtime[$flag] ?? null) !== true) self::deny();
         }
+        if (!KiComEngramHostingPolicy::permits($runtime)) self::deny();
         if (($runtime['runtime_source'] ?? null) !== 'server-only-reviewed'
             || ($runtime['private_memory_scope'] ?? null) !== 'dev-verified-owner'
             || ($runtime['admin_subject'] ?? null) !== self::OWNER
