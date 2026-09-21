@@ -250,6 +250,12 @@ final class KiComEngramSignedOwnerActivation
         $data=$root.'/data';
         foreach(['engrams.sqlite','mirage-activation.sqlite','mirage-oauth.sqlite']as $f)
             if(!self::file($data.'/'.$f,10485760))self::deny();
+        // The existing private memory database must be a real, readable
+        // original Engram store, not a zero-byte placeholder or a path
+        // accidentally created as part of the activation HTTP request.
+        $memory=self::openPrivateDb($data.'/engrams.sqlite');
+        try{$memory->query('SELECT id,revision FROM engram_revisions LIMIT 0')->fetchAll();}
+        finally{unset($memory);}
         if(!self::file($root.'/owners/engram-owners.json',65536))self::deny();
         return [$web,$path,$doc,hash('sha256',$raw),
             $data.'/mirage-activation.sqlite',$data.'/mirage-oauth.sqlite'];
