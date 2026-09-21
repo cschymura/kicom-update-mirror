@@ -1,0 +1,37 @@
+name: KiCom Engram actual original admin synthetic sample source
+on:
+  push:
+    branches: [work/kicom-0.9.27-pam]
+    paths:
+      - '.github/workflows/export-0927-engram-dev64-owner-sample.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  export-sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite,sqlite3,openssl,sodium
+          coverage: none
+      - name: Test existing owner sample and triple genuine signed WebAuthn OAuth MCP recall
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l development/0.9.27/engram/KiComEngramSyntheticMcpSampleHttp.php
+          php development/0.9.27/engram/test-engram-signed-owner-activation.php
+          cd development/0.9.27/engram
+          sha256sum KiComEngramSyntheticMcpSampleHttp.php > DEV64-OWNER-SAMPLE.sha256
+          sha256sum --status -c DEV64-OWNER-SAMPLE.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mirage-dev64-exact-owner-synthetic-sample
+          path: |
+            development/0.9.27/engram/KiComEngramSyntheticMcpSampleHttp.php
+            development/0.9.27/engram/DEV64-OWNER-SAMPLE.sha256
+          retention-days: 7
+          if-no-files-found: error
