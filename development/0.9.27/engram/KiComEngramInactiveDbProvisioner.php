@@ -67,7 +67,7 @@ final class KiComEngramInactiveDbProvisioner
         try {
             $lockPath=$data.'/.mirage-provision.lock';
             if (is_link($lockPath)
-                || (file_exists($lockPath) && !self::privateFile($lockPath,4096)))
+                || (file_exists($lockPath) && !self::privateLock($lockPath)))
                 self::deny('PRIVATE_LOCK_INVALID');
             $lock=@fopen($lockPath,'c');
             if ($lock===false || !@flock($lock,LOCK_EX))self::deny('PRIVATE_LOCK_UNAVAILABLE');
@@ -161,6 +161,15 @@ final class KiComEngramInactiveDbProvisioner
         clearstatcache(true,$p);$s=@lstat($p);
         return is_array($s)&&($s['mode']&0170000)===0040000
             && ($s['mode']&0077)===0 && !is_link($p) && is_dir($p);
+    }
+
+    private static function privateLock(string $p):bool
+    {
+        clearstatcache(true,$p);$s=@lstat($p);
+        return is_array($s)&&($s['mode']&0170000)===0100000
+            && ($s['mode']&0077)===0 && ($s['nlink']??0)===1
+            && ($s['size']??PHP_INT_MAX)<=4096
+            && !is_link($p)&&is_file($p);
     }
 
     private static function privateFile(string $p,int $max):bool
