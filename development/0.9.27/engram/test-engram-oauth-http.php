@@ -42,8 +42,27 @@ check53($metadata['code_challenge_methods_supported']===['S256']
  'OAuth metadata supports only public-client authorization code with mandatory S256');
 check53($metadata['client_id_metadata_document_supported']===false
  &&!isset($metadata['registration_endpoint'])
- &&!isset($metadata['authorization_response_iss_parameter_supported']),
+ &&($metadata['authorization_response_iss_parameter_supported']??null)===false,
  'unimplemented CIMD, DCR and issuer-response features are not falsely advertised');
+$stable=$host;
+$stable['oauth_issuer_response_supported']=true;
+$stable['oauth_client']=[
+ 'client_id'=>KiComEngramOAuthHttp::STABLE_CHATGPT_CLIENT,
+ 'redirect_uri'=>KiComEngramOAuthHttp::STABLE_CHATGPT_CALLBACK
+];
+check53(KiComEngramOAuthHttp::stableClientReady($stable),
+ 'exact operator-pinned stable ChatGPT callback enables RFC9207 support');
+$stableMeta=$decode(KiComEngramOAuthHttp::discovery($httpGet,$stable,'authorization_server'));
+check53(($stableMeta['authorization_response_iss_parameter_supported']??null)===true,
+ 'real stable ChatGPT client profile advertises issuer-bound callbacks');
+$fake=$stable;$fake['oauth_client']['redirect_uri']='https://chatgpt.com/connector/oauth/callback';
+check53(!KiComEngramOAuthHttp::stableClientReady($fake)
+ &&$decode(KiComEngramOAuthHttp::discovery($httpGet,$fake,'authorization_server'))
+    ['authorization_response_iss_parameter_supported']===false,
+ 'synthetic placeholder callback must never advertise stable issuer mode');
+$fake=$stable;$fake['oauth_issuer_response_supported']=false;
+check53(!KiComEngramOAuthHttp::stableClientReady($fake),
+ 'server-only issuer grant is mandatory; request parameters cannot self-enable');
 check53(KiComEngramOAuthHttp::discovery($httpGet,$inactive,'protected_resource')['http_status']===404,
  'real 0.9.31 inactive/default OAuth policy never advertises a nonexistent login');
 foreach(['operator_approved','host_isolation_verified','enabled','mcp_connector_enabled','review_enabled'] as $flag){
