@@ -1,0 +1,9 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "mirage-engram": {
+      "type": "streamable-http",
+      "url": "https://kicom.rurtalbahn.info/api.php?q=ENGRAM_MCP"
+    }
+  }
+}
