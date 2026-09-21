@@ -95,6 +95,7 @@ final class KiComEngramMcpProtocol
                     'tools'=>[[
                         'name'=>'engram_search',
                         'description'=>'Find up to three explicitly authorized project memories in private KiCom Engram.',
+                        'securitySchemes'=>[['type'=>'oauth2','scopes'=>['engram.read']]],
                         'inputSchema'=>[
                             'type'=>'object',
                             'properties'=>[
