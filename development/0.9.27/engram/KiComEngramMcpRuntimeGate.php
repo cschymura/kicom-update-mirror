@@ -82,8 +82,7 @@ final class KiComEngramMcpRuntimeGate
             || ($owner['subject'] ?? null) !== self::OWNER
             || ($owner['namespaces'] ?? null) !== ['project']) self::deny();
         $rights = $owner['engram_rights'] ?? null;
-        if (!is_array($rights) || !in_array('engram.read', $rights, true)
-            || !in_array('engram.write', $rights, true)) self::deny();
+        if (!is_array($rights) || !in_array('engram.read', $rights, true)) self::deny();
         // Bind the approval to the exact currently verified passkey identity.
         if (!hash_equals($ownerBinding, hash('sha256', self::OWNER . "\0" . $fp))) self::deny();
 
@@ -95,6 +94,9 @@ final class KiComEngramMcpRuntimeGate
     }
 
     /**
+     * Initial live adapter mode is READ-ONLY. Writing requires the separate
+     * exact-content, one-use KiCom passkey approval flow, which is not wired
+     * through this synthetic MCP adapter yet.
      * Private in-process entrypoint. The trusted factory is invoked ONLY after
      * checking live runtime policy, activation, connector and owner revocation.
      * This function is not a public MCP route or an authenticator.
@@ -114,7 +116,8 @@ final class KiComEngramMcpRuntimeGate
             $parsed = json_decode($wire, true, 16, JSON_THROW_ON_ERROR);
             // The actual owner registry allows ONLY the project namespace.
             if (!is_array($parsed) || array_is_list($parsed)
-                || ($parsed['namespace'] ?? null) !== 'project') self::deny();
+                || ($parsed['namespace'] ?? null) !== 'project'
+                || ($parsed['op'] ?? null) !== 'read') self::deny();
             $adapter = $adapterFactory($identity);
             if (!$adapter instanceof KiComEngramMcpJsonAdapter) self::deny();
             return $adapter->handle($wire, $identity, $now);
