@@ -19,6 +19,8 @@ final class KiComEngramOAuthPasskeyConsent
     ): void {
         if (!$https || ($session['admin']??null)!==true
             || strlen($sessionId)<24 || strlen($csrf)<24
+            || !is_string($session['csrf']??null)
+            || !hash_equals($session['csrf'],$csrf)
             || !hash_equals($csrf,$submittedCsrf)) self::deny();
     }
 
