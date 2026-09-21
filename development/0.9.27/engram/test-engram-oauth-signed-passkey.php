@@ -112,13 +112,15 @@ try{
     'original KiCom issues fresh user-verified registered-credential assertion options');
   $forged=$sign($started,$privateKey,$rawId);
   $forged['response']['signature']=KiComPasskeyBridge::b64uEncode(random_bytes(64));
-  reject52(fn()=>KiComEngramOAuthPasskeyConsent::confirm(
+  reject52(function() use (&$session,$db,$requestId,$sid,$csrf,$started,$forged,$bridge,$registry,$now) {
+    return KiComEngramOAuthPasskeyConsent::confirm(
     $db,$requestId,$session,$sid,$csrf,$csrf,true,$started['challenge_id'],
-    $forged,true,$bridge,$registry,$now+1),
+    $forged,true,$bridge,$registry,$now+1); }, 
     'invalid P-256 signature cannot authorize OAuth client');
-  reject52(fn()=>KiComEngramOAuthPasskeyConsent::confirm(
+  reject52(function() use (&$session,$db,$requestId,$sid,$csrf,$started,$sign,$privateKey,$rawId,$bridge,$registry,$now) {
+    return KiComEngramOAuthPasskeyConsent::confirm(
     $db,$requestId,$session,$sid,$csrf,$csrf,true,$started['challenge_id'],
-    $sign($started,$privateKey,$rawId),true,$bridge,$registry,$now+1),
+    $sign($started,$privateKey,$rawId),true,$bridge,$registry,$now+1); }, 
     'failed original signature burns the browser OAuth challenge');
   reject52(fn()=>KiComEngramOAuthTransactions::issueApprovedCode(
     $db,$requestId,$sid,$fingerprint,$now+1),
@@ -126,9 +128,10 @@ try{
   $second=KiComEngramOAuthPasskeyConsent::begin(
     $db,$requestId,$session,$sid,$csrf,$csrf,true,$bridge,$now+2
   );
-  reject52(fn()=>KiComEngramOAuthPasskeyConsent::confirm(
+  reject52(function() use (&$session,$db,$requestId,$sid,$csrf,$second,$sign,$privateKey,$rawId,$bridge,$registry,$now) {
+    return KiComEngramOAuthPasskeyConsent::confirm(
     $db,$requestId,$session,$sid,$csrf,$csrf,true,$second['challenge_id'],
-    $sign($second,$privateKey,$rawId),false,$bridge,$registry,$now+3),
+    $sign($second,$privateKey,$rawId),false,$bridge,$registry,$now+3); }, 
     'explicit refusal of read permission denies OAuth code');
   $third=KiComEngramOAuthPasskeyConsent::begin(
     $db,$requestId,$session,$sid,$csrf,$csrf,true,$bridge,$now+4
@@ -137,7 +140,8 @@ try{
     $db,$requestId,$session,str_repeat('q',64),$csrf,$csrf,true,$third['challenge_id'],
     $sign($third,$privateKey,$rawId),true,$bridge,$registry,$now+5),
     'other session cannot approve current OAuth browser challenge');
-  // The foreign-session check burns the pending browser challenge as intended.
+  // The invalid foreign-session request is denied before it can consume the
+  // valid admin's pending challenge; beginning anew intentionally supersedes it.
   $fourth=KiComEngramOAuthPasskeyConsent::begin(
     $db,$requestId,$session,$sid,$csrf,$csrf,true,$bridge,$now+6
   );
