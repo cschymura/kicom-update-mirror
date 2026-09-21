@@ -162,6 +162,41 @@ try {
     assert54(array_keys($memories[0])===['id','revision','body','source_kind'],
         'projection excludes host configuration and private authentication metadata');
 
+    // DEV-62: the REAL OAuth -> MCP -> private SQLite path is also exercised
+    // with Christoph's EXPLICIT shared-host policy, not fake UID isolation.
+    $shared=$runtime;
+    $shared['host_isolation_verified']=false;
+    $shared['operator_accepts_shared_host_risk']=true;
+    $shared['hosting_policy_mode']='shared-host-explicit-operator-acceptance/v1';
+    $shared['hosting_policy_source']='protected-operator-host-config';
+    $shared['hosting_policy_owner']='mirage-owner';
+    $shared['hosting_policy_known_limitation']='shared-php-uid-not-verified';
+    $shared['hosting_policy_acknowledged_at_utc']='2026-09-21T13:00:00Z';
+    $sharedResponse=$send($auth,$search,$shared);
+    $sharedJson=json_decode($sharedResponse['body'],true,16,JSON_THROW_ON_ERROR);
+    $sharedMemories=json_decode($sharedJson['result']['content'][0]['text'],true,16,JSON_THROW_ON_ERROR);
+    assert54($sharedResponse['http_status']===200 &&count($sharedMemories)===1
+        &&$sharedMemories[0]['body']==='Synthetic cobalt horizon memory on operator test server.',
+        'explicit accepted shared host completes genuine OAuth to private SQLite read');
+    assert54($shared['host_isolation_verified']===false,
+        'successful synthetic shared-host read never fabricates PHP UID isolation');
+    $noAcceptance=$shared;
+    $noAcceptance['operator_accepts_shared_host_risk']=false;
+    assert54($send($auth,$search,$noAcceptance)['http_status']===404,
+        'client bearer cannot replace missing original operator shared-host acceptance');
+    $noReview=$shared;
+    $noReview['hosting_policy_source']='client-request';
+    assert54($send($auth,$search,$noReview)['http_status']===404,
+        'HTTP request cannot self-assert protected server-side hosting policy');
+    $sharedDisabled=$shared;
+    $sharedDisabled['oauth_enabled']=false;
+    assert54($send($auth,$search,$sharedDisabled)['http_status']===404,
+        'operator shared-host risk acceptance never activates disabled OAuth');
+    $sharedUnapproved=$shared;
+    $sharedUnapproved['operator_approved']=false;
+    assert54($send($auth,$search,$sharedUnapproved)['http_status']===404,
+        'shared-host consent cannot bypass separate private-memory approval');
+
     $noToken=$send($server,$search,$runtime);
     assert54($noToken['http_status']===401&&
         str_contains($noToken['headers']['WWW-Authenticate']??'','resource_metadata='),
