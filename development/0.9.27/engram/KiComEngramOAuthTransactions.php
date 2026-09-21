@@ -108,6 +108,39 @@ final class KiComEngramOAuthTransactions
     }
 
     /**
+     * An explicit authenticated+CSRF-checked refusal is a terminal OAuth
+     * authorization response. No passkey is required to decline an ungranted
+     * request. Burns the pending code transaction and returns ONLY the
+     * previously pinned callback and original opaque state.
+     */
+    public static function cancel(
+        PDO $db,string $requestId,string $adminSessionId,int $now
+    ): array {
+        self::sqlite($db);
+        if(!self::secretFormat($requestId) || strlen($adminSessionId)<24)self::denied();
+        $db->exec('BEGIN IMMEDIATE');
+        try {
+            $q=$db->prepare('SELECT redirect_uri,state,admin_session_hash,
+                   issued_at,expires_at,consent_at,consumed
+                   FROM mirage_oauth_codes WHERE request_hash=?');
+            $q->execute([hash('sha256',$requestId)]);
+            $row=$q->fetch(PDO::FETCH_ASSOC);
+            if(!$row || (int)$row['consumed']!==0 || (int)$row['consent_at']!==0
+                || (int)$row['expires_at']<=$now || (int)$row['issued_at']>$now
+                || !hash_equals((string)$row['admin_session_hash'],hash('sha256',$adminSessionId)))
+                self::denied();
+            $q=$db->prepare('UPDATE mirage_oauth_codes SET consumed=1
+                WHERE request_hash=? AND consumed=0 AND consent_at=0');
+            $q->execute([hash('sha256',$requestId)]);
+            if($q->rowCount()!==1)self::denied();
+            $db->exec('COMMIT');
+            return ['redirect_uri'=>$row['redirect_uri'],'state'=>$row['state']];
+        } catch(Throwable $e){
+            $db->exec('ROLLBACK');throw $e;
+        }
+    }
+
+    /**
      * This is an INTERNAL integration boundary, NOT a client-callable bool.
      * $verifiedFingerprint MUST be the result of the ORIGINAL KiCom's fresh
      * signed WebAuthn verification for the same original admin PHP session.
