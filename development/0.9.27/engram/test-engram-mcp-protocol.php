@@ -57,6 +57,8 @@ try{
  $list=$unpack($send($req(2,'tools/list',[])));
  p46(count($list['result']['tools'])===1&&$list['result']['tools'][0]['name']==='engram_search',
   'read-only search is the sole discoverable MCP tool');
+ p46(($list['result']['tools'][0]['securitySchemes']??null)===[['type'=>'oauth2','scopes'=>['engram.read']]],
+  'MCP search tool declares exactly the read-only OAuth scope for ChatGPT linking');
  p46(($list['result']['tools'][0]['inputSchema']['additionalProperties']??null)===false,
   'tool schema disallows injected owner and session fields');
  p46($unpack($send($req(3,'ping',[])))['result']===[],'MCP ping returns JSON-RPC result');
