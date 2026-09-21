@@ -144,13 +144,56 @@ try{
    $web,$session,$sid,$csrf,$csrf,false,$start['confirmation'],
    $start['challenge_id'],$sign($start,$key,$rawId,1),$passkeys,$now+5);
  },'unencrypted HTTP cannot confirm signed owner policy attestation');
- // Begin a new original challenge after the rejected unencrypted request.
- $start=KiComEngramSharedHostAdminConfig::begin($web,$session,$sid,$csrf,$csrf,true,$passkeys,$now+4);
+ // Test REAL first-party KiCom admin HTTP facade, not just internal class.
+ require_once __DIR__.'/KiComEngramSharedHostAdminHttp.php';
+ $get=['HTTPS'=>'on','HTTP_HOST'=>'kicom.rurtalbahn.info','REQUEST_METHOD'=>'GET'];
+ $post=['HTTPS'=>'on','HTTP_HOST'=>'kicom.rurtalbahn.info','REQUEST_METHOD'=>'POST',
+  'CONTENT_TYPE'=>'application/json','HTTP_ORIGIN'=>'https://kicom.rurtalbahn.info'];
+ $call=static function(array $srv,string $raw)use(&$session,$sid,$csrf,$web,$passkeys,$now):array{
+  return KiComEngramSharedHostAdminHttp::handle(
+    $srv,$raw,$session,$sid,$csrf,$web,$passkeys,$now+4
+  );
+ };
+ $anonymous=['admin'=>false,'csrf'=>$csrf];
+ ok63(KiComEngramSharedHostAdminHttp::handle(
+    $get,'',$anonymous,$sid,$csrf,$web,$passkeys,$now+4)['http_status']===404,
+  'anonymous original admin cannot view signed private-host policy page');
+ $insecure=$get;$insecure['HTTPS']='off';
+ ok63($call($insecure,'')['http_status']===404,
+  'first-party hosting approval unavailable over HTTP');
+ $page=$call($get,'');
+ ok63($page['http_status']===200
+  &&str_contains($page['body'],'id="mirage-host-policy"')
+  &&str_contains($page['body'],'assets/mirage-host-policy-client.js')
+  &&str_contains($page['body'],'nicht technisch isoliert'),
+  'admin page visibly discloses shared-host risk and separate original Passkey consent');
+ ok63(hash_file('sha256',$config)===$originalCfg,
+  'read-only original admin consent page does not change private host JSON');
+ $wire=static fn(array $data):string=>json_encode($data,JSON_THROW_ON_ERROR);
+ $beginWire=$wire(['step'=>'begin','csrf'=>$csrf]);
+ $foreign=$post;$foreign['HTTP_ORIGIN']='https://attacker.invalid';
+ ok63($call($foreign,$beginWire)['http_status']===404,
+  'foreign browser origin cannot start owner policy challenge');
+ ok63($call($post,$wire(['step'=>'begin','csrf'=>str_repeat('0',48)]))['http_status']===403,
+  'first-party signed operator approval requires original KiCom session CSRF');
+ $begun=$call($post,$beginWire);
+ $start=json_decode($begun['body'],true,16,JSON_THROW_ON_ERROR);
+ ok63($begun['http_status']===200&&($start['ok']??null)===true
+  &&($start['publicKey']['userVerification']??null)==='required',
+  'first-party admin issues fresh original registered-owner Passkey challenge');
  $signed=$sign($start,$key,$rawId,1);
- $approved=KiComEngramSharedHostAdminConfig::confirm(
-  $web,$session,$sid,$csrf,$csrf,true,$start['confirmation'],
-  $start['challenge_id'],$signed,$passkeys,$now+5
- );
+ $confirmation=['step'=>'confirm','csrf'=>$csrf,
+  'challenge_id'=>$start['challenge_id'],
+  'confirmation'=>$start['confirmation'],'assertion'=>$signed];
+ $injected=$confirmation;$injected['owner']='forged-owner';
+ ok63($call($post,$wire($injected))['http_status']===403,
+  'first-party admin rejects browser-injected owner fields before signature verification');
+ $done=$call($post,$wire($confirmation));
+ $approved=json_decode($done['body'],true,16,JSON_THROW_ON_ERROR);
+ ok63($done['http_status']===200&&($approved['ok']??null)===true,
+  'original signed WebAuthn and operator acceptance commit via real admin JSON facade');
+ ok63($call($post,$wire($confirmation))['http_status']===403,
+  'replayed signed first-party browser approval cannot alter existing host policy');
  $new=json_decode(file_get_contents($config),true,32,JSON_THROW_ON_ERROR);
  ok63($approved['ok']===true
   &&$approved['code']==='SHARED_HOST_POLICY_PREPARED_INACTIVE',
