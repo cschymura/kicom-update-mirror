@@ -180,6 +180,110 @@ try{
   KiComEngramOAuthTransactions::revoke($db,$exchange['access_token']);
   ok52(KiComEngramOAuthTransactions::verify($db,$exchange['access_token'],$now+11)===null,
     'original verified-owner OAuth token revokes immediately');
+
+  // DEV-55 first-party OAuth admin controller with the SAME original KiCom
+  // P-256 verifier, authenticated PHP session and private owner registry.
+  require_once __DIR__.'/KiComEngramOAuthAuthorizeHttp.php';
+  $host=[
+    'enabled'=>true,'operator_approved'=>true,'host_isolation_verified'=>true,
+    'review_enabled'=>true,'mcp_connector_enabled'=>true,'oauth_enabled'=>true,
+    'runtime_source'=>'server-only-reviewed',
+    'private_memory_scope'=>'dev-verified-owner',
+    'expected_origin'=>'https://kicom.rurtalbahn.info',
+    'rp_id'=>'kicom.rurtalbahn.info'
+  ];
+  $httpsGet=[
+    'REQUEST_METHOD'=>'GET','HTTPS'=>'on',
+    'HTTP_HOST'=>'kicom.rurtalbahn.info'
+  ];
+  $httpsPost=[
+    'REQUEST_METHOD'=>'POST','HTTPS'=>'on',
+    'HTTP_HOST'=>'kicom.rurtalbahn.info',
+    'CONTENT_TYPE'=>'application/json','HTTP_ORIGIN'=>'https://kicom.rurtalbahn.info'
+  ];
+  $query=['engram_oauth'=>'1']+$request;
+  $handler=static function(array $http,array $q,string $wire,array $policy,array &$currentSession)use(
+    $sid,$csrf,$client,$db,$bridge,$registry,$now
+  ):array{
+    return KiComEngramOAuthAuthorizeHttp::handle(
+      $http,$q,$wire,$currentSession,$sid,$csrf,$policy,$client,$db,$bridge,
+      $registry,$now+20
+    );
+  };
+  $off=$host;$off['oauth_enabled']=false;
+  ok52($handler($httpsGet,$query,'',$off,$session)['http_status']===404,
+    'inactive original KiCom cannot show OAuth consent UI');
+  $anon=['admin'=>false,'csrf'=>$csrf];
+  ok52($handler($httpsGet,$query,'',$host,$anon)['http_status']===404,
+    'anonymous requester cannot initiate admin-bound OAuth consent');
+  $h=$httpsGet;$h['HTTPS']='off';
+  ok52($handler($h,$query,'',$host,$session)['http_status']===404,
+    'plain HTTP cannot begin OAuth consent');
+  $wrong=$query;$wrong['redirect_uri']='https://chatgpt.com/other';
+  ok52($handler($httpsGet,$wrong,'',$host,$session)['http_status']===404,
+    'browser-selected unpinned callback cannot create pending client consent');
+  $page=$handler($httpsGet,$query,'',$host,$session);
+  ok52($page['http_status']===200 &&
+    str_contains($page['body'],'id="mirage-oauth-consent"') &&
+    str_contains($page['body'],'engram.read') &&
+    str_contains($page['body'],'assets/mirage-oauth-client.js'),
+    'original admin GET shows explicit READ-only first-party passkey consent');
+  preg_match('/data-request-id="([A-Za-z0-9_-]{43})"/',$page['body'],$matched);
+  $rid=$matched[1]??'';
+  ok52(strlen($rid)===43 &&
+    !str_contains($page['body'],$verifier),
+    'HTML exposes only bounded request ID, not PKCE verifier or OAuth code');
+  $sendPost=static function(array $body,array $policy,array &$currentSession,array $http=[])use(
+    $handler,$httpsPost,$rid
+  ):array{
+    return $handler($http+$httpsPost,[],
+      json_encode(['request_id'=>$rid]+$body,JSON_THROW_ON_ERROR),
+      $policy,$currentSession
+    );
+  };
+  $denied=$sendPost(['step'=>'challenge','csrf'=>str_repeat('0',48)],$host,$session);
+  ok52($denied['http_status']===403,'POST challenge requires actual original session CSRF');
+  $start=$sendPost(['step'=>'challenge','csrf'=>$csrf],$host,$session);
+  $challengeJson=json_decode($start['body'],true,16,JSON_THROW_ON_ERROR);
+  ok52($start['http_status']===200 &&
+    ($challengeJson['publicKey']['userVerification']??null)==='required' &&
+    strlen($challengeJson['challenge_id']??'')===32,
+    'authenticated admin JSON route returns original registered-passkey challenge');
+  $wrongOrigin=['HTTP_ORIGIN'=>'https://evil.example'];
+  ok52($sendPost(['step'=>'confirm','csrf'=>$csrf,
+    'challenge_id'=>$challengeJson['challenge_id'],
+    'assertion'=>$sign($challengeJson,$privateKey,$rawId,2),'consent'=>true
+  ],$host,$session,$wrongOrigin)['http_status']===404,
+    'cross-origin JSON confirmation denied before signature verification');
+  $post=$sendPost(['step'=>'confirm','csrf'=>$csrf,
+    'challenge_id'=>$challengeJson['challenge_id'],
+    'assertion'=>$sign($challengeJson,$privateKey,$rawId,2),'consent'=>true
+  ],$host,$session);
+  $confirmed=json_decode($post['body'],true,16,JSON_THROW_ON_ERROR);
+  ok52($post['http_status']===200 &&
+    ($confirmed['ok']??null)===true &&
+    str_starts_with($confirmed['redirect_to']??'', $client['redirect_uri'].'?code=') &&
+    str_contains($confirmed['redirect_to'],$request['state']),
+    'real signed KiCom passkey approves only pinned HTTPS ChatGPT redirect and state');
+  ok52(!isset($session['mirage_oauth_pending']),
+    'successful approval consumes first-party pending browser challenge');
+  $replay=$sendPost(['step'=>'confirm','csrf'=>$csrf,
+    'challenge_id'=>$challengeJson['challenge_id'],
+    'assertion'=>$sign($challengeJson,$privateKey,$rawId,2),'consent'=>true
+  ],$host,$session);
+  ok52($replay['http_status']===403,
+    'replayed signed browser approval cannot issue another authorization code');
+  $url=parse_url($confirmed['redirect_to']);
+  parse_str($url['query']??'',$params);
+  $access=KiComEngramOAuthTransactions::exchange($db,[
+      'grant_type'=>'authorization_code','code'=>$params['code'],
+      'code_verifier'=>$verifier,'redirect_uri'=>$client['redirect_uri'],
+      'client_id'=>$client['client_id'],'resource'=>$request['resource']
+    ],$client,$now+21);
+  ok52(strlen($access['access_token'])===43 &&
+    KiComEngramOAuthTransactions::verify($db,$access['access_token'],$now+22)
+      ['credential_fingerprint']===$fingerprint,
+    'real original signed admin consent -> HTTP redirect -> PKCE exchange -> exact owner token');
   echo "KICOM_ENGRAM_OAUTH_SIGNED_PASSKEY_TESTS_PASSED=$checks\n";
 }finally{
   unset($bridge,$registry,$db);
