@@ -1,0 +1,28 @@
+name: KiCom Engram DEV71 FTS5 baseline
+on:
+  push:
+    branches: [work/kicom-engram-dev70-mutation-core]
+    paths:
+      - 'development/0.9.27/engram/dev71/**'
+      - '.github/workflows/test-0927-engram-dev71-fts5.yml'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  fts5:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ github.sha }}'}
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite,sqlite3
+          coverage: none
+      - name: Runtime capability and tests
+        run: |
+          set -euo pipefail
+          php -r 'echo "PHP=".PHP_VERSION." sqlite=".(extension_loaded("pdo_sqlite")?"yes":"no").PHP_EOL;'
+          php -l development/0.9.27/engram/dev71/KiComEngramFts5Index.php
+          php -l development/0.9.27/engram/dev71/test_fts5_index.php
+          php development/0.9.27/engram/dev71/test_fts5_index.php
