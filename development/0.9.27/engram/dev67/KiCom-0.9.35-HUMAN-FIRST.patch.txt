@@ -1,0 +1,48 @@
+DEV-67 KiCom 0.9.34 -> 0.9.35 minimal source delta (all other content byte-preserved)
+
+modules/engram/KiComEngramAdminDbProvisionHttp.php
+@@ catch block
+-        }catch(Throwable){
+-            // Do not leak private host paths, owner identity, file contents or
+-            // database diagnostics in public HTML.
+-            return $deny(409);
++        }catch(Throwable $e){
++            // Only reached after the original admin session, route and CSRF gates.
++            $code='VORBEREITUNG_NICHT_MOEGLICH';
++            if($e instanceof RuntimeException
++                && str_starts_with($e->getMessage(),'ENGRAM_PROVISION_')){
++                $candidate=substr($e->getMessage(),strlen('ENGRAM_PROVISION_'));
++                $allowed=[
++                    'ADMIN_APPROVAL_REQUIRED','INACTIVE_PRIVATE_SCAFFOLD_REQUIRED',
++                    'TRUSTED_WEB_ROOT_UNAVAILABLE','SQLITE_UNAVAILABLE',
++                    'PRIVATE_LOCK_INVALID','PRIVATE_LOCK_UNAVAILABLE',
++                    'EXISTING_DATABASE_UNSAFE','EXISTING_DATABASE_REQUIRES_REVIEW',
++                    'INITIAL_ACTIVATION_STATE_INVALID','PRIVATE_SCHEMA_INVALID',
++                    'PRIVATE_DATABASE_INSTALL_FAILED','PROVISIONING_FAILED'
++                ];
++                if(in_array($candidate,$allowed,true))$code=$candidate;
++            }
++            return ['http_status'=>409,'headers'=>$headers,
++                'body'=>'<!doctype html><html lang="de"><meta charset="utf-8">'
++                    .'<title>Engram – Vorbereitung</title><main>'
++                    .'<h1>Vorbereitung nicht abgeschlossen</h1>'
++                    .'<p>Fehlercode: <code>'.$code.'</code></p>'
++                    .'<p>Keine Engram-Aktivierung oder OAuth-Freigabe erfolgt.</p>'
++                    .'<a href="admin.php?engram_db_setup=1">Zurück zur Vorbereitung</a>'
++                    .'</main></html>'];
+         }
+@@ HTML form
+-            .'<label>Bestätige mit dem Text '
+-            .'<code>INAKTIVE ENGRAM DATENBANKEN VORBEREITEN</code>'
+-            .'<input name="confirmation" required autocomplete="off"></label>'
+-            .'<button type="submit">Fehlende Datenbanken vorbereiten</button></form>'
++            .'<p>Fehlende, weiterhin inaktive Datenbanken anlegen?</p>'
++            .'<button type="submit" name="confirmation" value="FREIGABE">FREIGABE – Datenbanken vorbereiten</button></form>'
+
+modules/engram/KiComEngramInactiveDbProvisioner.php
+-            || !hash_equals('INAKTIVE ENGRAM DATENBANKEN VORBEREITEN',$confirmation))
++            || !hash_equals('FREIGABE',$confirmation))
+
+lib.php: const KICOM_VERSION = '0.9.35';
+genome/genome.json: version=0.9.35, generation=34, parent=kicom-0.9.34-g33-mirage-engram-admin-form-origin-compat, id=kicom-0.9.35-g34-mirage-human-first-admin-confirmation.
+Recompute all exact original genome SHA256 component hashes and MANIFEST.sha256; preserve all other archive bytes.
