@@ -1,0 +1,14 @@
+DEV-68 / KiCom-0.9.36: exact source modification relative to the verified 0.9.35 package.
+File modules/engram/KiComEngramMcpProtocol.php, exactly one tools/list entry:
+- 'name'=>'engram_search',
+- 'description'=>'Find up to three explicitly authorized project memories in private KiCom Engram.',
++ 'name'=>'engram_search',
++ 'title'=>'Private Engram-Erinnerungen suchen',
++ 'description'=>'Read-only search of up to three owner-authorized project memories from the private KiCom store. Does not create, update, archive or send records to other systems.',
++ 'annotations'=>[
++   'title'=>'Private Engram-Erinnerungen suchen',
++   'readOnlyHint'=>true,
++   'destructiveHint'=>false,
++   'openWorldHint'=>false,
++ ],
+Also: source docstring updated, lib.php KICOM_VERSION=0.9.36, genome/genome.json id=kicom-0.9.36-g35-mirage-mcp-truthful-readonly-annotations parent=kicom-0.9.35-g34-mirage-human-first-admin-confirmation generation=35, hashes and MANIFEST.sha256 regenerated. NO other source files modified. The zip is a conversation artifact, not a GitHub binary release. Do not attribute a successful OpenAI security approval to annotations alone.
