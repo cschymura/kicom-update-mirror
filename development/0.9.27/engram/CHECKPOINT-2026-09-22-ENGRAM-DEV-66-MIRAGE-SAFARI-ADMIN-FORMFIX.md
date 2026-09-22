@@ -1,0 +1,24 @@
+# Mirage DEV-66 — Safari admin form navigation compatibility (2026-09-22)
+
+## Production boundary
+Christoph confirmed KiCom 0.9.33 DEV-65 installed. Public read-only BOOTSTRAP, HELLO and GENOME_STATUS returned 0.9.33 and healthy=true, zero drift/unknown; no production mutation by DEV-66. Operator explicitly approved PREPARATION AND TESTING of a corrective update, but **DID NOT approve its production installation**, private Engram activation, or OAuth grant.
+
+## Reproduced root cause and second blocker
+Safari showed HTTP POST admin.php?engram_db_setup=1 returning HTTP 403, Origin: null, Sec-Fetch-Site: same-origin, Sec-Fetch-Mode: navigate, Sec-Fetch-Dest: document. Original DEV-65 KiComEngramAdminDbProvisionHttp.php rejects all Origin values other than https://kicom.rurtalbahn.info. Browser screenshots also show submitted confirmation `ENGRAM DATENBANK VORBEREITEN`, while the original inactive DB provisioner requires exactly `INAKTIVE ENGRAM DATENBANKEN VORBEREITEN`; the operator must enter the exact phrase after correction. Do not copy screenshots containing session cookies or CSRF values to public GitHub or Slack.
+
+## One full native follow-up package — NOT INSTALLED
+`KiCom-0.9.34-Mirage-Engram-Safari-Admin-Formfix-VOLLSTAENDIG.zip`, SHA256 `14550466e751ec5f8c2dcc7b017fa141c53a8be637774f35e2f063f1f6576d6b`, 82 entries; generated conversation attachment in DEV-66 chat, **not a GitHub binary release**. Parent exact DEV-65 0.9.33 ZIP SHA256 `3bda90fd29338200e126fff4e91443c120105ac22afe1e695e8f35377b06e959`, 81 entries. Genome parent `kicom-0.9.33-g32-mirage-engram-signed-owner-oauth-mcp-artificial-test`, new generation 33, version 0.9.34, kernel revision 1 unchanged.
+
+Minimal delta: version metadata, immutable genome/manifests, NEW module `KiComEngramAdminSameOriginNavigation.php`, and its use ONLY by the two original admin HTML form POST handlers `KiComEngramAdminDbProvisionHttp.php` and `KiComEngramSyntheticMcpSampleHttp.php`. Exact trusted Origin is still accepted. Literal null/absent Origin only passes when HTTPS+exact canonical host+POST and Fetch Metadata is exactly `same-origin` / `navigate` / `document`. Explicit foreign Origin, same-site subdomain, cross-site, absent metadata, wrong method/host/protocol are all denied. Admin session, CSRF, exact form fields and confirmation, host/owner/private DB guards remain unchanged. JSON/WebAuthn/OAuth/MCP routes and activation permissions are NOT relaxed. Parent guardian, recovery kernel, original PasskeyBridge, api.php, index.php, existing private data and state paths are byte-preserved.
+
+## Actual testing (local only)
+- 27/27 PHP branch/negative tests PASS for navigation guard, real handler decisions for CSRF/session/extra fields, wrong origin, and synthetic sample default-off. The valid form returns 409 on the local fixture with no real private host configuration, demonstrating it passes the origin/CSRF gate and then fails closed at the private-store gate. This is NOT successful live SQLite DB provisioning.
+- All 61 PHP files `php -l` PASS; all bundled JS files `node --check` PASS.
+- Python zipfile verified full ZIP CRC, 82 unique safe entries, every MANIFEST SHA256, 74 genome component hashes, correct parent/generation/metadata, original key security/recovery paths byte-preserved.
+- The **unmodified original 0.9.33 KiCom self-update verifier logic** accepted exact 0.9.34 ZIP as successor, 82 entries, risk **RED**, kernel_update=false. Because this local PHP does NOT provide ZipArchive or pdo_sqlite, a test-only ZipArchive adapter supplied the exact Python-verified ZIP entries to KiCom's unchanged verifier; the damaged ZIP was rejected with MANIFEST_HASH_MISMATCH. Do not misrepresent the adapter run as complete native server verification, or claim positive PDO SQLite HTTP provisioning locally.
+- No real deployment or real cross-chat MCP memory recall has occurred in DEV-66.
+
+## Next
+Operator explicitly approve ONE production 0.9.33 -> 0.9.34 installation of the *exact* SHA-confirmed full ZIP using original KiCom admin UI and its native on-host verifier (RED), then verify version 0.9.34/healthy/genome. After installation, enter the **exact** inactive DB confirmation phrase from the form and confirm the two private DB schemas are prepared while Engram remains disabled. Host acknowledgment, signed read activation, synthetic owner/project record, OAuth connector and independent chat recall require their separate genuine human approvals. Never install any old 0.9.33 variant, manually replace a PHP file, bypass Origin/CSRF or publish secret-bearing browser screenshots.
+
+Source of new guard: `development/0.9.27/engram/dev66/KiComEngramAdminSameOriginNavigation.php` on this branch. Exact compiled 0.9.34 archive is only a verified conversation attachment; reverify SHA in any new chat before linking or recommending installation.
