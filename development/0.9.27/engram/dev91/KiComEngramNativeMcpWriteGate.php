@@ -35,7 +35,8 @@ final class KiComEngramNativeMcpWriteGate {
                 || !in_array('engram.write',$owner['engram_rights'],true))return null;
             $q=$oauthDb->prepare('SELECT c.consent_ref,c.source_kind FROM mirage_oauth_write_consents c
                 INNER JOIN mirage_oauth_tokens t ON
-                    t.client_id=c.client_id AND t.connector_id=c.connector_id
+                    t.token_hash=c.token_hash AND t.client_id=c.client_id
+                    AND t.connector_id=c.connector_id
                     AND t.owner_binding=c.owner_binding
                     AND t.credential_fingerprint=c.credential_fingerprint
                 WHERE t.token_hash=:token AND t.scope=:scope AND t.revoked=0
