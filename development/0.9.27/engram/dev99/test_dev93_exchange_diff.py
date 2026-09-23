@@ -3,7 +3,7 @@
 Optionally confirm byte-exact ORIGINAL 0.9.37 ZIP contains old-side context.
 Never installs, modifies private data, or uploads original source.
 """
-import argparse,hashlib,pathlib,re,zipfile
+import argparse,hashlib,pathlib,re,zipfile,subprocess,tempfile
 BASE=pathlib.Path(__file__).resolve().parents[1]
 PATCH=BASE/'dev93/NATIVE-original-oauth-write-consent.patch'
 SHA='0c6e02c64d44d603cb229f562d189f1b798bd78c2188fd2907e6b5cbafdb5ea7'
@@ -31,6 +31,22 @@ def audit(original=None):
         old=sum(s.startswith((' ','-')) for s in b['lines'])
         new=sum(s.startswith((' ','+')) for s in b['lines'])
         assert (old,new)==(b['old'],b['new']), 'MALFORMED_HUNK '+b['header']
+    # A syntactically valid unified diff is not necessarily acceptable to GNU
+    # patch: verify the REAL patch parser at --fuzz=0 against an old-side
+    # synthetic fixture, then optionally the full SHA-checked parent below.
+    with tempfile.TemporaryDirectory() as temp:
+        root=pathlib.Path(temp)
+        target=root/'KiComEngramOAuthTransactions.php'
+        old=''.join((line[1:]+'\\n') for line in h['lines'] if line.startswith((' ','-')))
+        target.write_text('// synthetic prior content\\n'*255+old+'// trailing context\\n')
+        extract=['--- a/KiComEngramOAuthTransactions.php',
+                 '+++ b/KiComEngramOAuthTransactions.php',h['header'],*h['lines']]
+        patch=root/'hunk.patch';patch.write_text('\\n'.join(extract)+'\\n')
+        for opts in (['--dry-run'],[]):
+            proc=subprocess.run(['patch','--fuzz=0','-p1',*opts,'--input',str(patch)],
+                cwd=root,text=True,capture_output=True)
+            assert proc.returncode==0,'GNU_PATCH_EXCHANGE_REJECTED '+proc.stdout+proc.stderr
+        assert 'if($requested===self::COMBINED_SCOPE)' in target.read_text()
     if original is not None:
         assert hashlib.sha256(original.read_bytes()).hexdigest()==SHA,'WRONG_ORIGINAL_ZIP'
         with zipfile.ZipFile(original) as z:
