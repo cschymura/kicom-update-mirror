@@ -1,0 +1,83 @@
+--- a/modules/engram/KiComEngramOAuthPasskeyConsent.php
++++ b/modules/engram/KiComEngramOAuthPasskeyConsent.php
+@@ -71,6 +71,7 @@
+                 'admin_session_hash'=>hash('sha256',$sessionId),
+                 'csrf_hash'=>hash('sha256',$csrf),
+                 'expires_at'=>min($now+120,$review['expires_at']),
++                'reviewed_scope'=>$review['scope'],
+             ];
+             return [
+                 'challenge_id'=>$started['challenge_id'],
+@@ -106,6 +107,8 @@
+             || !hash_equals((string)($pending['admin_session_hash']??''),hash('sha256',$sessionId))
+             || !hash_equals((string)($pending['csrf_hash']??''),hash('sha256',$csrf))
+             || (int)($pending['expires_at']??0)<=$now)self::deny();
++        $review=self::review($db,$requestId,$session,$sessionId,$csrf,$submittedCsrf,$https,$now);
++        if(!hash_equals((string)($pending['reviewed_scope']??''),(string)$review['scope']))self::deny();
+         try {
+             // Original KiCom PasskeyBridge verifies rpId, origin, UV, challenge,
+             // enrolled credential, real P-256 signature and replay counter.
+@@ -119,7 +122,9 @@
+                 || ($owner['subject']??null)!=='mirage-owner'
+                 || ($owner['credential_fingerprint']??null)!==$fp
+                 || ($owner['namespaces']??null)!==['project']
+-                || !in_array('engram.read',$owner['engram_rights']??[],true))
++                || !in_array('engram.read',$owner['engram_rights']??[],true)
++                || ($review['scope']==='engram.read engram.write'
++                    && !in_array('engram.write',$owner['engram_rights']??[],true)))
+                 self::deny();
+             KiComEngramOAuthTransactions::approve(
+                 $db,$requestId,$sessionId,$fp,$owners,true,$now
+--- a/modules/engram/KiComEngramOAuthAuthorizeHttp.php
++++ b/modules/engram/KiComEngramOAuthAuthorizeHttp.php
+@@ -56,9 +56,15 @@
+                     $p=$query;
+                     if (($p['engram_oauth']??null)!=='1')return self::empty404();
+                     unset($p['engram_oauth']);
+-                    $created=KiComEngramOAuthTransactions::begin(
+-                        $privateOAuthDb,$p,$pinnedClient,$originalSessionId,$now
+-                    );
++                    $requested=$p['scope']??null;
++                    $created=$requested==='engram.read engram.write'
++                        ? KiComEngramOAuthTransactions::beginWrite(
++                            $privateOAuthDb,$p,$pinnedClient,$originalSessionId,
++                            $now,($trustedRuntime['engram_write_ready']??null)===true
++                        )
++                        : KiComEngramOAuthTransactions::begin(
++                            $privateOAuthDb,$p,$pinnedClient,$originalSessionId,$now
++                        );
+                     $id=$created['request_id'];
+                     $review=KiComEngramOAuthPasskeyConsent::review(
+                         $privateOAuthDb,$id,$originalAdminSession,
+@@ -158,13 +164,16 @@
+             .'<link rel="stylesheet" href="assets/control-plane.css"></head>'
+             .'<body><main id="mirage-oauth-consent" data-request-id="'.$h($id)
+             .'" data-csrf="'.$h($csrf).'"><h1>ChatGPT mit Mirage verbinden</h1>'
+-            .'<p>Du erlaubst diesem Client ausschließlich den lesenden Abruf '
+-            .'bereits freigegebener Projekt-Erinnerungen. Kein automatisches Speichern.</p>'
++            .'<p>'.($review['scope']==='engram.read engram.write'
++                ? 'Einmalige Freigabe: Erinnerungen lesen, anlegen, ändern und archivieren. '
++                    .'Die Berechtigung ist widerrufbar; es ist keine Einzelbestätigung pro Erinnerung nötig.'
++                : 'Du erlaubst diesem Client ausschließlich den lesenden Abruf '
++                    .'bereits freigegebener Projekt-Erinnerungen. Kein automatisches Speichern.').'</p>'
+             .'<dl><dt>Client</dt><dd>'.$h((string)$review['client_id']).'</dd>'
+             .'<dt>Rücksprung</dt><dd>'.$h((string)$review['redirect_uri']).'</dd>'
+             .'<dt>Berechtigung</dt><dd>'.$h((string)$review['scope']).'</dd></dl>'
+             .'<label><input id="mirage-oauth-consent-check" type="checkbox">'
+-            .' Ich erlaube den lesenden Zugriff für diesen Client.</label>'
++            .' Ich erlaube die oben angezeigte Berechtigung für diesen Client.</label>'
+             .'<p><button type="button" id="mirage-oauth-consent-button" disabled>'
+             .'Mit KiCom-Passkey freigeben</button></p>'
+             .'<p id="mirage-oauth-consent-status" role="status"></p>'
+--- a/modules/engram/KiComEngramOAuthHttp.php
++++ b/modules/engram/KiComEngramOAuthHttp.php
+@@ -131,7 +131,8 @@
+         try{
+             $form=self::strictForm($raw);
+             $token=KiComEngramOAuthTransactions::exchange(
+-                $privateOAuthDb,$form,$trustedClient,$now
++                $privateOAuthDb,$form,$trustedClient,$now,
++                ($trustedHost['engram_write_ready']??null)===true
+             );
+             return self::json(200,$token);
+         }catch(Throwable){
