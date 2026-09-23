@@ -21,3 +21,4 @@ jobs:
           set -euo pipefail
           python3 -m py_compile development/0.9.27/engram/dev99/test_dev93_exchange_diff.py
           python3 development/0.9.27/engram/dev99/test_dev93_exchange_diff.py
+          python3 development/0.9.27/engram/dev97/test_integration_inputs.py
