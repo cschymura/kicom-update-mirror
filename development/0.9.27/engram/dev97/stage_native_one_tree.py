@@ -12,7 +12,7 @@ PATCHES=[
  'dev93/NATIVE-first-party-passkey-ui-and-oauth-http-write-consent.patch',
  'dev94/NATIVE-after-DEV93-original-oauth-both-scope-atomic-refresh.patch',
  'dev94/NATIVE-original-0937-oauth-optional-locale-after-dev93.patch',
- 'dev94/NATIVE-after-DEV93-oauth-http-refresh-discovery.patch',
+ 'dev100/NATIVE-exact-original-oauth-http-refresh-discovery.patch',
  'dev91/native-0937-separate-combined-scope-verify.patch',
  'dev97/NATIVE-exact-original-host-gated-write-dispatch.patch',
  'dev92/native-original-api-first-party-write-factory.patch',
