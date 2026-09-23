@@ -154,7 +154,7 @@
              $q=$db->prepare('UPDATE mirage_oauth_codes SET consumed=1
                  WHERE code_hash=? AND consumed=2');$q->execute([hash('sha256',$p['code'])]);
              if($q->rowCount()!==1)self::denied();
-@@ -256,10 +345,17 @@
+@@ -256,10 +345,16 @@
                  VALUES(?,?,?,?,?,?,?,?,?,?)');
              $q->execute([hash('sha256',$token),$r['client_id'],
                  $r['connector_id'],$r['host_evidence_id'],self::RESOURCE,
