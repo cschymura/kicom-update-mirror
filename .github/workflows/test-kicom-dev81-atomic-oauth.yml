@@ -5,6 +5,7 @@ on:
       - work/kicom-engram-dev81-atomic-oauth
     paths:
       - 'development/0.9.27/engram/dev81/**'
+      - 'development/0.9.27/engram/dev77/**'
       - '.github/workflows/test-kicom-dev81-atomic-oauth.yml'
   workflow_dispatch:
 
@@ -21,3 +22,4 @@ jobs:
           php -l development/0.9.27/engram/dev81/test_atomic_exchange.php
       - name: Real SQLite transactional positive and negative checks
         run: php development/0.9.27/engram/dev81/test_atomic_exchange.php
+          php development/0.9.27/engram/dev77/test-oauth-continuity.php
