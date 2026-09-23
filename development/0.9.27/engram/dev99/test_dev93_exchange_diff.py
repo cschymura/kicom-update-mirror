@@ -22,7 +22,7 @@ def audit(original=None):
             elif line:raise ValueError('INVALID_PATCH_LINE')
     assert blocks and len(blocks)>=7
     exchange=[b for b in blocks if any('if($requested===self::COMBINED_SCOPE)' in s for s in b['lines'])
-       and any("return ['access_token']" in s for s in b['lines'])]
+       and any("return ['access_token'" in s for s in b['lines'])]
     assert len(exchange)==1,'EXCHANGE_HUNK_NOT_UNIQUE'
     h=exchange[0];combined=[s for s in h['lines'] if 'if($requested===self::COMBINED_SCOPE)' in s]
     assert combined==['+            if($requested===self::COMBINED_SCOPE) {'], \
