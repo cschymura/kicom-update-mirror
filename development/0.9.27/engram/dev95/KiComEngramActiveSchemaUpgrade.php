@@ -62,6 +62,24 @@ final class KiComEngramActiveSchemaUpgrade
         return [$data,$backups,$oauth,$store];
     }
 
+    /** Ensure the table not only has columns but also its replay-binding UNIQUE key. */
+    private static function uniqueIndex(PDO $db,string $table,array $columns):void {
+        if(!in_array($table,['mirage_oauth_refresh_tokens','mirage_oauth_write_consents'],true))
+            self::refuse();
+        $indexes=$db->query('PRAGMA index_list('.$table.')')->fetchAll(PDO::FETCH_ASSOC);
+        foreach($indexes as $index) {
+            if((int)($index['unique']??0)!==1 || (int)($index['partial']??0)!==0)
+                continue;
+            $name=$index['name']??null;
+            if(!is_string($name)||!preg_match('/\\A[a-zA-Z0-9_]+\\z/D',$name))
+                continue;
+            $actual=$db->query('PRAGMA index_info('.$name.')')
+                ->fetchAll(PDO::FETCH_COLUMN,2);
+            if($actual===$columns)return;
+        }
+        self::refuse();
+    }
+
     /** READ-ONLY preflight. No schema DDL, key, file, token, scope, or runtime writes. */
     public static function preflight(string $webRoot,array $trustedRuntime):array {
         [$data,$backups,$oauth,$store]=self::fixedPaths($webRoot,$trustedRuntime);
@@ -151,6 +169,13 @@ final class KiComEngramActiveSchemaUpgrade
             $have=$oauth->query('PRAGMA table_info(mirage_oauth_refresh_tokens)')
                 ->fetchAll(PDO::FETCH_COLUMN,1);
             if($have!==$required)self::refuse();
+            self::uniqueIndex($oauth,'mirage_oauth_refresh_tokens',['parent_access_hash']);
+            $consentCols=$oauth->query('PRAGMA table_info(mirage_oauth_write_consents)')
+                ->fetchAll(PDO::FETCH_COLUMN,1);
+            if($consentCols!==['consent_ref','owner','namespace','client_id',
+                'connector_id','owner_binding','credential_fingerprint','source_kind',
+                'approved_at','revoked_at','token_hash'])self::refuse();
+            self::uniqueIndex($oauth,'mirage_oauth_write_consents',['token_hash']);
             foreach([$oauth,$engram] as $db)
                 if($db->query('PRAGMA quick_check')->fetchColumn()!=='ok')self::refuse();
 
