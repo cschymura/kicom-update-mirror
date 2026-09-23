@@ -72,8 +72,16 @@
 -        foreach(explode('&',$raw)as $pair){
 -            if(!str_contains($pair,'='))throw new RuntimeException('INVALID_FORM');
 -            [$key,$value]=explode('=',$pair,2);
--            if(count($out)!==count($allowed))throw new RuntimeException('INVALID_FORM');
--            return $out;
+-            if(!in_array($key,$allowed,true)||array_key_exists($key,$out)
+-                || strlen($value)>1024 || preg_match('/%(?![0-9a-fA-F]{2})/',$value))
+-                throw new RuntimeException('INVALID_FORM');
+-            $decoded=urldecode($value);
+-            if(str_contains($decoded,"\0")||str_contains($decoded,"\r")
+-                || str_contains($decoded,"\n"))throw new RuntimeException('INVALID_FORM');
+-            $out[$key]=$decoded;
+-        }
+-        if(count($out)!==count($allowed))throw new RuntimeException('INVALID_FORM');
+-        return $out;
 -    }
 -
      private static function httpsHost(array $server):bool
