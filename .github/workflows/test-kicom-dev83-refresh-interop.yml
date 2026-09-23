@@ -1,0 +1,20 @@
+name: KiCom DEV83 OAuth refresh interop
+on:
+  push:
+    branches:
+      - work/kicom-engram-dev83-oauth-refresh-interop
+    paths:
+      - 'development/0.9.27/engram/dev83/**'
+      - '.github/workflows/test-kicom-dev83-refresh-interop.yml'
+  workflow_dispatch:
+
+jobs:
+  oauth-refresh-interop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax and OAuth exact-audience regression
+        run: |
+          php -l development/0.9.27/engram/dev83/KiComEngramOAuthGrantForm.php
+          php -l development/0.9.27/engram/dev83/test_oauth_grant_form.php
+          php development/0.9.27/engram/dev83/test_oauth_grant_form.php
