@@ -1,0 +1,32 @@
+name: KiCom Engram DEV77 OAuth continuity
+on:
+  push:
+    branches: [work/kicom-engram-dev70-mutation-core]
+    paths:
+      - 'development/0.9.27/engram/dev77/**'
+      - '.github/workflows/test-0927-engram-dev77-oauth-continuity.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  oauth-continuity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite,sqlite3
+          coverage: none
+      - name: Verify unchanged original R3 baseline
+        run: |
+          set -euo pipefail
+          echo '6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f  releases/0.9.26/KiCom-0.9.26-R3.zip' | sha256sum -c -
+          (cd source/0.9.26-r3 && sha256sum --status -c MANIFEST.sha256)
+      - name: Lint and test bounded OAuth continuity
+        run: |
+          set -euo pipefail
+          php -l development/0.9.27/engram/dev77/KiComEngramOAuthContinuity.php
+          php -l development/0.9.27/engram/dev77/test-oauth-continuity.php
+          php development/0.9.27/engram/dev77/test-oauth-continuity.php
