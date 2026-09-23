@@ -1,0 +1,44 @@
+--- a/api.php
++++ b/api.php
+@@ -84,13 +84,40 @@
+             || ($runtime['mcp_connector_enabled']??null)!==true
+             || ($runtime['oauth_enabled']??null)!==true)
+             throw new RuntimeException('MCP_UNAVAILABLE');
+         require_once __DIR__.'/modules/engram/KiComEngramOAuthMcpHostBridge.php';
++        // Disabled by default. This FIRST-PARTY dependency injection can only
++        // be enabled by the original operator-owned server runtime. It does
++        // NOT grant OAuth scopes, approve a Passkey or provision SQLite.
++        $trustedWriteFactory=null;
++        if (($runtime['engram_write_enabled']??null)===true) {
++            foreach ([
++                'KiComEngramWriteGrant.php',
++                'KiComEngramMutationSchema.php',
++                'KiComEngramRevisionAdapter.php',
++                'KiComEngramVerifiedWriteProvenance.php',
++                'KiComEngramCanonicalMutationService.php',
++                'KiComEngramCanonicalMcpMutationController.php',
++                'KiComEngramPrivateWriteConsentReader.php',
++                'KiComEngramNativeWriteFactory.php'
++            ] as $trustedFile) {
++                require_once __DIR__.'/modules/engram/'.$trustedFile;
++            }
++            $trustedWriteFactory=static function(
++                PDO $privateOAuthDb,string $verifiedBearer,
++                array $verifiedIdentity,array $verifiedConsent,int $now
++            )use($runtime):?callable {
++                return KiComEngramNativeWriteFactory::build(
++                    $privateOAuthDb,$verifiedBearer,$verifiedIdentity,
++                    $verifiedConsent,$runtime,__DIR__,$now
++                );
++            };
++        }
+         $body=file_get_contents('php://input',false,null,0,8193);
+         if (!is_string($body) || strlen($body)>8192)
+             throw new RuntimeException('MCP_REQUEST_UNAVAILABLE');
+         $result=KiComEngramOAuthMcpHostBridge::handle(
+-            $_SERVER,$body,$runtime,__DIR__,time()
++            $_SERVER,$body,$runtime,__DIR__,time(),$trustedWriteFactory
+         );
+         // Only a small fixed set of HTTP response fields can be emitted.
+         foreach (($result['headers']??[]) as $key=>$value) {
+             if (in_array($key,['Cache-Control','Content-Type','X-Content-Type-Options',
