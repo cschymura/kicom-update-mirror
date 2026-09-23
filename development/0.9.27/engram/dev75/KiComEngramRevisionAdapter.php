@@ -1,9 +1,15 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/../dev87/KiComEngramMutationSchema.php';
 /** DEV-75 adapter: mutation semantics on the canonical engram_revisions schema. */
 final class KiComEngramRevisionAdapter {
  private PDO $db;
- public function __construct(PDO $db){$this->db=$db;$db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);$db->exec('PRAGMA foreign_keys=ON');$cols=$db->query('PRAGMA table_info(engram_revisions)')->fetchAll(PDO::FETCH_COLUMN,1);$need=['subject','namespace','id','revision','kind','body','source_kind','source_ref','entry_state','previous_hash','revision_hash'];if(array_diff($need,$cols))throw new RuntimeException('incompatible engram_revisions schema');$db->exec('CREATE TABLE IF NOT EXISTS engram_mutation_receipts(subject TEXT NOT NULL,namespace TEXT NOT NULL,idempotency_key TEXT NOT NULL,operation TEXT NOT NULL,request_hash TEXT NOT NULL,result_json TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,grant_nonce TEXT NOT NULL,PRIMARY KEY(subject,namespace,idempotency_key),UNIQUE(subject,namespace,grant_nonce))');$db->exec('CREATE TABLE IF NOT EXISTS engram_mutation_audit(seq INTEGER PRIMARY KEY AUTOINCREMENT,subject TEXT NOT NULL,namespace TEXT NOT NULL,operation TEXT NOT NULL,engram_id TEXT NOT NULL,revision INTEGER NOT NULL,outcome TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)');}
+ public function __construct(PDO $db){
+    $this->db=$db;
+    $db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
+    KiComEngramMutationSchema::assertReady($db);
+    // Do not initialize or migrate SQLite as a side effect of an MCP call.
+ }
  private static function digest(array $r):string{$f=['subject','namespace','id','revision','kind','body','source_kind','source_ref','entry_state','previous_hash'];return hash('sha256',json_encode(array_map(fn($k)=>$r[$k],$f),JSON_UNESCAPED_UNICODE|JSON_THROW_ON_ERROR));}
  public function mutate(string $subject,string $ns,string $operation,array $input,string $idem,string $grantNonce):array{
   if(!preg_match('/\A[a-z0-9][a-z0-9._:-]{0,63}\z/D',$subject)||!preg_match('/\A[a-z0-9][a-z0-9._:-]{0,63}\z/D',$ns)||!preg_match('/\A[a-zA-Z0-9._:-]{8,128}\z/D',$idem)||!preg_match('/\A[a-zA-Z0-9._:-]{8,128}\z/D',$grantNonce))throw new InvalidArgumentException('invalid identity/idempotency/grant nonce');
