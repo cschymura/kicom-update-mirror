@@ -1,0 +1,67 @@
+--- a/modules/engram/KiComEngramOAuthTransactions.php
++++ b/modules/engram/KiComEngramOAuthTransactions.php
+@@ -17,6 +17,7 @@
+ {
+     private const RESOURCE = 'https://kicom.rurtalbahn.info/api.php?q=ENGRAM_MCP';
+     private const SCOPE = 'engram.read';
++    private const REFRESH_TTL = 604800;
+ 
+     /** Explicit operator-controlled schema installation, NEVER from HTTP. */
+     public static function install(PDO $db): void
+@@ -38,6 +39,25 @@
+             owner_binding TEXT NOT NULL, credential_fingerprint TEXT NOT NULL,
+             issued_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
+             revoked INTEGER NOT NULL DEFAULT 0)');
++        self::prepareRefreshSchema($db);
++    }
++
++
++    /** PRIVATE schema only: called by explicit authenticated operator provisioning,
++     * never from an incoming token or MCP request. Existing codes/tokens stay intact.
++     */
++    public static function prepareRefreshSchema(PDO $db):void
++    {
++        self::sqlite($db);
++        $db->exec('CREATE TABLE IF NOT EXISTS mirage_oauth_refresh_tokens (
++          refresh_hash TEXT PRIMARY KEY,
++          client_id TEXT NOT NULL,connector_id TEXT NOT NULL,
++          host_evidence_id TEXT NOT NULL,resource TEXT NOT NULL,
++          scope TEXT NOT NULL,owner_binding TEXT NOT NULL,
++          credential_fingerprint TEXT NOT NULL,
++          issued_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,
++          consumed INTEGER NOT NULL DEFAULT 0,revoked INTEGER NOT NULL DEFAULT 0,
++          parent_access_hash TEXT NOT NULL UNIQUE)');
+     }
+ 
+     /**
+@@ -250,16 +270,29 @@
+                 WHERE code_hash=? AND consumed=2');$q->execute([hash('sha256',$p['code'])]);
+             if($q->rowCount()!==1)self::denied();
+             $token=self::secret();
++            $accessHash=hash('sha256',$token);
+             $q=$db->prepare('INSERT INTO mirage_oauth_tokens
+                 (token_hash,client_id,connector_id,host_evidence_id,resource,scope,
+                  owner_binding,credential_fingerprint,issued_at,expires_at)
+                 VALUES(?,?,?,?,?,?,?,?,?,?)');
+-            $q->execute([hash('sha256',$token),$r['client_id'],
++            $q->execute([$accessHash,$r['client_id'],
+                 $r['connector_id'],$r['host_evidence_id'],self::RESOURCE,
+                 self::SCOPE,$r['owner_binding'],$r['approved_fingerprint'],$now,$now+3600]);
++            // Initial refresh is issued in the SAME transaction as code consumption.
++            // A missing operator-prepared table aborts the WHOLE exchange.
++            $refresh=self::secret();
++            $q=$db->prepare('INSERT INTO mirage_oauth_refresh_tokens
++                (refresh_hash,client_id,connector_id,host_evidence_id,resource,scope,
++                 owner_binding,credential_fingerprint,issued_at,expires_at,parent_access_hash)
++                VALUES(?,?,?,?,?,?,?,?,?,?,?)');
++            $q->execute([hash('sha256',$refresh),$r['client_id'],
++                $r['connector_id'],$r['host_evidence_id'],self::RESOURCE,
++                self::SCOPE,$r['owner_binding'],$r['approved_fingerprint'],$now,
++                $now+self::REFRESH_TTL,$accessHash]);
+             $db->exec('COMMIT');
+             return ['access_token'=>$token,'token_type'=>'Bearer',
+-                'expires_in'=>3600,'scope'=>self::SCOPE];
++                'expires_in'=>3600,'refresh_token'=>$refresh,
++                'refresh_expires_in'=>self::REFRESH_TTL,'scope'=>self::SCOPE];
+         }catch(Throwable $e){$db->exec('ROLLBACK');throw $e;}
+     }
