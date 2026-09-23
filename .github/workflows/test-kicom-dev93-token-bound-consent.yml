@@ -1,0 +1,40 @@
+name: KiCom DEV93 token-bound private consent and native writer
+on:
+  push:
+    branches:
+      - work/kicom-engram-dev93-native-oauth-write-consent
+    paths:
+      - 'development/0.9.27/engram/dev89/**'
+      - 'development/0.9.27/engram/dev91/**'
+      - 'development/0.9.27/engram/dev92/**'
+      - 'development/0.9.27/engram/dev93/**'
+      - '.github/workflows/test-kicom-dev93-token-bound-consent.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  token-bound-private-consent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite,sqlite3
+          coverage: none
+      - name: Native PDO SQLite token-specific consent, first-party writer, old read scope
+        run: |
+          set -euo pipefail
+          php -m | grep -i pdo_sqlite
+          php -l development/0.9.27/engram/dev89/KiComEngramPrivateWriteConsentReader.php
+          php -l development/0.9.27/engram/dev91/KiComEngramNativeMcpWriteGate.php
+          php -l development/0.9.27/engram/dev91/test_native_mcp_write_gate.php
+          php -l development/0.9.27/engram/dev92/KiComEngramNativeWriteFactory.php
+          php development/0.9.27/engram/dev91/test_native_mcp_write_gate.php
+          php development/0.9.27/engram/dev92/test_native_write_factory.php
+          php development/0.9.27/engram/dev89/test_private_consent_reader.php
+          php development/0.9.27/engram/dev88/test_verified_provenance.php
+          php development/0.9.27/engram/dev87/test_explicit_private_schema.php
+          php development/0.9.27/engram/dev76/test_canonical_e2e.php
+          php development/0.9.27/engram/dev86/test_durable_grant_nonce.php
