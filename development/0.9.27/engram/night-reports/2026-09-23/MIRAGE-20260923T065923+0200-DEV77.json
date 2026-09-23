@@ -1,0 +1,30 @@
+{
+  "run_id": "MIRAGE-20260923T065923+0200-DEV77",
+  "started_at": "2026-09-23T06:59:23+02:00",
+  "finished_at": "2026-09-23T07:03:00+02:00",
+  "status": "PARTIAL",
+  "stage": "DEV-77 single targeted new-chat/new-device OAuth continuity correction",
+  "source_versions": {
+    "github_branch": "work/kicom-engram-dev70-mutation-core",
+    "github_prechange_head": "894bc6a6fcfd42dafb7e0a895c5629f919a9acee",
+    "github_tested_sha": "3eaf8b7498d2b3b48990aa26230c37ea00600a10",
+    "live_kicom": "0.9.37 operator-documented baseline; no live mutation or fresh private-data read in DEV-77",
+    "slack": "D0C2D8CKWDD read; no newer conflicting reservation in retrieved messages"
+  },
+  "changes": [
+    "Implemented bounded rotating refresh-token continuity derived only from a verified engram.read access token",
+    "Preserved client/connector/host/owner/credential bindings and prohibited write-scope upgrade",
+    "Added fail-fast positive/negative CI and documented this as the one targeted auth correction path for the consolidated candidate"
+  ],
+  "tests_passed": 13,
+  "tests_failed": 0,
+  "commit_sha": "3eaf8b7498d2b3b48990aa26230c37ea00600a10",
+  "checkpoint_url": "https://github.com/cschymura/kicom-update-mirror/blob/work/kicom-engram-dev70-mutation-core/development/0.9.27/engram/CHECKPOINT-2026-09-23-ENGRAM-DEV-77-MIRAGE-OAUTH-CONTINUITY.md",
+  "semantic_search": "DEV-71 disabled FTS5 baseline remains optional and unchanged; it is not allowed to delay the consolidated release.",
+  "production_changes": false,
+  "blocker": "DEV-77 is not yet integrated into the single native package/OAuth HTTP endpoint and cannot prove ChatGPT platform reconnection behavior without the separately approved live new-device/new-chat test.",
+  "next_step": "Integrate DEV-77 exactly once into the consolidated native candidate and OAuth metadata/token endpoint, then run full search/write/update/archive plus package/genome/recovery/rollback regressions before requesting one operator-approved live new-chat/new-device test.",
+  "persistence_status": "PERSISTED",
+  "release_candidate": null,
+  "auth_fix_attempt_status": "TESTED_LOCAL"
+}
