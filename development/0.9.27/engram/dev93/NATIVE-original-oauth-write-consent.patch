@@ -1,0 +1,167 @@
+--- a/modules/engram/KiComEngramOAuthTransactions.php
++++ b/modules/engram/KiComEngramOAuthTransactions.php
+@@ -17,6 +17,7 @@
+ {
+     private const RESOURCE = 'https://kicom.rurtalbahn.info/api.php?q=ENGRAM_MCP';
+     private const SCOPE = 'engram.read';
++    private const COMBINED_SCOPE = 'engram.read engram.write';
+ 
+     /** Explicit operator-controlled schema installation, NEVER from HTTP. */
+     public static function install(PDO $db): void
+@@ -40,6 +41,62 @@
+             revoked INTEGER NOT NULL DEFAULT 0)');
+     }
+ 
++    /** Operator-only and backup-gated ADDITIVE schema upgrade.
++     * Caller MUST verify original first-party admin session, fresh passkey,
++     * trusted host and a successful PRIVATE SQLite backup before invocation.
++     * This method must NEVER be reachable from OAuth/MCP public HTTP routes.
++     */
++    public static function prepareWriteSchema(PDO $db):void
++    {
++        self::sqlite($db);
++        $db->exec('BEGIN IMMEDIATE');
++        try {
++            $cols=$db->query('PRAGMA table_info(mirage_oauth_codes)')
++                ->fetchAll(PDO::FETCH_ASSOC);
++            if(!in_array('requested_scope',array_column($cols,'name'),true)) {
++                $db->exec("ALTER TABLE mirage_oauth_codes ADD COLUMN requested_scope TEXT NOT NULL DEFAULT 'engram.read'");
++            }
++            if(!in_array('write_consent_ref',array_column($cols,'name'),true)) {
++                $db->exec("ALTER TABLE mirage_oauth_codes ADD COLUMN write_consent_ref TEXT NOT NULL DEFAULT ''");
++            }
++            $db->exec('CREATE TABLE IF NOT EXISTS mirage_oauth_write_consents(
++                consent_ref TEXT PRIMARY KEY, owner TEXT NOT NULL,
++                namespace TEXT NOT NULL, client_id TEXT NOT NULL,
++                connector_id TEXT NOT NULL, owner_binding TEXT NOT NULL,
++                credential_fingerprint TEXT NOT NULL, source_kind TEXT NOT NULL,
++                approved_at INTEGER NOT NULL, revoked_at INTEGER)');
++            $check=$db->query('PRAGMA table_info(mirage_oauth_write_consents)')
++                ->fetchAll(PDO::FETCH_ASSOC);
++            $needed=['consent_ref','owner','namespace','client_id','connector_id',
++                'owner_binding','credential_fingerprint','source_kind',
++                'approved_at','revoked_at'];
++            if(array_column($check,'name')!==$needed)self::denied();
++            $db->exec('COMMIT');
++        }catch(Throwable $e){if($db->inTransaction())$db->exec('ROLLBACK');throw $e;}
++    }
++
++    /** Separate combined-scope request: original read begin() stays untouched.
++     * $allowWrite MUST come from operator-owned, already provisioned runtime.
++     */
++    public static function beginWrite(
++        PDO $db,array $p,array $trustedClient,string $adminSessionId,int $now,
++        bool $allowWrite
++    ):array {
++        if(!$allowWrite || ($p['scope']??null)!==self::COMBINED_SCOPE)self::denied();
++        self::sqlite($db);
++        $p['scope']=self::SCOPE;
++        $db->exec('BEGIN IMMEDIATE');
++        try {
++            $pending=self::begin($db,$p,$trustedClient,$adminSessionId,$now);
++            $q=$db->prepare('UPDATE mirage_oauth_codes SET requested_scope=?
++                WHERE request_hash=? AND consumed=0');
++            $q->execute([self::COMBINED_SCOPE,hash('sha256',$pending['request_id'])]);
++            if($q->rowCount()!==1)self::denied();
++            $db->exec('COMMIT');
++            return $pending;
++        }catch(Throwable $e){if($db->inTransaction())$db->exec('ROLLBACK');throw $e;}
++    }
++
+     /**
+      * Starts a pending request scoped to the existing operator-pinned client,
+      * exact redirect and canonical MCP resource. Caller MUST have loaded the
+@@ -93,8 +150,7 @@
+     ): array {
+         self::sqlite($db);
+         if(!self::secretFormat($requestId) || strlen($adminSessionId)<24)self::denied();
+-        $q=$db->prepare('SELECT client_id,redirect_uri,resource,state,expires_at,
+-              issued_at,consumed,consent_at,admin_session_hash
++        $q=$db->prepare('SELECT *
+               FROM mirage_oauth_codes WHERE request_hash=?');
+         $q->execute([hash('sha256',$requestId)]);
+         $r=$q->fetch(PDO::FETCH_ASSOC);
+@@ -103,7 +159,7 @@
+             || !hash_equals((string)$r['admin_session_hash'],hash('sha256',$adminSessionId)))
+             self::denied();
+         return ['client_id'=>$r['client_id'],'redirect_uri'=>$r['redirect_uri'],
+-            'resource'=>$r['resource'],'scope'=>self::SCOPE,
++            'resource'=>$r['resource'],'scope'=>$r['requested_scope']??self::SCOPE,
+             'expires_at'=>(int)$r['expires_at']];
+     }
+ 
+@@ -171,7 +227,9 @@
+                 || ($owner['credential_fingerprint']??null)!==$verifiedFingerprint
+                 || ($owner['namespaces']??null)!==['project']
+                 || !is_array($owner['engram_rights']??null)
+-                || !in_array('engram.read',$owner['engram_rights'],true)) self::denied();
++                || !in_array('engram.read',$owner['engram_rights'],true)
++                || (($row['requested_scope']??self::SCOPE)===self::COMBINED_SCOPE
++                    && !in_array('engram.write',$owner['engram_rights'],true))) self::denied();
+ 
+             $binding=hash('sha256',"mirage-owner\0".$verifiedFingerprint);
+             $q=$db->prepare('UPDATE mirage_oauth_codes SET
+@@ -218,13 +276,27 @@
+               consumed=2 WHERE request_hash=? AND consumed=0');
+             $q->execute([hash('sha256',$code),hash('sha256',$requestId)]);
+             if($q->rowCount()!==1)self::denied();
++            if(($r['requested_scope']??self::SCOPE)===self::COMBINED_SCOPE) {
++                $ref='consent:'.bin2hex(random_bytes(32));
++                $q=$db->prepare('INSERT INTO mirage_oauth_write_consents
++                    (consent_ref,owner,namespace,client_id,connector_id,
++                     owner_binding,credential_fingerprint,source_kind,approved_at)
++                     VALUES(?,?,?,?,?,?,?,?,?)');
++                $q->execute([$ref,'mirage-owner','project',$r['client_id'],
++                    $r['connector_id'],$r['owner_binding'],
++                    $r['approved_fingerprint'],'explicit_user',$now]);
++                $q=$db->prepare('UPDATE mirage_oauth_codes SET write_consent_ref=?
++                    WHERE request_hash=? AND consumed=2');
++                $q->execute([$ref,hash('sha256',$requestId)]);
++                if($q->rowCount()!==1)self::denied();
++            }
+             $db->exec('COMMIT');
+             return ['code'=>$code,'state'=>$r['state'],'redirect_uri'=>$r['redirect_uri']];
+         }catch(Throwable $e){$db->exec('ROLLBACK');throw $e;}
+     }
+ 
+     /** Single-use authorization-code + exact PKCE/resource/client binding. */
+-    public static function exchange(PDO $db,array $p,array $client,int $now):array
++    public static function exchange(PDO $db,array $p,array $client,int $now,bool $allowWrite=false):array
+     {
+         self::sqlite($db);self::client($client);
+         self::keys($p,['grant_type','code','code_verifier','redirect_uri','client_id','resource']);
+@@ -246,6 +318,22 @@
+                 || !hash_equals($r['pkce_challenge'],$c)
+                 || !self::hex64($r['owner_binding'])
+                 || !self::hex64($r['approved_fingerprint']))self::denied();
++            $requested=$r['requested_scope']??self::SCOPE;
++            if(!in_array($requested,[self::SCOPE,self::COMBINED_SCOPE],true))self::denied();
++            if($requested===self::COMBINED_SCOPE) {
++                if(!$allowWrite || !self::hex64($r['approved_fingerprint'])
++                    || !is_string($r['write_consent_ref']??null)
++                    || !preg_match('/\Aconsent:[a-f0-9]{64}\z/D',$r['write_consent_ref']))self::denied();
++                $q=$db->prepare('SELECT 1 FROM mirage_oauth_write_consents
++                    WHERE consent_ref=? AND owner=? AND namespace=?
++                    AND client_id=? AND connector_id=? AND owner_binding=?
++                    AND credential_fingerprint=? AND source_kind=?
++                    AND revoked_at IS NULL AND approved_at<=?');
++                $q->execute([$r['write_consent_ref'],'mirage-owner','project',
++                    $r['client_id'],$r['connector_id'],$r['owner_binding'],
++                    $r['approved_fingerprint'],'explicit_user',$now]);
++                if($q->fetchColumn()===false)self::denied();
++            }
+             $q=$db->prepare('UPDATE mirage_oauth_codes SET consumed=1
+                 WHERE code_hash=? AND consumed=2');$q->execute([hash('sha256',$p['code'])]);
+             if($q->rowCount()!==1)self::denied();
+@@ -256,10 +344,10 @@
+                 VALUES(?,?,?,?,?,?,?,?,?,?)');
+             $q->execute([hash('sha256',$token),$r['client_id'],
+                 $r['connector_id'],$r['host_evidence_id'],self::RESOURCE,
+-                self::SCOPE,$r['owner_binding'],$r['approved_fingerprint'],$now,$now+3600]);
++                $requested,$r['owner_binding'],$r['approved_fingerprint'],$now,$now+3600]);
+             $db->exec('COMMIT');
+             return ['access_token'=>$token,'token_type'=>'Bearer',
+-                'expires_in'=>3600,'scope'=>self::SCOPE];
++                'expires_in'=>3600,'scope'=>$requested];
+         }catch(Throwable $e){$db->exec('ROLLBACK');throw $e;}
+     }
