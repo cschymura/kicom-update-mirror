@@ -1,0 +1,57 @@
+--- a/modules/engram/KiComEngramOAuthHttp.php
++++ b/modules/engram/KiComEngramOAuthHttp.php
+@@ -1,6 +1,7 @@
+ <?php
+ declare(strict_types=1);
+ require_once __DIR__.'/KiComEngramOAuthTransactions.php';
++require_once __DIR__.'/KiComEngramOAuthGrantForm.php';
+ require_once __DIR__.'/KiComEngramHostingPolicy.php';
+ 
+ /**
+@@ -129,10 +130,12 @@
+                 && $server['HTTP_ORIGIN']!==self::ISSUER))
+             return self::result(404,'');
+         try{
+-            $form=self::strictForm($raw);
+-            $token=KiComEngramOAuthTransactions::exchange(
+-                $privateOAuthDb,$form,$trustedClient,$now
+-            );
++            $grant=KiComEngramOAuthGrantForm::parse($raw,$trustedClient);
++            $token=$grant['kind']==='authorization_code'
++                ? KiComEngramOAuthTransactions::exchange(
++                    $privateOAuthDb,$grant['arguments'],$trustedClient,$now)
++                : KiComEngramOAuthTransactions::refresh(
++                    $privateOAuthDb,$grant['arguments']['refresh_token'],$trustedClient,$now);
+             return self::json(200,$token);
+         }catch(Throwable){
+             // Never leak whether a code, client, PKCE, private path or
+@@ -141,29 +144,6 @@
+         }
+     }
+ 
+-    /** Exactly the expected six form fields; no PHP bracket/dot normalization. */
+-    private static function strictForm(string $raw):array
+-    {
+-        if($raw===''||strlen($raw)>2048)throw new RuntimeException('INVALID_FORM');
+-        $allowed=[
+-            'grant_type','code','code_verifier','redirect_uri','client_id','resource'
+-        ];
+-        $out=[];
+-        foreach(explode('&',$raw)as $pair){
+-            if(!str_contains($pair,'='))throw new RuntimeException('INVALID_FORM');
+-            [$key,$value]=explode('=',$pair,2);
+-            if(!in_array($key,$allowed,true)||array_key_exists($key,$out)
+-                || strlen($value)>1024 || preg_match('/%(?![0-9a-fA-F]{2})/',$value))
+-                throw new RuntimeException('INVALID_FORM');
+-            $decoded=urldecode($value);
+-            if(str_contains($decoded,"\0")||str_contains($decoded,"\r")
+-                || str_contains($decoded,"\n"))throw new RuntimeException('INVALID_FORM');
+-            $out[$key]=$decoded;
+-        }
+-        if(count($out)!==count($allowed))throw new RuntimeException('INVALID_FORM');
+-        return $out;
+-    }
+-
+     private static function httpsHost(array $server):bool
+     {
+         return ($server['HTTPS']??null)==='on'
