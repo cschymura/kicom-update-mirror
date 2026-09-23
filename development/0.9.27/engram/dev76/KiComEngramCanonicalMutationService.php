@@ -7,16 +7,12 @@ require_once __DIR__.'/../dev75/KiComEngramRevisionAdapter.php';
 final class KiComEngramCanonicalMutationService {
     private KiComEngramWriteGrant $grants;
     private KiComEngramRevisionAdapter $store;
-    /** @var array<string,bool> */
-    private array $usedNonces=[];
     public function __construct(KiComEngramWriteGrant $grants, KiComEngramRevisionAdapter $store){$this->grants=$grants;$this->store=$store;}
     public function mutate(string $grant,array $oauth,string $operation,array $input,string $idempotencyKey,int $now):array {
         $claims=$this->grants->verify($grant,$oauth,$operation,$now);
-        $nonceKey=$claims['owner']."\0".$claims['namespace']."\0".$claims['nonce'];
-        if(isset($this->usedNonces[$nonceKey])) throw new RuntimeException('write grant nonce replay');
-        // Mark only after authorization succeeded; idempotency belongs to the SQLite adapter.
-        $result=$this->store->mutate($claims['owner'],$claims['namespace'],$operation,$input,$idempotencyKey);
-        $this->usedNonces[$nonceKey]=true;
-        return $result;
+        // Durable nonce consumption occurs atomically with receipt and revision.
+        // The same grant+request idempotently retries; a different request cannot
+        // consume the grant again, even in another PHP process.
+        return $this->store->mutate($claims['owner'],$claims['namespace'],$operation,$input,$idempotencyKey,$claims['nonce']);
     }
 }
