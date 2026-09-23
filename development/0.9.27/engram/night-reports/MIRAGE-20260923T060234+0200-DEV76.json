@@ -1,0 +1,28 @@
+{
+  "run_id": "MIRAGE-20260923T060234+0200-DEV76",
+  "started_at": "2026-09-23T06:02:34+02:00",
+  "finished_at": "2026-09-23T06:05:30+02:00",
+  "status": "SUCCESS",
+  "stage": "DEV-76 canonical OAuth/MCP/write-grant/private-SQLite mutation E2E",
+  "source_versions": {
+    "github_branch": "work/kicom-engram-dev70-mutation-core",
+    "github_prechange_head": "6be744872238d414ac804da8699d396233979972",
+    "github_tested_sha": "b9699779b47d602b272c3e1d6f936fded967aa5a",
+    "live_kicom": "0.9.37 operator-documented baseline; BOOTSTRAP/PROJECT_STATE unavailable through available web path this run",
+    "slack": "D0C2D8CKWDD read; no newer conflicting DEV-76 reservation in retrieved messages"
+  },
+  "changes": [
+    "Composed server-signed engram.write grant verification with canonical engram_revisions mutation adapter",
+    "Added canonical MCP mutation controller preserving server-side OAuth owner/namespace binding and read-token denial",
+    "Added synthetic E2E positive/negative CI for write/update/archive and fixed the initial typed-backend integration failure"
+  ],
+  "tests_passed": 10,
+  "tests_failed": 0,
+  "commit_sha": "b9699779b47d602b272c3e1d6f936fded967aa5a",
+  "checkpoint_url": "https://github.com/cschymura/kicom-update-mirror/blob/work/kicom-engram-dev70-mutation-core/development/0.9.27/engram/CHECKPOINT-2026-09-23-ENGRAM-DEV-76-MIRAGE-CANONICAL-E2E.md",
+  "semantic_search": "DEV-71 FTS5 lexical baseline remains disabled and unchanged; next safe slice is canonical lifecycle/index rebuild/isolation/performance validation. No embedding/vector capability newly verified.",
+  "production_changes": false,
+  "blocker": null,
+  "next_step": "Validate disabled FTS5 against canonical active-latest revision lifecycle, archived exclusion, owner/namespace isolation, rebuild/migration and synthetic performance/quality; do not activate production.",
+  "persistence_status": "PERSISTED"
+}
