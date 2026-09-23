@@ -8,7 +8,7 @@
  
      /** Explicit operator-controlled schema installation, NEVER from HTTP. */
      public static function install(PDO $db): void
-@@ -40,6 +41,62 @@
+@@ -40,6 +41,63 @@
              revoked INTEGER NOT NULL DEFAULT 0)');
      }
  
@@ -72,7 +72,7 @@
      /**
       * Starts a pending request scoped to the existing operator-pinned client,
       * exact redirect and canonical MCP resource. Caller MUST have loaded the
-@@ -93,8 +150,7 @@
+@@ -93,8 +151,7 @@
      ): array {
          self::sqlite($db);
          if(!self::secretFormat($requestId) || strlen($adminSessionId)<24)self::denied();
@@ -82,7 +82,7 @@
                FROM mirage_oauth_codes WHERE request_hash=?');
          $q->execute([hash('sha256',$requestId)]);
          $r=$q->fetch(PDO::FETCH_ASSOC);
-@@ -103,7 +159,7 @@
+@@ -103,7 +160,7 @@
              || !hash_equals((string)$r['admin_session_hash'],hash('sha256',$adminSessionId)))
              self::denied();
          return ['client_id'=>$r['client_id'],'redirect_uri'=>$r['redirect_uri'],
@@ -91,7 +91,7 @@
              'expires_at'=>(int)$r['expires_at']];
      }
  
-@@ -171,7 +227,9 @@
+@@ -171,7 +228,9 @@
                  || ($owner['credential_fingerprint']??null)!==$verifiedFingerprint
                  || ($owner['namespaces']??null)!==['project']
                  || !is_array($owner['engram_rights']??null)
@@ -102,7 +102,7 @@
  
              $binding=hash('sha256',"mirage-owner\0".$verifiedFingerprint);
              $q=$db->prepare('UPDATE mirage_oauth_codes SET
-@@ -218,13 +276,27 @@
+@@ -218,13 +277,27 @@
                consumed=2 WHERE request_hash=? AND consumed=0');
              $q->execute([hash('sha256',$code),hash('sha256',$requestId)]);
              if($q->rowCount()!==1)self::denied();
@@ -131,7 +131,7 @@
      {
          self::sqlite($db);self::client($client);
          self::keys($p,['grant_type','code','code_verifier','redirect_uri','client_id','resource']);
-@@ -246,6 +318,22 @@
+@@ -246,6 +319,22 @@
                  || !hash_equals($r['pkce_challenge'],$c)
                  || !self::hex64($r['owner_binding'])
                  || !self::hex64($r['approved_fingerprint']))self::denied();
@@ -154,7 +154,7 @@
              $q=$db->prepare('UPDATE mirage_oauth_codes SET consumed=1
                  WHERE code_hash=? AND consumed=2');$q->execute([hash('sha256',$p['code'])]);
              if($q->rowCount()!==1)self::denied();
-@@ -256,10 +344,10 @@
+@@ -256,10 +345,17 @@
                  VALUES(?,?,?,?,?,?,?,?,?,?)');
              $q->execute([hash('sha256',$token),$r['client_id'],
                  $r['connector_id'],$r['host_evidence_id'],self::RESOURCE,
