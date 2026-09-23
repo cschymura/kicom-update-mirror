@@ -1,0 +1,19 @@
+--- a/modules/engram/KiComEngramOAuthAuthorizeHttp.php
++++ b/modules/engram/KiComEngramOAuthAuthorizeHttp.php
+@@ -2,6 +2,7 @@
+ declare(strict_types=1);
+ require_once __DIR__.'/KiComEngramOAuthHttp.php';
+ require_once __DIR__.'/KiComEngramOAuthPasskeyConsent.php';
++require_once __DIR__.'/KiComEngramOAuthOptionalParams.php';
+ 
+ /**
+  * DEV-55: authenticated FIRST-PARTY KiCom admin OAuth authorization endpoint.
+@@ -53,7 +54,7 @@
+                     );
+                     $id=$query['request_id'];
+                 } else {
+-                    $p=$query;
++                    $p=KiComEngramOAuthOptionalParams::authorizationQuery($query);
+                     if (($p['engram_oauth']??null)!=='1')return self::empty404();
+                     unset($p['engram_oauth']);
+                     $created=KiComEngramOAuthTransactions::begin(
