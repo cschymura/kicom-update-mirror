@@ -1,0 +1,49 @@
+name: KiCom DEV100 native SQLite full-tree gate
+on:
+  workflow_dispatch:
+    inputs:
+      parent_artifact_run_id:
+        description: 'Run ID containing the private SHA-pinned 0.9.37 parent artifact'
+        required: true
+        type: string
+      parent_artifact_name:
+        description: 'Artifact name containing exactly one KiCom 0.9.37 parent ZIP'
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  native-sqlite-full-tree:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_sqlite, sqlite3
+          coverage: none
+      - name: Download operator-provided private parent artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.parent_artifact_name }}
+          run-id: ${{ inputs.parent_artifact_run_id }}
+          github-token: ${{ github.token }}
+          path: /tmp/kicom-parent
+      - name: Stage exact native tree and run real PDO SQLite gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t zips < <(find /tmp/kicom-parent -maxdepth 2 -type f -name '*.zip' -print)
+          test "${#zips[@]}" -eq 1
+          echo '0c6e02c64d44d603cb229f562d189f1b798bd78c2188fd2907e6b5cbafdb5ea7  '"${zips[0]}" | sha256sum -c -
+          python3 development/0.9.27/engram/dev97/stage_native_one_tree.py \
+            --parent "${zips[0]}" --repo "$GITHUB_WORKSPACE" --output /tmp/kicom-staged-native | tee /tmp/stage.json
+          grep -q '"status": "STAGED_ONLY"' /tmp/stage.json
+          php development/0.9.27/engram/dev100/test_native_sqlite_full_tree_gate.php /tmp/kicom-staged-native
+      - name: Ensure no parent/private runtime is published
+        if: always()
+        shell: bash
+        run: |
+          rm -rf /tmp/kicom-parent /tmp/kicom-staged-native /tmp/stage.json
