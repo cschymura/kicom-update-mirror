@@ -1,0 +1,37 @@
+name: KiCom DEV87 explicit private mutation schema
+on:
+  push:
+    branches:
+      - work/kicom-engram-dev87-explicit-write-schema
+    paths:
+      - 'development/0.9.27/engram/dev75/**'
+      - 'development/0.9.27/engram/dev76/**'
+      - 'development/0.9.27/engram/dev86/**'
+      - 'development/0.9.27/engram/dev87/**'
+      - '.github/workflows/test-kicom-dev87-private-schema.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  private-schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite,sqlite3
+          coverage: none
+      - name: PHP lint + real PDO SQLite tests
+        run: |
+          set -euo pipefail
+          php -m | grep -i pdo_sqlite
+          php -l development/0.9.27/engram/dev87/KiComEngramMutationSchema.php
+          php -l development/0.9.27/engram/dev87/test_explicit_private_schema.php
+          php -l development/0.9.27/engram/dev75/KiComEngramRevisionAdapter.php
+          php -l development/0.9.27/engram/dev76/KiComEngramCanonicalMutationService.php
+          php -l development/0.9.27/engram/dev86/test_durable_grant_nonce.php
+          php development/0.9.27/engram/dev87/test_explicit_private_schema.php
+          php development/0.9.27/engram/dev76/test_canonical_e2e.php
+          php development/0.9.27/engram/dev86/test_durable_grant_nonce.php
