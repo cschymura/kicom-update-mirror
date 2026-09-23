@@ -118,14 +118,19 @@ final class KiComEngramActiveSchemaUpgrade
     ):array {
         [$data,$backups,$oauthPath,$engramPath]=self::fixedPaths($webRoot,$trustedRuntime);
         $lockPath=$backups.'/.engram-schema-upgrade.lock';
+        if(is_link($lockPath))self::refuse();
+        if(file_exists($lockPath))self::privateFile($lockPath,128);
         $mask=umask(0077);
         try {$lock=@fopen($lockPath,'c+b');}
         finally {umask($mask);}
         if(!is_resource($lock))self::refuse();
         try {
+            if(!flock($lock,LOCK_EX|LOCK_NB))self::refuse();
+            if(fstat($lock)['size']===0) {
+                if(fwrite($lock,'1')!==1||!fflush($lock))self::refuse();
+            }
             @chmod($lockPath,0600);
             self::privateFile($lockPath,128);
-            if(!flock($lock,LOCK_EX|LOCK_NB))self::refuse();
             $oauth=self::open($oauthPath);
             $engram=self::open($engramPath);
             foreach([$oauth,$engram] as $db)
