@@ -1,0 +1,31 @@
+name: KiCom DEV95 active private DB backup migration
+on:
+  push:
+    branches:
+      - work/kicom-engram-dev95-active-db-upgrade
+    paths:
+      - 'development/0.9.27/engram/dev95/**'
+      - 'development/0.9.27/engram/dev87/KiComEngramMutationSchema.php'
+      - '.github/workflows/test-kicom-dev95-active-upgrade.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-active-db-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite,sqlite3,sodium
+          coverage: none
+      - name: PHP lint and SQLite upgrade backup tests
+        run: |
+          set -euo pipefail
+          php -m | grep -i pdo_sqlite
+          php -l development/0.9.27/engram/dev95/KiComEngramActiveSchemaUpgrade.php
+          php -l development/0.9.27/engram/dev95/KiComEngramActiveUpgradeAdminHttp.php
+          php -l development/0.9.27/engram/dev95/test_active_schema_upgrade.php
+          php development/0.9.27/engram/dev95/test_active_schema_upgrade.php
