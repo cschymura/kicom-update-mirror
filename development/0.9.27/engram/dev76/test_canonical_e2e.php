@@ -1,11 +1,10 @@
 <?php
 declare(strict_types=1);
-require __DIR__.'/KiComEngramCanonicalMutationService.php';
-require __DIR__.'/../dev74/KiComEngramMcpMutationController.php';
+require __DIR__.'/KiComEngramCanonicalMcpMutationController.php';
 $n=0; function ok($v,$m){global $n;if(!$v)throw new RuntimeException('FAIL '.$m);$n++;echo "PASS $m\n";} function deny($f,$m){try{$f();}catch(Throwable $e){ok(true,$m);return;}throw new RuntimeException('FAIL '.$m);}
 $db=new PDO('sqlite::memory:');$db->setAttribute(PDO::ATTR_ERRMODE,PDO::ERRMODE_EXCEPTION);
 $db->exec("CREATE TABLE engram_revisions(subject TEXT,namespace TEXT,id TEXT,revision INTEGER,kind TEXT,body TEXT,source_kind TEXT,source_ref TEXT,entry_state TEXT,previous_hash TEXT,revision_hash TEXT,PRIMARY KEY(subject,namespace,id,revision))");
-$secret=str_repeat('s',48);$wg=new KiComEngramWriteGrant($secret);$adapter=new KiComEngramRevisionAdapter($db);$svc=new KiComEngramCanonicalMutationService($wg,$adapter);$ctl=new KiComEngramMcpMutationController($svc);
+$secret=str_repeat('s',48);$wg=new KiComEngramWriteGrant($secret);$adapter=new KiComEngramRevisionAdapter($db);$svc=new KiComEngramCanonicalMutationService($wg,$adapter);$ctl=new KiComEngramCanonicalMcpMutationController($svc);
 $now=1790129000;$oauth=['authenticated'=>true,'owner'=>'owner-0001','namespace'=>'project-01','connector_id'=>'connector-01','token_fingerprint'=>'fingerprint-01','scopes'=>['engram.write']];
 function grant($wg,$oauth,$ops,$nonce,$now){return $wg->issueSynthetic(['v'=>1,'grant_id'=>'grant-'.$nonce,'owner'=>$oauth['owner'],'namespace'=>$oauth['namespace'],'connector_id'=>$oauth['connector_id'],'token_fingerprint'=>$oauth['token_fingerprint'],'operations'=>$ops,'nonce'=>$nonce,'iat'=>$now-1,'exp'=>$now+60]);}
 $g=grant($wg,$oauth,['engram_write'],'nonce-0001',$now);$w=$ctl->handle($oauth,['tool'=>'engram_write','write_grant'=>$g,'idempotency_key'=>'idem-0001','input'=>['body'=>'synthetic canonical memory']],$now);ok($w['revision']===1&&$w['state']==='active','write through OAuth/MCP/grant/canonical SQLite');
