@@ -1,0 +1,39 @@
+# DEV-80 integration map — one native KiCom candidate ONLY
+#
+# This is a development change specification, NOT an independently deployable fix.
+# The existing production KiCom 0.9.37 authorization-code path is kept, and
+# the original KiComEngramOAuthHttp::token() HTTPS/host/method/content-type/
+# origin/runtime checks MUST execute BEFORE grant dispatch.
+
+*** modules/engram/KiComEngramOAuthHttp.php
+@@ first-party module imports
++ require_once __DIR__.'/KiComEngramOAuthGrantForm.php';
++ require_once __DIR__.'/KiComEngramOAuthRefreshDispatch.php';
++ require_once __DIR__.'/KiComEngramOAuthContinuity.php';
+@@ token() existing gate and try block
+-            $form=self::strictForm($raw);
+-            $token=KiComEngramOAuthTransactions::exchange(
+-                $privateOAuthDb,$form,$trustedClient,$now
+-            );
++            $token=KiComEngramOAuthRefreshDispatch::afterOriginalHttpGate(
++                $privateOAuthDb,$raw,$trustedClient,$now
++            );
+
+# Staging source files:
+# dev79/KiComEngramOAuthGrantForm.php ->
+#   modules/engram/KiComEngramOAuthGrantForm.php (adjust require path in dev80)
+# dev80/KiComEngramOAuthRefreshDispatch.php ->
+#   modules/engram/KiComEngramOAuthRefreshDispatch.php
+# dev77/KiComEngramOAuthContinuity.php ->
+#   modules/engram/KiComEngramOAuthContinuity.php
+#
+# IMPORTANT still open before any release:
+# - Explicit operator-approved private refresh SQLite schema installation.
+# - Initial refresh token MUST be issued in SAME atomic transaction as original
+#   authorization-code consumption + initial access-token issuance.
+# - Refresh token rotation must verify active owner/credential and revocation.
+# - Native real-SQLite/HTTP/CSRF/OAuth/MCP positive and negative regressions.
+# - Only THEN add 'refresh_token' to OAuth discovery grant_types_supported.
+# - Integrate DEV76 write/update/archive with explicit independent engram.write
+#   issuance and full native manifest/genome/updater/rollback checks.
+# - No standalone DEV80 ZIP to be installed, no live function asserted.
