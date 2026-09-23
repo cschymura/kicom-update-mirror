@@ -22,6 +22,21 @@ https://github.com/cschymura/kicom-update-mirror/actions/runs/35923582702
 
 DEV98 hat den neuen Passkey-Konstruktor der aktiven DB-Administrationsroute an den bereits vorhandenen First-Party-Konstruktor in `admin.php` angeglichen. Das ist korrekt. Die pauschale frühere Aussage, die ursprüngliche `kicomEngramServerRuntime()` könne grundsätzlich kein Feld `passkey_store` bereitstellen, war dagegen zu weitgehend: `lib.php` liest die genehmigte private Konfiguration, und der ursprüngliche SetupWizard schreibt `passkey_store` als Konfigurationsfeld. Aus dem Vorhandensein eines alternativen neuen Pfadzugriffs allein darf deshalb keine zwangsläufige produktive OAuth-Störung behauptet werden.
 
+## 23.09. spätere echte GNU-patch-Kontrolle und Fortschritt
+
+Ein weiterer tatsächlicher Originalquellcode-Test deckte einen zweiten Fehler im selben historischen DEV93-Austausch-Hunk auf: Auch nach der korrekten Kennzeichnung der neuen IF-Zeile und formal richtigen 9/16-Hunkzählern verweigerte GNU `patch --fuzz=0` die Anwendung auf die SHA-geprüfte ursprüngliche 0.9.37-Klasse. Die hinzugezogene **folgende originale Leer-Kontextzeile** und die dazu korrekten `@@ -256,10 +345,17 @@`-Zähler machen den Hunk für den GNU-Parser eindeutig. Im aktuellen lokalen Modell-Arbeitscontainer wurde EXAKT der reparierte Austausch-Hunk auf einer frisch aus dem Original-ZIP extrahierten Kopie zunächst mit `patch --dry-run --fuzz=0` und anschließend tatsächlich mit `patch --fuzz=0` angewendet: **beide erfolgreich**, anschließend **php -l ohne Syntaxfehler**. Die übrigen sieben DEV93-Hunks oder gar alle elf nativen Integrationspatches wurden damit NICHT als angewendet bestätigt.
+
+Der committed `dev99/test_dev93_exchange_diff.py` testet jetzt über den ECHTEN GNU-patch-Parser ohne Fuzz auf synthetischem Alt-Kontext; bei lokal vorhandenem SHA-korrektem Original-ZIP kann er zusätzlich denselben Austausch-Hunk auf einer WEGWERF-Kopie der Originalklasse anwenden und PHP-linten. CI hat kein Original-ZIP und bleibt dort bei der synthetischen Parser-Prüfung plus elf Input-/Formathunks. GitHub Actions Lauf **35924645951**, Job **107396697596**: SUCCESS. Dies ist eine reale Regressionstestverbesserung, aber ausdrücklich KEIN kompletter Original-Quellbaum, keine native OAuth-HTTP/Passkey-Migration und kein installierbarer Release.
+
+### Aktuelle grobe Restaufwandsplanung (Schätzung, kein bestätigter Termin)
+
+- Exakte gemeinsame Originalquellbaum-Integration aller DEV90–99-Änderungen, Flat-Imports und Fehlersuche: 6–12 konzentrierte Stunden.
+- Echte native PDO-SQLite, Erst- und Folge-Chat OAuth/Passkey/HTTP/MCP, Host-/Revoke- und Datenbank-/Backup-Regression: 8–16 Stunden.
+- Eindeutiges Genome/Manifest, bestehender Original-Updater, Backup/Recovery/Rollback, kompletter ZIP-Build und vorab geprüfter Release-Candidate: 6–12 Stunden.
+- Gesondert genehmigte Betreiberinstallation und genau ein gezielter unabhängiger Live-OAuth-Test: 2–4 Stunden einschließlich eventueller reversibler Diagnose.
+
+**Grobe Gesamtschätzung: 22–44 Stunden konzentrierte tatsächliche Arbeit**, bei unerwarteter ursprünglicher Hosting-/ChatGPT-OAuth-Abweichung deutlich mehr. Stündliche Automationsläufe sind NICHT mit acht durchgehenden Entwicklerstunden pro Nacht gleichzusetzen. Der Termin hängt an tatsächlicher Datei-/PHP-Runner-Verfügbarkeit, der notwendigen Testtiefe und Christophs gesonderter Installationsfreigabe. Kein READY_FOR_RELEASE vor den belegten GATES.
+
 ## Nächste notwendige tatsächliche Arbeit
 
 Genau EIN SHA-geprüfter Originalquellbaum muss jetzt mit der reparierten DEV93-Datei sowie allen DEV90–DEV98-Quellen über `dev97/stage_native_one_tree.py` mit echten `patch --fuzz=0`-Anwendungen aufgebaut werden. Fehlende Patches dürfen nicht mit höheren Fuzz-Werten übergangen werden. Danach Original PHP+PDO SQLite/WebAuthn/HTTP/MCP, bisherige READ-Kontinuität, separate write consent, Refresh, private Backups, MANIFEST/Genome/Updater/Guardian/Rollback prüfen und EIN vollständiges Paket erstellen. Keine isolierten Zwischeninstallationen, keine Live-Datenbankänderungen ohne gesonderte Freigabe. Nach EINER genehmigten Gesamtinstallation GENAU EIN gezielter neuer Chat-/iPhone-OAuth-Test; scheitert er, keine weiteren automatischen Auth-Reparaturen, stattdessen gemeinsame Belegprüfung KiCom vs. ChatGPT.
