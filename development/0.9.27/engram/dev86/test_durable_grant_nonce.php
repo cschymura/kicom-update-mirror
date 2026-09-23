@@ -65,6 +65,7 @@ $q=$db->prepare('SELECT source_kind,source_ref FROM engram_revisions WHERE subje
 $q->execute([$oauth['owner'],$oauth['namespace'],$a['id']]);
 $storedProvenance=$q->fetch(PDO::FETCH_ASSOC);
 check86($storedProvenance===['source_kind'=>'synthetic_test','source_ref'=>'dev-test:synthetic-001'],'canonical revision persists only the server-verified test provenance');
+$q->closeCursor(); unset($q); // Release fixture read lock before second independent PDO writer.
 $spoof=grant86($grants,$oauth,'engram_write','nonce-0006',$now);
 denied86(fn()=>call86($first,$oauth,'engram_write',$spoof,'idem-0007',
  ['body'=>'x','source_kind'=>'explicit_user','source_ref'=>'consent:'.str_repeat('a',64)],$now),
