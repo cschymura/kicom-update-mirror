@@ -28,4 +28,6 @@ jobs:
           php -l development/0.9.27/engram/dev95/KiComEngramActiveSchemaUpgrade.php
           php -l development/0.9.27/engram/dev95/KiComEngramActiveUpgradeAdminHttp.php
           php -l development/0.9.27/engram/dev95/test_active_schema_upgrade.php
+          php -l development/0.9.27/engram/dev95/test_admin_http_guards.php
           php development/0.9.27/engram/dev95/test_active_schema_upgrade.php
+          php development/0.9.27/engram/dev95/test_admin_http_guards.php
