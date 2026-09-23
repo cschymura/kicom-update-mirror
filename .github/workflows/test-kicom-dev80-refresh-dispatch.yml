@@ -1,0 +1,23 @@
+name: KiCom DEV80 OAuth refresh dispatch contract
+on:
+  push:
+    branches:
+      - work/kicom-engram-dev79-token-grant-form
+    paths:
+      - 'development/0.9.27/engram/dev79/**'
+      - 'development/0.9.27/engram/dev80/**'
+      - '.github/workflows/test-kicom-dev80-refresh-dispatch.yml'
+  workflow_dispatch:
+
+jobs:
+  synthetic-refresh-dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax and strict HTTP token grant dispatch
+        run: |
+          php -l development/0.9.27/engram/dev79/KiComEngramOAuthGrantForm.php
+          php -l development/0.9.27/engram/dev80/KiComEngramOAuthRefreshDispatch.php
+          php -l development/0.9.27/engram/dev80/test_refresh_dispatch.php
+          php development/0.9.27/engram/dev79/test_oauth_grant_form.php
+          php development/0.9.27/engram/dev80/test_refresh_dispatch.php
