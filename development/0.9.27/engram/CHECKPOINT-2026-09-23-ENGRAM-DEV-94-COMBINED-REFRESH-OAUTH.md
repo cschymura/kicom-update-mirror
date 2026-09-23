@@ -1,0 +1,34 @@
+# Mirage DEV-94 — original-native DEV93 read/write consent + single-use OAuth refresh + first-party ChatGPT language compatibility
+
+Date: 2026-09-23. **DEVELOPMENT SOURCE ONLY. No production installation, no active private SQLite alteration, no final native ZIP, no independently proven ChatGPT-client refresh support.**
+
+## Single-tree consolidation — actual source edited
+
+Exact original parent KiCom 0.9.37 package SHA256 `0c6e02c64d44d603cb229f562d189f1b798bd78c2188fd2907e6b5cbafdb5ea7`. DEV93 original-native combined-scope OAuthTransactions staging SHA256 `d9a0fe9fd66d33f0e2193a1494814929be89834e7e72018b6364a8a4bd33159b`. DEV94 local merged source tree: `/mnt/data/mirage-dev94-integrated/` (conversation working-directory only; availability in future chats must be independently confirmed, and these paths are NOT downloadable package links). The merged exact-original native OAuthTransactions module SHA256 `934af5383972be826068ffaaab9a63172ddeb34beb393fa740c49e7816f6eadc`.
+
+Two historical native branches changed the SAME OAuth exchange implementation: DEV82/83/84 rotating read-refresh, and DEV93 separately consented combined read/write scope with one-to-one bearer-bound consent. **They have NOW been merged in ONE original native OAuthTransactions.php**, rather than applying incompatible historical patches successively in production. The exact-parent DELTA against DEV93 is committed at `dev94/NATIVE-after-DEV93-original-oauth-both-scope-atomic-refresh.patch`; apply ONLY once AFTER the canonical DEV93 native source, and NEVER apply the older conflicting DEV82 exchange patch to this staged tree. The merged first-party OAuth GET and HTTP code/token/discovery deltas are separately committed in `dev94/NATIVE-original-0937-oauth-optional-locale-after-dev93.patch` and `dev94/NATIVE-after-DEV93-oauth-http-refresh-discovery.patch`. Flat native helper modules `dev94/KiComEngramOAuthOptionalParams.php` and `dev94/KiComEngramOAuthGrantForm.php` must be copied into `modules/engram/` in the future SINGLE package.
+
+## Behavioral regression covered
+- Original read-only OAuth code/password/PKCE/Passkey path survives on an unmigrated ACTIVE private database. Existing read scopes are never upgraded and the HTTP token handler cannot initialize a private schema.
+- Strict original first-party OAuth authorization GET now removes ONLY validated optional `ui_locales` (the observed `de-DE` ChatGPT language hint), keeping all required OAuth keys/client/redirect/scope/PKCE checks unchanged and correctly displaying separate read-vs-write consent.
+- Operator-prepared private refresh schema issues an opaque single-use read OR approved combined-scope refresh token **atomically** with code redemption and access issuance. Without schema it returns original access-only response rather than breaking a working login. Malformed existing table fails closed.
+- Rotation validates original client/host/owner/access-row scope and revocation. Combined-scope rotation requires EXACTLY one current, unrevoked, bearer-bound owner/passkey consent and transfers it atomically to the renewed access token. Old combined bearer therefore loses write eligibility; a read refresh can NEVER gain write. Request-supplied optional scope must match the stored original approved scope exactly.
+- Native HTTP token endpoint uses one strict grant parser for code and refresh only after unchanged HTTPS/host/method/content-type/origin checks. Refresh may omit resource only because the stored row pins audience; metadata advertises refresh and/or write only when separately operator-owned runtime flags report ready. No ChatGPT-platform prompt behavior claimed.
+- A previously unobserved **synthetic DEV93 fixture defect**: its `SELECT consent_ref ... LIMIT 1` revoked whichever consent happened to be first, causing intermittent second-chat refresh test failure. The local test fixture was corrected to revoke the specific first access-token-linked consent. The actual DEV93 production source was NOT changed to accommodate a flaky fixture. In refreshed local tests, five consecutive complete suite executions succeeded.
+
+## Actual locally executed checks and limitation
+- **70/70 PHP syntax checks clean** on complete local staged source/test tree; source module count includes original and development-only test files.
+- Standalone DEV78 optional language-hint strict parser: 17/17 pass.
+- Exact-original combined first-party code/consent (DEV93) against real SQLite C library via TEST-ONLY PHP FFI-backed PDO adapter: 22/22 pass.
+- Exact-original OAuth query strict/optional-language and independent combined authorization: 9/9 pass.
+- First and rotated read/combined token, grant replay, host/consent mismatch and revocation: 15/15 pass.
+- Real original OAuthHttp class code/refresh POST and conditional discovery metadata: 14/14 pass.
+- Together: 77 local deterministic assertions (17+22+9+15+14), 0 remaining failures on last run; original 22+15+14 suites repeated FIVE times with clean results.
+- These tests actually execute the staged original PHP OAuthTransactions/OAuthHttp code and real SQLite C engine, but **not native ext-pdo_sqlite**, due to the local PHP environment lacking it. No genuine first-party HTTPS browser/WebAuthn or ChatGPT OAuth network E2E was run. The generated GitHub patch files persist the SOURCE deltas; local full native staging tree is NOT itself a GitHub artifact or installable package.
+
+## Release blockers and next exact step
+1. Implement and verify an explicitly operator-owned, backup-before-DDL first-party ADMIN procedure against the existing ACTIVE OAuth and Engram private SQLite for BOTH combined write consent schema and refresh schema, original write receipt/audit, and private signing key. Do not use original INACTIVE-only DB installer for an active database; no DDL/activation at OAuth/MCP HTTP.
+2. Integrate actual native admin operator controls/owner write-right approval with the DEV93 first-party passkey flow and original `api.php` DEV92 native factory. Confirm real PHP 8.2 ext-pdo_sqlite/HTTP/MCP tests of the FULL staged original code; include current owner/passkey revocation after refresh as well as token-bound consent migration.
+3. Original complete MANIFEST/Genome/updater/backup/recovery/rollback verification, then ONE comprehensive package only; seek Christoph's separate production INSTALLATION approval. ONE targeted new ChatGPT chat/iPhone OAuth test. If it fails, stop automatic auth/security modifications and jointly inspect KiCom-vs-platform path with Christoph. Optional FTS5 default OFF unless independently tested; no private memories/tokens in GitHub.
+
+No manual action from Christoph is needed to continue development now.
