@@ -44,7 +44,7 @@ $oauth->exec('CREATE TABLE mirage_oauth_write_consents(
 consent_ref TEXT PRIMARY KEY,owner TEXT NOT NULL,namespace TEXT NOT NULL,
 client_id TEXT NOT NULL,connector_id TEXT NOT NULL,owner_binding TEXT NOT NULL,
 credential_fingerprint TEXT NOT NULL,source_kind TEXT NOT NULL,
-approved_at INTEGER NOT NULL,revoked_at INTEGER)');
+approved_at INTEGER NOT NULL,revoked_at INTEGER,token_hash TEXT UNIQUE)');
 $now=time();
 $bearer=str_repeat('a',43);$tokenHash=hash('sha256',$bearer);
 $fp=str_repeat('b',64);$binding=hash('sha256',"mirage-owner\0".$fp);
@@ -54,8 +54,8 @@ $ref='consent:'.hash('sha256','synthetic first-party passkey-reviewed grant');
 $oauth->prepare('INSERT INTO mirage_oauth_tokens VALUES(?,?,?,?,?,?,?,?,?,?,0)')
  ->execute([$tokenHash,$client,$connector,$host,$resource,'engram.read engram.write',
   $binding,$fp,$now-10,$now+3600]);
-$oauth->prepare('INSERT INTO mirage_oauth_write_consents VALUES (?,?,?,?,?,?,?,?,?,NULL)')
- ->execute([$ref,'mirage-owner','project',$client,$connector,$binding,$fp,'explicit_user',$now-10]);
+$oauth->prepare('INSERT INTO mirage_oauth_write_consents VALUES (?,?,?,?,?,?,?,?,?,NULL,?)')
+ ->execute([$ref,'mirage-owner','project',$client,$connector,$binding,$fp,'explicit_user',$now-10,$tokenHash]);
 $identity=['authenticated'=>true,'connector_id'=>$connector,'credential_fingerprint'=>$fp,
   'owner_binding'=>$binding,'host_evidence_id'=>$host];
 $approved=['source_kind'=>'explicit_user','source_ref'=>$ref];
