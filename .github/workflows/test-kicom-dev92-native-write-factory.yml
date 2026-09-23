@@ -1,0 +1,42 @@
+name: KiCom DEV92 native write factory integration
+on:
+  push:
+    branches:
+      - work/kicom-engram-dev92-native-write-factory
+    paths:
+      - 'development/0.9.27/engram/dev72/**'
+      - 'development/0.9.27/engram/dev75/**'
+      - 'development/0.9.27/engram/dev76/**'
+      - 'development/0.9.27/engram/dev86/**'
+      - 'development/0.9.27/engram/dev87/**'
+      - 'development/0.9.27/engram/dev88/**'
+      - 'development/0.9.27/engram/dev89/**'
+      - 'development/0.9.27/engram/dev92/**'
+      - '.github/workflows/test-kicom-dev92-native-write-factory.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  existing-private-databases:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite,sqlite3
+          coverage: none
+      - name: Syntax and actual PDO SQLite MCP writer tests
+        run: |
+          set -euo pipefail
+          php -m | grep -i pdo_sqlite
+          php -l development/0.9.27/engram/dev72/KiComEngramWriteGrant.php
+          php -l development/0.9.27/engram/dev92/KiComEngramNativeWriteFactory.php
+          php -l development/0.9.27/engram/dev92/test_native_write_factory.php
+          php development/0.9.27/engram/dev92/test_native_write_factory.php
+          php development/0.9.27/engram/dev89/test_private_consent_reader.php
+          php development/0.9.27/engram/dev88/test_verified_provenance.php
+          php development/0.9.27/engram/dev87/test_explicit_private_schema.php
+          php development/0.9.27/engram/dev76/test_canonical_e2e.php
+          php development/0.9.27/engram/dev86/test_durable_grant_nonce.php
