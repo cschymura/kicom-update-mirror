@@ -1,0 +1,33 @@
+{
+  "run_id": "MIRAGE-20260924T000128+0200-DEV100-RUN",
+  "started_at": "2026-09-24T00:01:28+02:00",
+  "finished_at": "2026-09-24T00:02:48+02:00",
+  "status": "PARTIAL",
+  "stage": "DEV-100 one-tree runtime prerequisite verification and conflict avoidance",
+  "source_versions": {
+    "github_branch": "work/kicom-engram-dev100-one-tree-validation",
+    "github_head_verified": "a933f46562dd8b23742fe8144fe2ba23b72a24ca",
+    "github_dev100_ci": "35925962853 SUCCESS; source-only artifact sha256:00fa8b5f2d358040ccb4a9470e572889d13aeebd33443a5927a3ff909b0995d6",
+    "live_kicom": "0.9.37 documented baseline; BOOTSTRAP/PROJECT_STATE/GENOME_STATUS not independently reachable in this run",
+    "slack": "D0C2D8CKWDD read; retrieved recent history contained no newer reservation conflicting with DEV-100"
+  },
+  "changes": [
+    "Verified a newer DEV-100 branch already exists, so DEV-99 work was not duplicated.",
+    "Verified DEV-100 replaces the truncated historical MCP patch in stage_native_one_tree.py with dev100/NATIVE-exact-original-mcp-optional-write-protocol.patch.",
+    "Downloaded and inspected the DEV-100 source-only CI artifact; confirmed it deliberately contains development sources only, not the original KiCom 0.9.37 ZIP.",
+    "Executed dev97/test_integration_inputs.py successfully against the downloaded DEV-100 artifact (25 integration inputs valid).",
+    "Executed dev99/test_dev93_exchange_diff.py successfully in synthetic-parser mode (8 OAuth hunks; PARENT_TESTED=False).",
+    "Attempted DEV-96 release-gate test; it correctly refused to run without --parent. No old sandbox path or original ZIP was invented."
+  ],
+  "tests_passed": 33,
+  "tests_failed": 0,
+  "commit_sha": null,
+  "checkpoint_url": null,
+  "semantic_search": "No semantic-search change in this run; FTS5 remains optional and default-off pending native release work.",
+  "production_changes": false,
+  "blocker": "This automation runtime does not contain the SHA-verified original KiCom 0.9.37 ZIP (expected sha256 0c6e02c64d44d603cb229f562d189f1b798bd78c2188fd2907e6b5cbafdb5ea7). GitHub DEV-100 CI artifact is intentionally source-only. Therefore the required real stage_native_one_tree.py run, full zero-fuzz patch application, native PHP lint, and DEV-96 release gate cannot honestly be executed here.",
+  "next_step": "In the first runtime that actually contains the original 0.9.37 ZIP, verify its SHA256, use the current DEV-100 branch source, execute dev97/stage_native_one_tree.py once with patch --fuzz=0, diagnose/fix the first real conflict if any, then continue native PDO SQLite/WebAuthn/OAuth/MCP/HTTP and release-integrity work. Do not create or install an intermediate package.",
+  "persistence_status": "PERSISTED",
+  "release_candidate": null,
+  "auth_fix_attempt_status": "TESTED_LOCAL"
+}
