@@ -40,7 +40,7 @@ final class KiComEngramPrivateWriteConsentReader
                        c.owner_binding,c.credential_fingerprint,c.source_kind,c.approved_at
                   FROM mirage_oauth_write_consents c
                   INNER JOIN mirage_oauth_tokens t
-                    ON t.client_id=c.client_id
+                    ON t.token_hash=c.token_hash AND t.client_id=c.client_id
                    AND t.connector_id=c.connector_id
                    AND t.owner_binding=c.owner_binding
                    AND t.credential_fingerprint=c.credential_fingerprint
