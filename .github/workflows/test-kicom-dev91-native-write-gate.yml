@@ -1,0 +1,29 @@
+name: KiCom DEV91 native MCP write permission gate
+on:
+  push:
+    branches:
+      - work/kicom-engram-dev91-native-scope-separation
+    paths:
+      - 'development/0.9.27/engram/dev91/**'
+      - '.github/workflows/test-kicom-dev91-native-write-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  private-owner-write-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_sqlite,sqlite3
+          coverage: none
+      - name: Validate actual PDO SQLite write-authority joins and denials
+        run: |
+          set -euo pipefail
+          php -m | grep -i pdo_sqlite
+          php -l development/0.9.27/engram/dev91/KiComEngramNativeMcpWriteGate.php
+          php -l development/0.9.27/engram/dev91/test_native_mcp_write_gate.php
+          php development/0.9.27/engram/dev91/test_native_mcp_write_gate.php
