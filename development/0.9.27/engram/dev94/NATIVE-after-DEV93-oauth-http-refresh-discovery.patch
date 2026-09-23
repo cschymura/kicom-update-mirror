@@ -57,7 +57,7 @@
              return self::json(200,$token);
          }catch(Throwable){
              // Never leak whether a code, client, PKCE, private path or
-@@ -142,29 +154,6 @@
+@@ -142,28 +154,5 @@
          }
      }
  
