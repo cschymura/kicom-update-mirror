@@ -2,6 +2,8 @@
 declare(strict_types=1);
 require_once __DIR__.'/KiComEngramActiveSchemaUpgrade.php';
 require_once __DIR__.'/KiComEngramPrivateOwnerRegistry.php';
+require_once __DIR__.'/KiComEngramOAuthTransactions.php';
+require_once __DIR__.'/KiComEngramMutationSchema.php';
 
 /**
  * DEV-95: Original admin-session + CSRF + FRESH KiCom WebAuthn owner assertion
