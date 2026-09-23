@@ -1,0 +1,28 @@
+{
+  "run_id": "MIRAGE-20260923T050244+0200-DEV75",
+  "started_at": "2026-09-23T05:02:44+02:00",
+  "finished_at": "2026-09-23T05:04:03+02:00",
+  "status": "SUCCESS",
+  "stage": "DEV-75 canonical revision-schema mutation adapter",
+  "source_versions": {
+    "github_branch": "work/kicom-engram-dev70-mutation-core",
+    "github_prechange_head": "fa9999e796ddc0604119456039147a115a0d8c77",
+    "github_tested_sha": "9d2b82794d5b98f23ffb04872ed76d01be785e28",
+    "live_kicom": "0.9.37 operator-documented baseline; BOOTSTRAP/PROJECT_STATE host inaccessible to available web path in this run",
+    "slack": "D0C2D8CKWDD read; no newer conflicting reservation in retrieved messages"
+  },
+  "changes": [
+    "Added canonical engram_revisions mutation adapter instead of DEV-73 temporary tables",
+    "Added append-only write/update/archive with canonical withdrawn state, owner/namespace isolation, revision/hash concurrency, idempotency receipts and audit",
+    "Added incompatible-schema fail-closed check and dedicated synthetic CI"
+  ],
+  "tests_passed": 13,
+  "tests_failed": 0,
+  "commit_sha": "9d2b82794d5b98f23ffb04872ed76d01be785e28",
+  "checkpoint_url": "https://github.com/cschymura/kicom-update-mirror/blob/work/kicom-engram-dev70-mutation-core/development/0.9.27/engram/CHECKPOINT-2026-09-23-ENGRAM-DEV-75-MIRAGE-CANONICAL-SCHEMA.md",
+  "semantic_search": "DEV-71 FTS5 lexical baseline remains verified, disabled and unchanged; no local embedding/vector capability newly verified.",
+  "production_changes": false,
+  "blocker": null,
+  "next_step": "Compose DEV-74 OAuth/MCP controller and DEV-72 signed write grant with the canonical DEV-75 adapter in a synthetic E2E fixture, keeping engram.read denied and production untouched.",
+  "persistence_status": "PERSISTED"
+}
