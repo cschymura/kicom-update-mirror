@@ -154,13 +154,13 @@
              $q=$db->prepare('UPDATE mirage_oauth_codes SET consumed=1
                  WHERE code_hash=? AND consumed=2');$q->execute([hash('sha256',$p['code'])]);
              if($q->rowCount()!==1)self::denied();
-@@ -256,10 +345,16 @@
+@@ -256,9 +345,16 @@
                  VALUES(?,?,?,?,?,?,?,?,?,?)');
              $q->execute([hash('sha256',$token),$r['client_id'],
                  $r['connector_id'],$r['host_evidence_id'],self::RESOURCE,
 -                self::SCOPE,$r['owner_binding'],$r['approved_fingerprint'],$now,$now+3600]);
 +                $requested,$r['owner_binding'],$r['approved_fingerprint'],$now,$now+3600]);
-            if($requested===self::COMBINED_SCOPE) {
++            if($requested===self::COMBINED_SCOPE) {
 +                $q=$db->prepare('UPDATE mirage_oauth_write_consents
 +                    SET token_hash=? WHERE consent_ref=? AND token_hash IS NULL
 +                    AND revoked_at IS NULL');
