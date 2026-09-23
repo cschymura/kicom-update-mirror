@@ -7,6 +7,12 @@ $db->exec("CREATE TABLE engram_revisions(subject TEXT,namespace TEXT,id TEXT,rev
 KiComEngramMutationSchema::prepareNew($db);
 $secret=str_repeat('s',48);$wg=new KiComEngramWriteGrant($secret);$adapter=new KiComEngramRevisionAdapter($db);$svc=new KiComEngramCanonicalMutationService($wg,$adapter);$ctl=new KiComEngramCanonicalMcpMutationController($svc);
 $now=1790129000;$oauth=['authenticated'=>true,'owner'=>'owner-0001','namespace'=>'project-01','connector_id'=>'connector-01','token_fingerprint'=>'fingerprint-01','scopes'=>['engram.write']];
+$oauth['synthetic_environment']=true;
+$oauth['server_provenance']=[
+ 'source_kind'=>'synthetic_test','source_ref'=>'dev-test:synthetic-001',
+ 'verified'=>true,'owner'=>$oauth['owner'],'namespace'=>$oauth['namespace'],
+ 'token_fingerprint'=>$oauth['token_fingerprint']
+];
 function grant($wg,$oauth,$ops,$nonce,$now){return $wg->issueSynthetic(['v'=>1,'grant_id'=>'grant-'.$nonce,'owner'=>$oauth['owner'],'namespace'=>$oauth['namespace'],'connector_id'=>$oauth['connector_id'],'token_fingerprint'=>$oauth['token_fingerprint'],'operations'=>$ops,'nonce'=>$nonce,'iat'=>$now-1,'exp'=>$now+60]);}
 $g=grant($wg,$oauth,['engram_write'],'nonce-0001',$now);$w=$ctl->handle($oauth,['tool'=>'engram_write','write_grant'=>$g,'idempotency_key'=>'idem-0001','input'=>['body'=>'synthetic canonical memory']],$now);ok($w['revision']===1&&$w['state']==='active','write through OAuth/MCP/grant/canonical SQLite');
 deny(fn()=>$ctl->handle(array_merge($oauth,['scopes'=>['engram.read']]),['tool'=>'engram_write','write_grant'=>grant($wg,$oauth,['engram_write'],'nonce-0002',$now),'idempotency_key'=>'idem-0002','input'=>['body'=>'x']],$now),'read token cannot write');
