@@ -38,6 +38,12 @@ $oauth=[
  'scopes'=>['engram.write']
 ];
 $now=1790129000;
+$oauth['synthetic_environment']=true;
+$oauth['server_provenance']=[
+ 'source_kind'=>'synthetic_test','source_ref'=>'dev-test:synthetic-001',
+ 'verified'=>true,'owner'=>$oauth['owner'],'namespace'=>$oauth['namespace'],
+ 'token_fingerprint'=>$oauth['token_fingerprint']
+];
 function grant86(KiComEngramWriteGrant $g,array $o,string $op,string $nonce,int $now):string {
   return $g->issueSynthetic([
     'v'=>1,'grant_id'=>'grant-'.$nonce,'owner'=>$o['owner'],'namespace'=>$o['namespace'],
