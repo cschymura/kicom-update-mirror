@@ -1,0 +1,24 @@
+# DEV-78: STRICT, read-preserving OAuth ui_locales compatibility patch
+# Apply to the full native release ONLY after merging DEV-77 and DEV-76.
+# Parent: EXACT KiCom 0.9.37 archive. Do not deploy this development patch as a partial server edit.
+
+*** modules/engram/KiComEngramOAuthAuthorizeHttp.php
+@@ first-party require_once imports
++ require_once __DIR__.'/KiComEngramOAuthOptionalParams.php';
+@@ GET handler; ONLY in the branch that starts a NEW authorization request
+-                    $p=$query;
++                    $p=KiComEngramOAuthOptionalParams::authorizationQuery($query);
+                     if (($p['engram_oauth']??null)!=='1')return self::empty404();
+                     unset($p['engram_oauth']);
+                     $created=KiComEngramOAuthTransactions::begin(
+                         $privateOAuthDb,$p,$pinnedClient,$originalSessionId,$now
+                     );
+
+*** NEW modules/engram/KiComEngramOAuthOptionalParams.php
+# Copy exact file from development/0.9.27/engram/dev78/KiComEngramOAuthOptionalParams.php
+
+# IMPORTANT: The original admin session, consent and passkey, approved OAuth client,
+# PKCE, state, scopes, exact callback and resource verification are UNCHANGED.
+# Do not remove unknown query keys. Only 'ui_locales' is filtered when valid.
+# This does NOT fix or bypass platform-owned authorization prompts.
+# No installer/package, auth refresh integration or platform E2E test is claimed here.
