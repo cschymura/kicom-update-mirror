@@ -15,12 +15,12 @@ connector_id TEXT,host_evidence_id TEXT,resource TEXT,scope TEXT,owner_binding T
 credential_fingerprint TEXT,issued_at INTEGER,expires_at INTEGER,revoked INTEGER)');
 $db->exec('CREATE TABLE mirage_oauth_write_consents(consent_ref TEXT PRIMARY KEY,owner TEXT,
 namespace TEXT,client_id TEXT,connector_id TEXT,owner_binding TEXT,credential_fingerprint TEXT,
-source_kind TEXT,approved_at INTEGER,revoked_at INTEGER)');
+source_kind TEXT,approved_at INTEGER,revoked_at INTEGER,token_hash TEXT UNIQUE)');
 $db->prepare('INSERT INTO mirage_oauth_tokens VALUES (?,?,?,?,?,?,?,?,?,?,?)')
 ->execute([hash('sha256',$bearer),$client,$connector,$host,$resource,
 'engram.read engram.write',$binding,$fp,$now-1,$now+3600,0]);
-$db->prepare('INSERT INTO mirage_oauth_write_consents VALUES (?,?,?,?,?,?,?,?,?,NULL)')
-->execute([$ref,$owner,'project',$client,$connector,$binding,$fp,'explicit_user',$now-1]);
+$db->prepare('INSERT INTO mirage_oauth_write_consents VALUES (?,?,?,?,?,?,?,?,?,NULL,?)')
+->execute([$ref,$owner,'project',$client,$connector,$binding,$fp,'explicit_user',$now-1,hash('sha256',$bearer)]);
 $identity=['authenticated'=>true,'connector_id'=>$connector,
 'credential_fingerprint'=>$fp,'owner_binding'=>$binding,'host_evidence_id'=>$host];
 $approved=['enabled'=>true,'subject'=>$owner,'credential_fingerprint'=>$fp,
