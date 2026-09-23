@@ -132,4 +132,35 @@ yes95(count(glob($backup.'/dev95-*.sqlite')?:[])===4,'repeat preserves previous 
 $bad=$runtime;$bad['enabled']=false;
 no95(fn()=>KiComEngramActiveSchemaUpgrade::applyAfterVerifiedPasskey($web,$bad),'inactive/spoofed runtime denied');
 yes95((new PDO('sqlite:'.$data.'/engrams.sqlite'))->query('PRAGMA quick_check')->fetchColumn()==='ok','SQLite integrity after repeat');
+// SAME column names are not enough: corrupted preexisting tables MUST retain
+// both original single-use refresh and bearer-bound consent UNIQUE constraints.
+$o=new PDO('sqlite:'.$data.'/mirage-oauth.sqlite',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
+$o->exec('DROP TABLE mirage_oauth_refresh_tokens');
+$o->exec('CREATE TABLE mirage_oauth_refresh_tokens(
+ refresh_hash TEXT PRIMARY KEY,client_id TEXT NOT NULL,connector_id TEXT NOT NULL,
+ host_evidence_id TEXT NOT NULL,resource TEXT NOT NULL,scope TEXT NOT NULL,
+ owner_binding TEXT NOT NULL,credential_fingerprint TEXT NOT NULL,
+ issued_at INTEGER NOT NULL,expires_at INTEGER NOT NULL,
+ consumed INTEGER NOT NULL DEFAULT 0,revoked INTEGER NOT NULL DEFAULT 0,
+ parent_access_hash TEXT NOT NULL)');
+$o=null;
+no95(fn()=>KiComEngramActiveSchemaUpgrade::applyAfterVerifiedPasskey($web,$runtime),
+ 'existing refresh table with identical columns but MISSING parent-access uniqueness rejected');
+$o=new PDO('sqlite:'.$data.'/mirage-oauth.sqlite',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
+$o->exec('DROP TABLE mirage_oauth_refresh_tokens');
+KiComEngramOAuthTransactions::prepareRefreshSchema($o);
+$o->exec('DROP TABLE mirage_oauth_write_consents');
+$o->exec('CREATE TABLE mirage_oauth_write_consents(
+ consent_ref TEXT PRIMARY KEY,owner TEXT NOT NULL,namespace TEXT NOT NULL,
+ client_id TEXT NOT NULL,connector_id TEXT NOT NULL,owner_binding TEXT NOT NULL,
+ credential_fingerprint TEXT NOT NULL,source_kind TEXT NOT NULL,
+ approved_at INTEGER NOT NULL,revoked_at INTEGER,token_hash TEXT)');
+$o=null;
+no95(fn()=>KiComEngramActiveSchemaUpgrade::applyAfterVerifiedPasskey($web,$runtime),
+ 'existing consent table with identical columns but MISSING bearer uniqueness rejected');
+$o=new PDO('sqlite:'.$data.'/mirage-oauth.sqlite');
+yes95($o->query("SELECT scope FROM mirage_oauth_tokens WHERE token_hash='old-read-1'")->fetchColumn()==='engram.read',
+ 'rejected malformed additions do not rewrite original read token');
+yes95(file_get_contents($key)===$stableKey,'rejected malformed additions do not rotate original signing key');
+$o=null;
 echo "DEV95_ACTIVE_SCHEMA_ASSERTIONS=$n\n";
