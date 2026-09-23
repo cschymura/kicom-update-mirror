@@ -1,0 +1,50 @@
+--- a/modules/engram/KiComEngramOAuthMcpHostBridge.php
++++ b/modules/engram/KiComEngramOAuthMcpHostBridge.php
+@@ -4,6 +4,7 @@
+ require_once __DIR__.'/KiComEngramOAuthHttp.php';
+ require_once __DIR__.'/KiComEngramMcpProtocol.php';
+ require_once __DIR__.'/KiComEngramPrivateOwnerRegistry.php';
++require_once __DIR__.'/KiComEngramNativeMcpWriteGate.php';
+ 
+ /**
+@@ -42,7 +43,8 @@
+         string $body,
+         array $trustedRuntime,
+         string $trustedWebRoot,
+-        int $now
++        int $now,
++        ?callable $firstPartyWriteFactory = null
+     ): array {
+@@ -100,6 +102,27 @@
+             $identity=$token!==null
+                 ? KiComEngramOAuthTransactions::verify($oauthDb,$token,$now)
+                 : null;
++            $trustedWriteDispatch=null;
++            if($identity===null && $token!==null && $firstPartyWriteFactory!==null) {
++                // Read-only bearer NEVER acquires write; the actual original
++                // owner/passkey approval is checked again for every request.
++                $combined=KiComEngramOAuthTransactions::verifyCombinedScope(
++                    $oauthDb,$token,$now
++                );
++                if($combined!==null) {
++                    $approved=KiComEngramNativeMcpWriteGate::approved(
++                        $oauthDb,$token,$combined,$owners,$now
++                    );
++                    if($approved!==null) {
++                        $dispatch=$firstPartyWriteFactory(
++                            $oauthDb,$token,$combined,$approved,$now
++                        );
++                        if(!is_callable($dispatch))return $deny();
++                        $identity=$combined;
++                        $trustedWriteDispatch=$dispatch;
++                    }
++                }
++            }
+             if($identity===null) {
+@@ -115,7 +138,8 @@
+             };
+             $result=KiComEngramMcpProtocol::handle(
+-                $body,$trustedRuntime,$activation,$owners,$identity,$now,$factory
++                $body,$trustedRuntime,$activation,$owners,$identity,$now,$factory,
++                $trustedWriteDispatch
+             );
