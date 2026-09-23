@@ -1,6 +1,6 @@
 --- a/admin.php
 +++ b/admin.php
-@@ -87,4 +87,53 @@
+@@ -87,6 +87,55 @@
      exit;
  }
  
@@ -54,3 +54,5 @@
 +}
 +
  /* Mirage DEV-64: explicit separate ORIGINAL KiCom admin/Passkey owner approval.
+  * Unlike accepting the hosting model, this is the ONLY action which can
+  * activate the existing private SQLite state and OAuth/MCP read-only route.
