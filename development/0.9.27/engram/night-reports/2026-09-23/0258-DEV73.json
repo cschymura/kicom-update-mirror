@@ -1,0 +1,28 @@
+{
+  "run_id": "MIRAGE-20260923T025838+0200-DEV73",
+  "started_at": "2026-09-23T02:58:38+02:00",
+  "finished_at": "2026-09-23T03:01:24+02:00",
+  "status": "SUCCESS",
+  "stage": "DEV-73 signed write-grant to SQLite mutation integration",
+  "source_versions": {
+    "github_branch": "work/kicom-engram-dev70-mutation-core",
+    "github_prechange_head": "94a22ab1d811d7def984e964de3615a2660718f2",
+    "github_tested_sha": "9c2678fa72e6d74ea3721929f6b700dde0fec410",
+    "live_kicom": "0.9.37 (operator-documented baseline; not re-proved in this run)",
+    "independent_mcp_read": "previously proven authenticated synthetic read; not re-proved in this run"
+  },
+  "changes": [
+    "Integrated DEV-72 signed write grants with isolated SQLite write/update/archive transactions",
+    "Added revision/hash concurrency, request idempotency, grant-nonce replay denial, append-only archive and sanitized audit",
+    "Diagnosed and fixed explicit BEGIN IMMEDIATE rollback handling after first CI failure"
+  ],
+  "tests_passed": 15,
+  "tests_failed": 0,
+  "commit_sha": "9c2678fa72e6d74ea3721929f6b700dde0fec410",
+  "checkpoint_url": "https://github.com/cschymura/kicom-update-mirror/blob/work/kicom-engram-dev70-mutation-core/development/0.9.27/engram/CHECKPOINT-2026-09-23-ENGRAM-DEV-73-MIRAGE-MUTATION-INTEGRATION.md",
+  "semantic_search": "DEV-71 FTS5 lexical baseline remains verified, optional and disabled; no local embedding/vector capability has been verified or enabled.",
+  "production_changes": false,
+  "blocker": null,
+  "next_step": "Bind write/update/archive through the existing synthetic OAuth/MCP controller fixture using separate write consent/scope, then test actual private-schema migration compatibility without production activation.",
+  "persistence_status": "PERSISTED"
+}
