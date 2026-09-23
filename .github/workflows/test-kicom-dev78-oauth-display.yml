@@ -1,0 +1,21 @@
+name: KiCom DEV78 OAuth display-hint regression
+on:
+  push:
+    branches:
+      - work/kicom-engram-dev78-consolidated
+    paths:
+      - 'development/0.9.27/engram/dev78/**'
+      - '.github/workflows/test-kicom-dev78-oauth-display.yml'
+  workflow_dispatch:
+
+jobs:
+  test-oauth-optional:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax and deterministic security regression
+        run: |
+          php -v
+          php -l development/0.9.27/engram/dev78/KiComEngramOAuthOptionalParams.php
+          php -l development/0.9.27/engram/dev78/test-oauth-optional-params.php
+          php development/0.9.27/engram/dev78/test-oauth-optional-params.php
