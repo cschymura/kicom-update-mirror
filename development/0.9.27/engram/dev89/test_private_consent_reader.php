@@ -40,9 +40,9 @@ $db->exec('CREATE TABLE mirage_oauth_write_consents(
  consent_ref TEXT PRIMARY KEY,owner TEXT NOT NULL,namespace TEXT NOT NULL,
  client_id TEXT NOT NULL,connector_id TEXT NOT NULL,
  owner_binding TEXT NOT NULL,credential_fingerprint TEXT NOT NULL,
- source_kind TEXT NOT NULL,approved_at INTEGER NOT NULL,revoked_at INTEGER)');
-$q=$db->prepare('INSERT INTO mirage_oauth_write_consents VALUES (?,?,?,?,?,?,?,?,?,NULL)');
-$q->execute([$ref,$owner,$ns,$client,$connector,$ownerBinding,$credential,'approved_summary',$now-100]);
+ source_kind TEXT NOT NULL,approved_at INTEGER NOT NULL,revoked_at INTEGER,token_hash TEXT UNIQUE)');
+$q=$db->prepare('INSERT INTO mirage_oauth_write_consents VALUES (?,?,?,?,?,?,?,?,?,NULL,?)');
+$q->execute([$ref,$owner,$ns,$client,$connector,$ownerBinding,$credential,'approved_summary',$now-100,$tokenHash]);
 $q=$db->prepare('INSERT INTO mirage_oauth_tokens
 (token_hash,client_id,connector_id,host_evidence_id,resource,scope,
  owner_binding,credential_fingerprint,issued_at,expires_at,revoked)
