@@ -1,0 +1,20 @@
+name: KiCom DEV79 OAuth grant form regression
+on:
+  push:
+    branches:
+      - work/kicom-engram-dev79-token-grant-form
+    paths:
+      - 'development/0.9.27/engram/dev79/**'
+      - '.github/workflows/test-kicom-dev79-oauth-grant-form.yml'
+  workflow_dispatch:
+
+jobs:
+  token-form-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax and 29 negative-positive form checks
+        run: |
+          php -l development/0.9.27/engram/dev79/KiComEngramOAuthGrantForm.php
+          php -l development/0.9.27/engram/dev79/test_oauth_grant_form.php
+          php development/0.9.27/engram/dev79/test_oauth_grant_form.php
