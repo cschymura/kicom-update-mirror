@@ -64,7 +64,10 @@ final class KiComEngramWriteGrant
         $actual=array_keys($c); sort($actual); $expected=$keys; sort($expected);
         if ($actual !== $expected || $c['v'] !== 1) throw new InvalidArgumentException('invalid grant shape');
         foreach (['grant_id','owner','namespace','connector_id','token_fingerprint','nonce'] as $k) {
-            if (!is_string($c[$k]) || !preg_match('/\A[a-zA-Z0-9._:-]{8,128}\z/D',$c[$k])) throw new InvalidArgumentException('invalid '.$k);
+            $valid=($k==='owner'||$k==='namespace')
+                ? is_string($c[$k])&&preg_match('/\\A[a-z0-9][a-z0-9._:-]{0,63}\\z/D',$c[$k])===1
+                : is_string($c[$k])&&preg_match('/\\A[a-zA-Z0-9._:-]{8,128}\\z/D',$c[$k])===1;
+            if(!$valid)throw new InvalidArgumentException('invalid '.$k);
         }
         if (!is_array($c['operations']) || $c['operations'] === []) throw new InvalidArgumentException('operations required');
         foreach ($c['operations'] as $op) if (!in_array($op,['engram_write','engram_update','engram_archive'],true)) throw new InvalidArgumentException('invalid operation');
