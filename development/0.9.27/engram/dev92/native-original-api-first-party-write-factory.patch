@@ -1,6 +1,6 @@
 --- a/api.php
 +++ b/api.php
-@@ -84,13 +84,38 @@
+@@ -84,9 +84,36 @@
              || ($runtime['oauth_enabled']??null)!==true)
              throw new RuntimeException('MCP_UNAVAILABLE');
          require_once __DIR__.'/modules/engram/KiComEngramOAuthMcpHostBridge.php';
