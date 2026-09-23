@@ -1,0 +1,135 @@
+--- a/modules/engram/KiComEngramMcpProtocol.php
++++ b/modules/engram/KiComEngramMcpProtocol.php
+@@ -33,7 +33,8 @@
+         callable $lookupOwner,
+         array $verifiedConnector,
+         int $now,
+-        callable $adapterFactory
++        callable $adapterFactory,
++        ?callable $trustedWriteDispatch = null
+     ): array {
+         // Inactive or unauthenticated clients may not enumerate tools,
+         // initialize a session, or learn whether a memory database exists.
+@@ -94,14 +95,15 @@
+                     'protocolVersion'=>self::VERSION,
+                     'capabilities'=>['tools'=>['listChanged'=>false]],
+                     'serverInfo'=>['name'=>'mirage-engram','version'=>'0.1.0'],
+-                    'instructions'=>'Only authorized, bounded, read-only retrieval.',
++                    'instructions'=>$trustedWriteDispatch===null
++                        ? 'Only authorized, bounded, read-only retrieval.'
++                        : 'Authorized retrieval and separately approved private memory mutations.',
+                 ]);
+             }
+             if ($method==='ping' && $params===[]) return self::success($id,[]);
+             if ($method==='tools/list') {
+                 if ($params!==[]) return self::fault(-32602,'Invalid params',$id);
+-                return self::success($id,[
+-                    'tools'=>[[
++                $tools=[[
+                         'name'=>'engram_search',
+                         'title'=>'Private Engram-Erinnerungen suchen',
+                         'description'=>'Read-only search of up to three owner-authorized project memories from the private KiCom store. Does not create, update, archive or send records to other systems.',
+@@ -120,19 +122,100 @@
+                             'required'=>['query'],
+                             'additionalProperties'=>false,
+                         ],
+-                    ]],
+-                ]);
++                    ]];
++                if ($trustedWriteDispatch!==null) {
++                    // ONLY the authenticated first-party host may inject this
++                    // capability after separately checking current WRITE token,
++                    // private consent, passkey owner and host revocation.
++                    foreach(['engram_write','engram_update','engram_archive'] as $op) {
++                        $properties=[
++                            'idempotency_key'=>['type'=>'string','minLength'=>8,'maxLength'=>128],
++                            'input'=>['type'=>'object'],
++                        ];
++                        $tools[]=[
++                            'name'=>$op,
++                            'title'=>$op,
++                            'description'=>'Owner-bound, separately authorized private memory mutation.',
++                            'annotations'=>[
++                                'title'=>$op,'readOnlyHint'=>false,
++                                'destructiveHint'=>false,'openWorldHint'=>false,
++                            ],
++                            'inputSchema'=>[
++                                'type'=>'object','properties'=>$properties,
++                                'required'=>['idempotency_key','input'],
++                                'additionalProperties'=>false,
++                            ],
++                        ];
++                    }
++                }
++                return self::success($id,['tools'=>$tools]);
+             }
+             if ($method!=='tools/call') {
+                 return self::fault(-32601,'Method not found',$id);
+             }
+             if (!self::keys($params,['name','arguments'])
+-                || $params['name']!=='engram_search'
++                || !is_string($params['name'])
+                 || !is_array($params['arguments'])
+                 || array_is_list($params['arguments'])) {
+                 return self::fault(-32602,'Invalid params: tools/call envelope',$id);
+             }
+             $args=$params['arguments'];
++            if (in_array($params['name'],['engram_write','engram_update','engram_archive'],true)) {
++                // This callable is NEVER taken from JSON-RPC params or bearer
++                // claims. With the original KiCom 0.9.37 host wrapper it is
++                // absent, so all mutations remain unavailable and unlisted.
++                if ($trustedWriteDispatch===null) {
++                    return self::fault(-32601,'Method not found',$id);
++                }
++                if (!self::keys($args,['idempotency_key','input'])
++                    || !is_string($args['idempotency_key'])
++                    || !preg_match('/\A[a-zA-Z0-9._:-]{8,128}\z/D',$args['idempotency_key'])
++                    || !is_array($args['input']) || array_is_list($args['input'])) {
++                    return self::fault(-32602,'Invalid params: mutation arguments',$id);
++                }
++                $input=$args['input'];
++                if ($params['name']==='engram_write') {
++                    if (!self::keys($input,['body']) || !is_string($input['body'])
++                        || $input['body']==='' || strlen($input['body'])>4096)
++                        return self::fault(-32602,'Invalid params: write body',$id);
++                } else {
++                    if (!self::keys($input,['id','expected_revision','expected_hash'],
++                        $params['name']==='engram_update'?['body']:[])
++                        || !is_string($input['id'])
++                        || !preg_match('/\A[a-f0-9]{32}\z/D',$input['id'])
++                        || !is_int($input['expected_revision'])
++                        || $input['expected_revision']<1
++                        || !is_string($input['expected_hash'])
++                        || !preg_match('/\A[a-f0-9]{64}\z/D',$input['expected_hash'])
++                        || ($params['name']==='engram_update'
++                            && (!is_string($input['body']??null) || $input['body']===''
++                                || strlen($input['body'])>4096)))
++                        return self::fault(-32602,'Invalid params: revision mutation',$id);
++                }
++                try {
++                    $result=$trustedWriteDispatch(
++                        $params['name'],$input,$args['idempotency_key'],$now
++                    );
++                    if (!is_array($result)
++                        || !self::keys($result,['id','revision','revision_hash','state'])
++                        || !is_string($result['id']) || !is_int($result['revision'])
++                        || !is_string($result['revision_hash'])
++                        || !in_array($result['state'],['active','withdrawn'],true))
++                        throw new RuntimeException('INVALID_TRUSTED_MUTATION_RESULT');
++                    return self::success($id,[
++                        'content'=>[['type'=>'text','text'=>json_encode(
++                            $result,JSON_THROW_ON_ERROR)]],
++                        'isError'=>false,
++                    ]);
++                } catch(Throwable) {
++                    // No internal database, approval or owner data disclosed.
++                    return self::success($id,[
++                        'content'=>[['type'=>'text','text'=>'Engram mutation unavailable']],
++                        'isError'=>true,
++                    ]);
++                }
++            }
++            if ($params['name']!=='engram_search')return self::fault(-32601,'Method not found',$id);
+             if (!self::keys($args,['query'],['limit'])
+                 || !is_string($args['query'])
+                 || $args['query']==='' || strlen($args['query'])>128
