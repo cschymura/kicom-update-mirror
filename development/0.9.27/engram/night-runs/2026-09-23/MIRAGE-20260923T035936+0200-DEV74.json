@@ -1,0 +1,29 @@
+{
+  "run_id": "MIRAGE-20260923T035936+0200-DEV74",
+  "started_at": "2026-09-23T03:59:36+02:00",
+  "finished_at": "2026-09-23T04:01:45+02:00",
+  "status": "SUCCESS",
+  "stage": "DEV-74 MCP/OAuth mutation controller to private SQLite",
+  "source_versions": {
+    "github_branch": "work/kicom-engram-dev70-mutation-core",
+    "github_prechange_head": "70897ca2fd246af8a34ed58f2c07f6e5a31db1e8",
+    "github_tested_sha": "18a8ca786c8c3f62a4d354088f31663a8059eca5",
+    "live_kicom": "0.9.37 documented baseline; not newly re-proved or changed in DEV-74",
+    "slack": "D0C2D8CKWDD read; no newer conflicting Engram reservation found in retrieved messages"
+  },
+  "changes": [
+    "Added MCP mutation controller requiring authenticated server-side OAuth context and explicit engram.write scope",
+    "Rejected MCP-supplied owner/namespace/OAuth/scope identity claims",
+    "Bound engram_write/update/archive to DEV-73 signed-grant SQLite mutation service",
+    "Added dedicated synthetic positive/negative CI and checkpoint"
+  ],
+  "tests_passed": 12,
+  "tests_failed": 0,
+  "commit_sha": "18a8ca786c8c3f62a4d354088f31663a8059eca5",
+  "checkpoint_url": "https://github.com/cschymura/kicom-update-mirror/blob/work/kicom-engram-dev70-mutation-core/development/0.9.27/engram/CHECKPOINT-2026-09-23-ENGRAM-DEV-74-MIRAGE-MCP-MUTATION.md",
+  "semantic_search": "DEV-71 FTS5 lexical baseline remains verified, disabled and unchanged; no vector/embedding capability newly verified or enabled.",
+  "production_changes": false,
+  "blocker": null,
+  "next_step": "Compare DEV-73 mutation schema/controller contract with the actual private Engram schema/migration source for current 0.9.37 and implement a synthetic backwards-compatible migration/adapter test without live migration or OAuth scope changes.",
+  "persistence_status": "PERSISTED"
+}
