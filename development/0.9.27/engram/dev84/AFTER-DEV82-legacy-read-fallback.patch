@@ -1,0 +1,44 @@
+--- a/modules/engram/KiComEngramOAuthTransactions.php
++++ b/modules/engram/KiComEngramOAuthTransactions.php
+@@ -278,8 +278,16 @@
+             $q->execute([$accessHash,$r['client_id'],
+                 $r['connector_id'],$r['host_evidence_id'],self::RESOURCE,
+                 self::SCOPE,$r['owner_binding'],$r['approved_fingerprint'],$now,$now+3600]);
+-            // Initial refresh is issued in the SAME transaction as code consumption.
+-            // A missing operator-prepared table aborts the WHOLE exchange.
++            // Preserve the existing OAuth read flow until an authenticated
++            // operator has migrated the ACTIVE private SQLite database. A
++            // missing table is not permission to perform DDL from token HTTP.
++            // If the table exists but is malformed, fail atomically instead.
++            if (!self::refreshSchemaReady($db)) {
++                $db->exec('COMMIT');
++                return ['access_token'=>$token,'token_type'=>'Bearer',
++                    'expires_in'=>3600,'scope'=>self::SCOPE];
++            }
++            // Refresh is issued atomically with original code consumption.
+             $refresh=self::secret();
+             $q=$db->prepare('INSERT INTO mirage_oauth_refresh_tokens
+                 (refresh_hash,client_id,connector_id,host_evidence_id,resource,scope,
+@@ -296,6 +304,22 @@
+         }catch(Throwable $e){$db->exec('ROLLBACK');throw $e;}
+     }
+ 
++    /** False ONLY when no operator-prepared refresh table exists yet.
++     * An existing but corrupted/incompatible table must fail closed rather
++     * than silently downgrading issuance and concealing corruption.
++     * Called exclusively inside the existing exchange transaction.
++     */
++    private static function refreshSchemaReady(PDO $db):bool
++    {
++        $q=$db->query("SELECT name FROM sqlite_master WHERE type='table' AND name='mirage_oauth_refresh_tokens'");
++        if ($q->fetchColumn()===false) return false;
++        $db->query('SELECT refresh_hash,client_id,connector_id,host_evidence_id,
++            resource,scope,owner_binding,credential_fingerprint,issued_at,
++            expires_at,consumed,revoked,parent_access_hash
++            FROM mirage_oauth_refresh_tokens LIMIT 0');
++        return true;
++    }
++
+     /** Atomic single-use READ refresh, pinned to original client, owner and host.
+      * This method NEVER migrates/creates any table and never trusts caller scope.
+      * A revoked or rebound parent access row invalidates its refresh token.
