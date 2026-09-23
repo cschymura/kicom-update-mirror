@@ -36,7 +36,7 @@ final class KiComEngramOAuthContinuity
     /** Mint once from a currently verified READ access token row. */
     public static function mintForVerifiedRead(PDO $db,string $accessToken,int $now):array
     {
-        self::sqlite($db); self::install($db);
+        self::sqlite($db); // Schema was installed by explicit operator action, never token HTTP.
         if(!self::secretFormat($accessToken))self::denied();
         $accessHash=hash('sha256',$accessToken);
         $db->exec('BEGIN IMMEDIATE');
@@ -64,7 +64,7 @@ final class KiComEngramOAuthContinuity
     /** Single-use refresh rotation. Never creates or upgrades write scope. */
     public static function rotate(PDO $db,string $refreshToken,array $trustedClient,int $now):array
     {
-        self::sqlite($db); self::install($db);
+        self::sqlite($db); // Schema was installed by explicit operator action, never token HTTP.
         if(!self::secretFormat($refreshToken))self::denied();
         foreach(['client_id','connector_id','host_evidence_id'] as $k)
             if(!isset($trustedClient[$k])||!is_string($trustedClient[$k])||$trustedClient[$k]==='')self::denied();
@@ -80,6 +80,20 @@ final class KiComEngramOAuthContinuity
               || $r['connector_id']!==$trustedClient['connector_id']
               || $r['host_evidence_id']!==$trustedClient['host_evidence_id']
               || !self::hex64($r['owner_binding']) || !self::hex64($r['credential_fingerprint'])) self::denied();
+            // Reject a revoked, deleted or rebound parent access-token row even
+            // when the opaque refresh token remains unexpired.
+            $parent=$db->prepare('SELECT revoked,client_id,connector_id,host_evidence_id,
+                          owner_binding,credential_fingerprint,scope
+                          FROM mirage_oauth_tokens WHERE token_hash=?');
+            $parent->execute([$r['parent_access_hash']]);
+            $prior=$parent->fetch(PDO::FETCH_ASSOC);
+            if(!$prior || (int)$prior['revoked']!==0
+               || $prior['client_id']!==$r['client_id']
+               || $prior['connector_id']!==$r['connector_id']
+               || $prior['host_evidence_id']!==$r['host_evidence_id']
+               || $prior['owner_binding']!==$r['owner_binding']
+               || $prior['credential_fingerprint']!==$r['credential_fingerprint']
+               || $prior['scope']!==self::READ_SCOPE) self::denied();
             $u=$db->prepare('UPDATE mirage_oauth_refresh_tokens SET consumed=1 WHERE refresh_hash=? AND consumed=0');
             $u->execute([$hash]); if($u->rowCount()!==1)self::denied();
             $access=self::secret(); $next=self::secret();
