@@ -1,0 +1,171 @@
+--- a/modules/engram/KiComEngramOAuthTransactions.php
++++ b/modules/engram/KiComEngramOAuthTransactions.php
+@@ -18,6 +18,7 @@
+     private const RESOURCE = 'https://kicom.rurtalbahn.info/api.php?q=ENGRAM_MCP';
+     private const SCOPE = 'engram.read';
+     private const COMBINED_SCOPE = 'engram.read engram.write';
++    private const REFRESH_TTL = 604800;
+ 
+     /** Explicit operator-controlled schema installation, NEVER from HTTP. */
+     public static function install(PDO $db): void
+@@ -39,6 +40,22 @@
+             owner_binding TEXT NOT NULL, credential_fingerprint TEXT NOT NULL,
+             issued_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
+             revoked INTEGER NOT NULL DEFAULT 0)');
++        self::prepareRefreshSchema($db);
++    }
++
++    /** Operator-only additive refresh storage: no token endpoint may call this. */
++    public static function prepareRefreshSchema(PDO $db):void
++    {
++        self::sqlite($db);
++        $db->exec('CREATE TABLE IF NOT EXISTS mirage_oauth_refresh_tokens (
++          refresh_hash TEXT PRIMARY KEY,
++          client_id TEXT NOT NULL, connector_id TEXT NOT NULL,
++          host_evidence_id TEXT NOT NULL, resource TEXT NOT NULL,
++          scope TEXT NOT NULL, owner_binding TEXT NOT NULL,
++          credential_fingerprint TEXT NOT NULL,
++          issued_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
++          consumed INTEGER NOT NULL DEFAULT 0, revoked INTEGER NOT NULL DEFAULT 0,
++          parent_access_hash TEXT NOT NULL UNIQUE)');
+     }
+ 
+     /** Operator-only and backup-gated ADDITIVE schema upgrade.
+@@ -338,12 +355,12 @@
+             $q=$db->prepare('UPDATE mirage_oauth_codes SET consumed=1
+                 WHERE code_hash=? AND consumed=2');$q->execute([hash('sha256',$p['code'])]);
+             if($q->rowCount()!==1)self::denied();
+-            $token=self::secret();
++            $token=self::secret();$accessHash=hash('sha256',$token);
+             $q=$db->prepare('INSERT INTO mirage_oauth_tokens
+                 (token_hash,client_id,connector_id,host_evidence_id,resource,scope,
+                  owner_binding,credential_fingerprint,issued_at,expires_at)
+                 VALUES(?,?,?,?,?,?,?,?,?,?)');
+-            $q->execute([hash('sha256',$token),$r['client_id'],
++            $q->execute([$accessHash,$r['client_id'],
+                 $r['connector_id'],$r['host_evidence_id'],self::RESOURCE,
+                 $requested,$r['owner_binding'],$r['approved_fingerprint'],$now,$now+3600]);
+             if($requested===self::COMBINED_SCOPE) {
+@@ -353,12 +370,121 @@
+                 $q->execute([hash('sha256',$token),$r['write_consent_ref']]);
+                 if($q->rowCount()!==1)self::denied();
+             }
++            // Native OAuth read remains usable against an ACTIVE but as-yet
++            // unmigrated private OAuth database. Do not create schema from HTTP.
++            $refresh=null;
++            if(self::refreshSchemaReady($db)) {
++                $refresh=self::secret();
++                $q=$db->prepare('INSERT INTO mirage_oauth_refresh_tokens
++                    (refresh_hash,client_id,connector_id,host_evidence_id,resource,scope,
++                     owner_binding,credential_fingerprint,issued_at,expires_at,parent_access_hash)
++                     VALUES(?,?,?,?,?,?,?,?,?,?,?)');
++                $q->execute([hash('sha256',$refresh),$r['client_id'],
++                    $r['connector_id'],$r['host_evidence_id'],self::RESOURCE,
++                    $requested,$r['owner_binding'],$r['approved_fingerprint'],
++                    $now,$now+self::REFRESH_TTL,$accessHash]);
++            }
+             $db->exec('COMMIT');
+-            return ['access_token'=>$token,'token_type'=>'Bearer',
++            $response=['access_token'=>$token,'token_type'=>'Bearer',
+                 'expires_in'=>3600,'scope'=>$requested];
++            if($refresh!==null) {
++                $response['refresh_token']=$refresh;
++                $response['refresh_expires_in']=self::REFRESH_TTL;
++            }
++            return $response;
+         }catch(Throwable $e){$db->exec('ROLLBACK');throw $e;}
+     }
+ 
++    /** READ-only readiness check: an existing malformed schema fails closed. */
++    private static function refreshSchemaReady(PDO $db):bool
++    {
++        $q=$db->query("SELECT name FROM sqlite_master WHERE type='table' AND name='mirage_oauth_refresh_tokens'");
++        if($q->fetchColumn()===false)return false;
++        $db->query('SELECT refresh_hash,client_id,connector_id,host_evidence_id,
++           resource,scope,owner_binding,credential_fingerprint,issued_at,
++           expires_at,consumed,revoked,parent_access_hash
++           FROM mirage_oauth_refresh_tokens LIMIT 0');
++        return true;
++    }
++
++    /** Single-use read/combined-scope rotation, pinned to ORIGINAL approved scope.
++     * Combined-scope rotation atomically rebinds the ORIGINAL passkey consent
++     * to the freshly minted bearer. No read token can ever gain write scope.
++     * The native MCP host MUST still check the owner registry on each request.
++     */
++    public static function refresh(PDO $db,string $refreshToken,array $client,int $now,?string $requestedScope=null):array
++    {
++        self::sqlite($db);self::client($client);
++        if(!self::secretFormat($refreshToken))self::denied();
++        $db->exec('BEGIN IMMEDIATE');
++        try {
++            $hash=hash('sha256',$refreshToken);
++            $q=$db->prepare('SELECT * FROM mirage_oauth_refresh_tokens WHERE refresh_hash=?');
++            $q->execute([$hash]);$r=$q->fetch(PDO::FETCH_ASSOC);
++            if(!$r || (int)$r['consumed']!==0 || (int)$r['revoked']!==0
++                || (int)$r['issued_at']>$now || (int)$r['expires_at']<=$now
++                || $r['client_id']!==$client['client_id']
++                || $r['connector_id']!==$client['connector_id']
++                || $r['host_evidence_id']!==$client['host_evidence_id']
++                || $r['resource']!==self::RESOURCE
++                || !in_array($r['scope'],[self::SCOPE,self::COMBINED_SCOPE],true)
++                || ($requestedScope!==null && $requestedScope!==$r['scope'])
++                || !self::hex64($r['owner_binding'])
++                || !self::hex64($r['credential_fingerprint']))self::denied();
++            $q=$db->prepare('SELECT * FROM mirage_oauth_tokens WHERE token_hash=?');
++            $q->execute([$r['parent_access_hash']]);$parent=$q->fetch(PDO::FETCH_ASSOC);
++            if(!$parent || (int)$parent['revoked']!==0
++                || $parent['client_id']!==$r['client_id']
++                || $parent['connector_id']!==$r['connector_id']
++                || $parent['host_evidence_id']!==$r['host_evidence_id']
++                || $parent['resource']!==self::RESOURCE
++                || $parent['scope']!==$r['scope']
++                || $parent['owner_binding']!==$r['owner_binding']
++                || $parent['credential_fingerprint']!==$r['credential_fingerprint'])self::denied();
++            if($r['scope']===self::COMBINED_SCOPE) {
++                $q=$db->prepare('SELECT consent_ref FROM mirage_oauth_write_consents
++                    WHERE token_hash=? AND owner=? AND namespace=?
++                    AND client_id=? AND connector_id=? AND owner_binding=?
++                    AND credential_fingerprint=? AND revoked_at IS NULL
++                    AND approved_at<=? LIMIT 2');
++                $q->execute([$r['parent_access_hash'],'mirage-owner','project',
++                    $r['client_id'],$r['connector_id'],$r['owner_binding'],
++                    $r['credential_fingerprint'],$now]);
++                $consent=$q->fetch(PDO::FETCH_ASSOC);
++                if(!$consent || $q->fetch(PDO::FETCH_ASSOC)!==false)self::denied();
++            }
++            $q=$db->prepare('UPDATE mirage_oauth_refresh_tokens
++                SET consumed=1 WHERE refresh_hash=? AND consumed=0 AND revoked=0');
++            $q->execute([$hash]);if($q->rowCount()!==1)self::denied();
++            $access=self::secret();$next=self::secret();$accessHash=hash('sha256',$access);
++            $q=$db->prepare('INSERT INTO mirage_oauth_tokens
++                (token_hash,client_id,connector_id,host_evidence_id,resource,scope,
++                 owner_binding,credential_fingerprint,issued_at,expires_at)
++                 VALUES(?,?,?,?,?,?,?,?,?,?)');
++            $q->execute([$accessHash,$r['client_id'],$r['connector_id'],
++                $r['host_evidence_id'],self::RESOURCE,$r['scope'],
++                $r['owner_binding'],$r['credential_fingerprint'],$now,$now+3600]);
++            if($r['scope']===self::COMBINED_SCOPE) {
++                $q=$db->prepare('UPDATE mirage_oauth_write_consents
++                    SET token_hash=? WHERE consent_ref=? AND token_hash=?
++                    AND revoked_at IS NULL');
++                $q->execute([$accessHash,$consent['consent_ref'],$r['parent_access_hash']]);
++                if($q->rowCount()!==1)self::denied();
++            }
++            $q=$db->prepare('INSERT INTO mirage_oauth_refresh_tokens
++                (refresh_hash,client_id,connector_id,host_evidence_id,resource,scope,
++                 owner_binding,credential_fingerprint,issued_at,expires_at,parent_access_hash)
++                 VALUES(?,?,?,?,?,?,?,?,?,?,?)');
++            $q->execute([hash('sha256',$next),$r['client_id'],$r['connector_id'],
++                $r['host_evidence_id'],self::RESOURCE,$r['scope'],$r['owner_binding'],
++                $r['credential_fingerprint'],$now,$now+self::REFRESH_TTL,$accessHash]);
++            $db->exec('COMMIT');
++            return ['access_token'=>$access,'token_type'=>'Bearer',
++                'expires_in'=>3600,'refresh_token'=>$next,
++                'refresh_expires_in'=>self::REFRESH_TTL,'scope'=>$r['scope']];
++        }catch(Throwable $e){if($db->inTransaction())$db->exec('ROLLBACK');throw $e;}
++    }
++
+     /** Server-side identity resolution; caller rechecks owner revocation and active host. */
+     public static function verify(PDO $db,string $token,int $now):?array
+     {
