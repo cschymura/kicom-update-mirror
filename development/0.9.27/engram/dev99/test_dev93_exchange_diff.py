@@ -37,11 +37,11 @@ def audit(original=None):
     with tempfile.TemporaryDirectory() as temp:
         root=pathlib.Path(temp)
         target=root/'KiComEngramOAuthTransactions.php'
-        old=''.join((line[1:]+'\\n') for line in h['lines'] if line.startswith((' ','-')))
-        target.write_text('// synthetic prior content\\n'*255+old+'// trailing context\\n')
+        old=''.join((line[1:]+'\n') for line in h['lines'] if line.startswith((' ','-')))
+        target.write_text('// synthetic prior content\n'*255+old+'// trailing context\n')
         extract=['--- a/KiComEngramOAuthTransactions.php',
                  '+++ b/KiComEngramOAuthTransactions.php',h['header'],*h['lines']]
-        patch=root/'hunk.patch';patch.write_text('\\n'.join(extract)+'\\n')
+        patch=root/'hunk.patch';patch.write_text('\n'.join(extract)+'\n')
         for opts in (['--dry-run'],[]):
             proc=subprocess.run(['patch','--fuzz=0','-p1',*opts,'--input',str(patch)],
                 cwd=root,text=True,capture_output=True)
