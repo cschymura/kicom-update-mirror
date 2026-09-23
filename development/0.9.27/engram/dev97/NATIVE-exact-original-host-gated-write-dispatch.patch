@@ -1,0 +1,52 @@
+--- a/modules/engram/KiComEngramOAuthMcpHostBridge.php
++++ b/modules/engram/KiComEngramOAuthMcpHostBridge.php
+@@ -4,6 +4,7 @@
+ require_once __DIR__.'/KiComEngramOAuthHttp.php';
+ require_once __DIR__.'/KiComEngramMcpProtocol.php';
+ require_once __DIR__.'/KiComEngramPrivateOwnerRegistry.php';
++require_once __DIR__.'/KiComEngramNativeMcpWriteGate.php';
+ 
+ /**
+  * DEV-54: first-party OAuth access token -> actual MCP JSON-RPC read bridge.
+@@ -31,7 +32,8 @@
+         string $body,
+         array $trustedRuntime,
+         string $trustedWebRoot,
+-        int $now
++        int $now,
++        ?callable $firstPartyWriteFactory=null
+     ): array {
+         $deny=static fn():array=>[
+             'http_status'=>404,'headers'=>self::BASE_HEADERS,'body'=>''
+@@ -86,6 +88,21 @@
+             $identity=$token!==null
+                 ? KiComEngramOAuthTransactions::verify($oauthDb,$token,$now)
+                 : null;
++            $trustedWriteDispatch=null;
++            if($identity===null && $token!==null && $firstPartyWriteFactory!==null) {
++                // Explicitly approved combined-scope token: legacy read tokens
++                // never reach this branch and cannot gain write permissions.
++                $combined=KiComEngramOAuthTransactions::verifyCombinedScope($oauthDb,$token,$now);
++                if($combined!==null) {
++                    $approved=KiComEngramNativeMcpWriteGate::approved($oauthDb,$token,$combined,$owners,$now);
++                    if($approved!==null) {
++                        $dispatch=$firstPartyWriteFactory($oauthDb,$token,$combined,$approved,$now);
++                        if(!is_callable($dispatch))return $deny();
++                        $identity=$combined;
++                        $trustedWriteDispatch=$dispatch;
++                    }
++                }
++            }
+             if($identity===null) {
+                 // The actual host still has to pass the full active/owner
+                 // gate before disclosing any memories or capabilities.
+@@ -101,7 +118,8 @@
+                 );
+             };
+             $result=KiComEngramMcpProtocol::handle(
+-                $body,$trustedRuntime,$activation,$owners,$identity,$now,$factory
++                $body,$trustedRuntime,$activation,$owners,$identity,$now,$factory,
++                $trustedWriteDispatch
+             );
+             $status=$result['http_status']??404;
+             $payload=$result['body']??'';
