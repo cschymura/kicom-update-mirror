@@ -1,0 +1,31 @@
+name: KiCom Engram DEV73 mutation integration
+on:
+  push:
+    branches: [work/kicom-engram-dev70-mutation-core]
+    paths:
+      - 'development/0.9.27/engram/dev72/**'
+      - 'development/0.9.27/engram/dev73/**'
+      - '.github/workflows/test-0927-engram-dev73-mutation-integration.yml'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  mutation-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: {ref: '${{ github.sha }}'}
+      - uses: shivammathur/setup-php@v2
+        with: {php-version: '8.2', extensions: 'pdo_sqlite,sqlite3', coverage: none}
+      - name: Verify unchanged original R3 source/package
+        run: |
+          set -euo pipefail
+          echo '6e93e7b176ce429a922cb5e5906e90046f68c38fb3a8fb1b5cabcd529b56dd1f  releases/0.9.26/KiCom-0.9.26-R3.zip' | sha256sum -c -
+          (cd source/0.9.26-r3 && sha256sum --status -c MANIFEST.sha256)
+      - name: Lint and execute integration tests
+        run: |
+          set -euo pipefail
+          php -l development/0.9.27/engram/dev72/KiComEngramWriteGrant.php
+          php -l development/0.9.27/engram/dev73/KiComEngramMutationService.php
+          php -l development/0.9.27/engram/dev73/test_mutation_integration.php
+          php development/0.9.27/engram/dev73/test_mutation_integration.php
