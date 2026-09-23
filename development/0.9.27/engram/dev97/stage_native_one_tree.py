@@ -7,7 +7,7 @@ import argparse, hashlib, json, pathlib, shutil, stat, subprocess, sys, tempfile
 PARENT_SHA='0c6e02c64d44d603cb229f562d189f1b798bd78c2188fd2907e6b5cbafdb5ea7'
 BASE='development/0.9.27/engram'
 PATCHES=[
- 'dev90/native-0937-mcp-optional-write-protocol.patch',
+ 'dev100/NATIVE-exact-original-mcp-optional-write-protocol.patch',
  'dev93/NATIVE-original-oauth-write-consent.patch',
  'dev93/NATIVE-first-party-passkey-ui-and-oauth-http-write-consent.patch',
  'dev94/NATIVE-after-DEV93-original-oauth-both-scope-atomic-refresh.patch',
