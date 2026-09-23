@@ -54,6 +54,20 @@ def audit(original=None):
         old=''.join((line[1:]+'\n') for line in h['lines'] if line.startswith((' ','-')))
         assert old in parent,'DEV93_OAUTH_EXCHANGE_OLD_CONTEXT_NOT_PRESENT_IN_VERIFIED_PARENT'
         assert 'if($requested===self::COMBINED_SCOPE)' not in parent,'NEW_BRANCH_ALREADY_IN_ORIGINAL'
+        # The original archive is NEVER edited: test only a private throwaway
+        # copy of the actual OAuthTransactions.php extracted from its bytes.
+        with tempfile.TemporaryDirectory() as exact_temp:
+            base=pathlib.Path(exact_temp)
+            candidate=base/'KiComEngramOAuthTransactions.php'
+            candidate.write_text(parent)
+            pfile=base/'exchange-only.patch'
+            pfile.write_text('\n'.join(extract)+'\n')
+            for options in (['--dry-run'],[]):
+                cmd=subprocess.run(['patch','--fuzz=0','-p1',*options,
+                    '--input',str(pfile)],cwd=base,capture_output=True,text=True)
+                assert cmd.returncode==0,'ORIGINAL_ZERO_FUZZ_EXCHANGE_FAILED '+cmd.stdout+cmd.stderr
+            lint=subprocess.run(['php','-l',str(candidate)],capture_output=True,text=True)
+            assert lint.returncode==0,'ORIGINAL_EXCHANGE_PHP_SYNTAX_FAILED '+lint.stdout+lint.stderr
     return len(blocks)
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--original',type=pathlib.Path)
