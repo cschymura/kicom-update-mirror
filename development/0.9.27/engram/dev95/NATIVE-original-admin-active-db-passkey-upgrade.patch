@@ -25,8 +25,8 @@
 +        $runtime=kicomEngramServerRuntime();
 +        if (!is_array($runtime))throw new RuntimeException('UPGRADE_UNAVAILABLE');
 +        $passkeys=new KiComPasskeyBridge(
-+            (string)$runtime['passkey_store'],(string)$runtime['rp_id'],
-+            (string)$runtime['expected_origin'],'KiCom'
++            __DIR__.'/var/dev_zone/passkeys','kicom.rurtalbahn.info',
++            'https://kicom.rurtalbahn.info','KiCom'
 +        );
 +        $raw='';
 +        if (($_SERVER['REQUEST_METHOD']??null)==='POST') {
