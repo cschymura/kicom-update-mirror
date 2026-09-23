@@ -1,0 +1,31 @@
+name: KiCom exact-native staging inputs export
+on:
+  push:
+    branches:
+      - work/kicom-engram-dev100-one-tree-validation
+    paths:
+      - '.github/workflows/kicom-dev100-source-bundle.yml'
+      - 'development/0.9.27/engram/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert no private artifacts and verify tracked native input paths
+        run: |
+          set -euo pipefail
+          python3 development/0.9.27/engram/dev97/test_integration_inputs.py
+          test ! -e development/0.9.27/engram/engram-private
+          test ! -e development/0.9.27/engram/mirage-oauth.sqlite
+          test ! -e development/0.9.27/engram/engrams.sqlite
+      - name: Export development source ONLY for exact-local original integration
+        uses: actions/upload-artifact@v4
+        with:
+          name: kicom-dev100-native-dev-source
+          path: development/0.9.27/engram/
+          retention-days: 1
+          if-no-files-found: error
