@@ -1,0 +1,30 @@
+{
+  "run_id": "MIRAGE-20260924T010012+0200-DEV101",
+  "started_at": "2026-09-24T01:00:12+02:00",
+  "finished_at": "2026-09-24T01:08:30+02:00",
+  "status": "PARTIAL",
+  "stage": "DEV-101 native full-tree PDO SQLite gate prepared",
+  "source_versions": {
+    "github_branch": "work/kicom-engram-dev100-one-tree-validation",
+    "github_start_head": "05c921e736801555fefaa63e57cb72f4c45358a6",
+    "live_kicom": "0.9.37 documented proven read baseline; BOOTSTRAP/PROJECT_STATE/GENOME_STATUS unavailable via this run's web path",
+    "original_parent_zip": "not present in this runtime; expected sha256 0c6e02c64d44d603cb229f562d189f1b798bd78c2188fd2907e6b5cbafdb5ea7",
+    "slack": "D0C2D8CKWDD read; retrieved messages older than DEV100 and no conflicting reservation found"
+  },
+  "changes": [
+    "Added a real ext-pdo_sqlite gate that only runs against the complete staged native tree and verifies backup-before-DDL, non-activation, read-token preservation, canonical data preservation, quick_check and private signing key.",
+    "Added a manual Actions workflow that consumes an operator-provided private parent artifact, verifies exact 0.9.37 SHA, stages the complete native tree and runs the real-PDO gate without publishing the parent or staged runtime.",
+    "Persisted DEV-101 checkpoint; no production or live private data changes."
+  ],
+  "tests_passed": 0,
+  "tests_failed": 0,
+  "commit_sha": "ae34ba745a8b3e119c7b920ee75fb71c11618534",
+  "checkpoint_url": "https://github.com/cschymura/kicom-update-mirror/blob/work/kicom-engram-dev100-one-tree-validation/development/0.9.27/engram/CHECKPOINT-2026-09-24-ENGRAM-DEV-101-NATIVE-SQLITE-GATE.md",
+  "semantic_search": "FTS5 remains optional/default-off and was not changed or tested in this run.",
+  "production_changes": false,
+  "blocker": "This runtime has no original 0.9.37 parent ZIP and no verified private Actions artifact containing it, so the new full-tree native PDO SQLite workflow cannot honestly be dispatched yet. No test success is claimed.",
+  "next_step": "When the verified private parent artifact exists, dispatch the DEV100 native SQLite full-tree gate on the current branch; if green, continue same integrated tree with native Admin/WebAuthn/CSRF and HTTP/MCP OAuth read/write/update/archive/refresh/replay gates before updater/recovery/rollback release gate.",
+  "persistence_status": "PERSISTED",
+  "release_candidate": null,
+  "auth_fix_attempt_status": "TESTED_LOCAL"
+}
