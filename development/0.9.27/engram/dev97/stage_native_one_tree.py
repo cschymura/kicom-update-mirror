@@ -15,7 +15,7 @@ PATCHES=[
  'dev100/NATIVE-exact-original-oauth-http-refresh-discovery.patch',
  'dev91/native-0937-separate-combined-scope-verify.patch',
  'dev97/NATIVE-exact-original-host-gated-write-dispatch.patch',
- 'dev92/native-original-api-first-party-write-factory.patch',
+ 'dev100/NATIVE-exact-original-api-first-party-write-factory.patch',
  'dev95/NATIVE-original-admin-active-db-passkey-upgrade.patch',
  'dev95/NATIVE-original-admin-menu-link.patch',
 ]
