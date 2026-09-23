@@ -46,7 +46,7 @@
                  $r['connector_id'],$r['host_evidence_id'],self::RESOURCE,
                  $requested,$r['owner_binding'],$r['approved_fingerprint'],$now,$now+3600]);
              if($requested===self::COMBINED_SCOPE) {
-@@ -353,12 +370,121 @@
+@@ -353,12 +370,122 @@
                  $q->execute([hash('sha256',$token),$r['write_consent_ref']]);
                  if($q->rowCount()!==1)self::denied();
              }
@@ -123,16 +123,17 @@
 +                || $parent['owner_binding']!==$r['owner_binding']
 +                || $parent['credential_fingerprint']!==$r['credential_fingerprint'])self::denied();
 +            if($r['scope']===self::COMBINED_SCOPE) {
-+                $q=$db->prepare('SELECT consent_ref FROM mirage_oauth_write_consents
++                $q=$db->prepare('SELECT COUNT(*) AS consent_count, MIN(consent_ref) AS consent_ref
++                    FROM mirage_oauth_write_consents
 +                    WHERE token_hash=? AND owner=? AND namespace=?
 +                    AND client_id=? AND connector_id=? AND owner_binding=?
 +                    AND credential_fingerprint=? AND revoked_at IS NULL
-+                    AND approved_at<=? LIMIT 2');
++                    AND approved_at<=?');
 +                $q->execute([$r['parent_access_hash'],'mirage-owner','project',
 +                    $r['client_id'],$r['connector_id'],$r['owner_binding'],
 +                    $r['credential_fingerprint'],$now]);
 +                $consent=$q->fetch(PDO::FETCH_ASSOC);
-+                if(!$consent || $q->fetch(PDO::FETCH_ASSOC)!==false)self::denied();
++                if(!$consent || (int)$consent['consent_count']!==1 || !is_string($consent['consent_ref']))self::denied();
 +            }
 +            $q=$db->prepare('UPDATE mirage_oauth_refresh_tokens
 +                SET consumed=1 WHERE refresh_hash=? AND consumed=0 AND revoked=0');
