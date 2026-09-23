@@ -154,7 +154,7 @@
              $q=$db->prepare('UPDATE mirage_oauth_codes SET consumed=1
                  WHERE code_hash=? AND consumed=2');$q->execute([hash('sha256',$p['code'])]);
              if($q->rowCount()!==1)self::denied();
-@@ -256,9 +345,16 @@
+@@ -256,10 +345,17 @@
                  VALUES(?,?,?,?,?,?,?,?,?,?)');
              $q->execute([hash('sha256',$token),$r['client_id'],
                  $r['connector_id'],$r['host_evidence_id'],self::RESOURCE,
@@ -173,3 +173,4 @@
 +                'expires_in'=>3600,'scope'=>$requested];
          }catch(Throwable $e){$db->exec('ROLLBACK');throw $e;}
      }
+ 
