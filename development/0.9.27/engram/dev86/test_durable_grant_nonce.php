@@ -26,6 +26,7 @@ $db->exec('CREATE TABLE engram_revisions(
   source_kind TEXT NOT NULL,source_ref TEXT NOT NULL,entry_state TEXT NOT NULL,
   previous_hash TEXT NOT NULL,revision_hash TEXT NOT NULL,
   PRIMARY KEY(subject,namespace,id,revision))');
+KiComEngramMutationSchema::prepareNew($db);
 $grants=new KiComEngramWriteGrant(str_repeat('s',48));
 function instance86(PDO $db,KiComEngramWriteGrant $grants):KiComEngramCanonicalMcpMutationController{
   return new KiComEngramCanonicalMcpMutationController(
