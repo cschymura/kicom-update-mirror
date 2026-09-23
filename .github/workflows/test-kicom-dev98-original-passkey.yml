@@ -1,0 +1,23 @@
+name: KiCom DEV98 original first-party Passkey store
+on:
+  push:
+    branches:
+      - work/kicom-engram-dev98-original-passkey-path
+    paths:
+      - 'development/0.9.27/engram/dev95/NATIVE-original-admin-active-db-passkey-upgrade.patch'
+      - 'development/0.9.27/engram/dev98/**'
+      - '.github/workflows/test-kicom-dev98-original-passkey.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  original-web-authn-store:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: First-party admin Passkey store contract
+        run: |
+          set -euo pipefail
+          python3 -m py_compile development/0.9.27/engram/dev98/test_original_passkey_store.py
+          python3 development/0.9.27/engram/dev98/test_original_passkey_store.py
