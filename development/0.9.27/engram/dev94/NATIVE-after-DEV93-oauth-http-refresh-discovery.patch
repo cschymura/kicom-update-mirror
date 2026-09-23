@@ -1,0 +1,80 @@
+--- a/modules/engram/KiComEngramOAuthHttp.php
++++ b/modules/engram/KiComEngramOAuthHttp.php
+@@ -1,6 +1,7 @@
+ <?php
+ declare(strict_types=1);
+ require_once __DIR__.'/KiComEngramOAuthTransactions.php';
++require_once __DIR__.'/KiComEngramOAuthGrantForm.php';
+ require_once __DIR__.'/KiComEngramHostingPolicy.php';
+ 
+ /**
+@@ -69,7 +70,8 @@
+             $data=[
+                 'resource'=>self::RESOURCE,
+                 'authorization_servers'=>[self::ISSUER],
+-                'scopes_supported'=>['engram.read'],
++                'scopes_supported'=>($trustedHost['engram_write_ready']??null)===true
++                    ? ['engram.read','engram.write'] : ['engram.read'],
+             ];
+         }elseif($kind==='authorization_server'){
+             $data=[
+@@ -77,9 +79,11 @@
+                 'authorization_endpoint'=>self::AUTH_ENDPOINT,
+                 'token_endpoint'=>self::TOKEN_ENDPOINT,
+                 'response_types_supported'=>['code'],
+-                'grant_types_supported'=>['authorization_code'],
++                'grant_types_supported'=>($trustedHost['engram_refresh_ready']??null)===true
++                    ? ['authorization_code','refresh_token'] : ['authorization_code'],
+                 'code_challenge_methods_supported'=>['S256'],
+-                'scopes_supported'=>['engram.read'],
++                'scopes_supported'=>($trustedHost['engram_write_ready']??null)===true
++                    ? ['engram.read','engram.write'] : ['engram.read'],
+                 'token_endpoint_auth_methods_supported'=>['none'],
+                 // ChatGPT's pinned client is provisioned separately. Do not
+                 // advertise CIMD until actual HTTPS client document
+@@ -129,11 +133,19 @@
+                 && $server['HTTP_ORIGIN']!==self::ISSUER))
+             return self::result(404,'');
+         try{
+-            $form=self::strictForm($raw);
+-            $token=KiComEngramOAuthTransactions::exchange(
+-                $privateOAuthDb,$form,$trustedClient,$now,
+-                ($trustedHost['engram_write_ready']??null)===true
+-            );
++            $grant=KiComEngramOAuthGrantForm::parse($raw,$trustedClient);
++            if($grant['kind']==='authorization_code') {
++                $token=KiComEngramOAuthTransactions::exchange(
++                    $privateOAuthDb,$grant['arguments'],$trustedClient,$now,
++                    ($trustedHost['engram_write_ready']??null)===true
++                );
++            } elseif($grant['kind']==='refresh_token'
++                && ($trustedHost['engram_refresh_ready']??null)===true) {
++                $token=KiComEngramOAuthTransactions::refresh(
++                    $privateOAuthDb,$grant['arguments']['refresh_token'],$trustedClient,$now,
++                    $grant['arguments']['requested_scope']??null
++                );
++            } else throw new RuntimeException('UNSUPPORTED_OAUTH_GRANT');
+             return self::json(200,$token);
+         }catch(Throwable){
+             // Never leak whether a code, client, PKCE, private path or
+@@ -142,29 +154,6 @@
+         }
+     }
+ 
+-    /** Exactly the expected six form fields; no PHP bracket/dot normalization. */
+-    private static function strictForm(string $raw):array
+-    {
+-        if($raw===''||strlen($raw)>2048)throw new RuntimeException('INVALID_FORM');
+-        $allowed=[
+-            'grant_type','code','code_verifier','redirect_uri','client_id','resource'
+-        ];
+-        $out=[];
+-        foreach(explode('&',$raw)as $pair){
+-            if(!str_contains($pair,'='))throw new RuntimeException('INVALID_FORM');
+-            [$key,$value]=explode('=',$pair,2);
+-            if(count($out)!==count($allowed))throw new RuntimeException('INVALID_FORM');
+-            return $out;
+-    }
+-
+     private static function httpsHost(array $server):bool
+     {
