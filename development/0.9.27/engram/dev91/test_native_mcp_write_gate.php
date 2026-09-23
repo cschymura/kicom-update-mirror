@@ -29,6 +29,25 @@ $owners=static fn(string $fingerprint):array=>$approved;
 $check=static fn(?array $override=null,?callable $registry=null):?array=>
   KiComEngramNativeMcpWriteGate::approved($db,$bearer,$override??$identity,$registry??$owners,$now);
 ck($check()===['source_kind'=>'explicit_user','source_ref'=>$ref],'current combined token and private consent eligible');
+$secondBearer=str_repeat('x',43);$secondHash=hash('sha256',$secondBearer);
+$secondRef='consent:'.hash('sha256','second independent synthetic approved request');
+$db->prepare('INSERT INTO mirage_oauth_tokens VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+ ->execute([$secondHash,$client,$connector,$host,$resource,
+  'engram.read engram.write',$binding,$fp,$now-1,$now+3600,0]);
+$db->prepare('INSERT INTO mirage_oauth_write_consents VALUES (?,?,?,?,?,?,?,?,?,NULL,?)')
+ ->execute([$secondRef,$owner,'project',$client,$connector,$binding,$fp,
+  'explicit_user',$now-1,$secondHash]);
+ck($check()===['source_kind'=>'explicit_user','source_ref'=>$ref],
+ 'second independent consent cannot cause ambiguous first-token authorization');
+ck(KiComEngramNativeMcpWriteGate::approved($db,$secondBearer,$identity,$owners,$now)
+ ===['source_kind'=>'explicit_user','source_ref'=>$secondRef],
+ 'second combined bearer resolves only its own approved consent');
+$db->prepare('UPDATE mirage_oauth_write_consents SET token_hash=? WHERE consent_ref=?')
+ ->execute([hash('sha256','orphan-token'),$secondRef]);
+ck(KiComEngramNativeMcpWriteGate::approved($db,$secondBearer,$identity,$owners,$now)===null,
+ 'consent rebound to other token cannot approve original second bearer');
+$db->prepare('UPDATE mirage_oauth_write_consents SET token_hash=? WHERE consent_ref=?')
+ ->execute([$secondHash,$secondRef]);
 $db->exec("UPDATE mirage_oauth_tokens SET scope='engram.read'");
 ck($check()===null,'read token cannot become write');
 $db->exec("UPDATE mirage_oauth_tokens SET scope='engram.read engram.write',revoked=1");
