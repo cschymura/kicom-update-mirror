@@ -8,10 +8,11 @@ require_once __DIR__.'/../dev88/KiComEngramVerifiedWriteProvenance.php';
 final class KiComEngramCanonicalMutationService {
     private KiComEngramWriteGrant $grants;
     private KiComEngramRevisionAdapter $store;
-    public function __construct(KiComEngramWriteGrant $grants, KiComEngramRevisionAdapter $store){$this->grants=$grants;$this->store=$store;}
+    private $trustedReceiptLookup;
+    public function __construct(KiComEngramWriteGrant $grants, KiComEngramRevisionAdapter $store,?callable $trustedReceiptLookup=null){$this->grants=$grants;$this->store=$store;$this->trustedReceiptLookup=$trustedReceiptLookup;}
     public function mutate(string $grant,array $oauth,string $operation,array $input,string $idempotencyKey,int $now):array {
         $claims=$this->grants->verify($grant,$oauth,$operation,$now);
-        $provenance=KiComEngramVerifiedWriteProvenance::resolve($oauth);
+        $provenance=KiComEngramVerifiedWriteProvenance::resolve($oauth,$this->trustedReceiptLookup);
         // Durable nonce consumption occurs atomically with receipt and revision.
         // The same grant+request idempotently retries; a different request cannot
         // consume the grant again, even in another PHP process.
