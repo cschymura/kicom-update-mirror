@@ -12,7 +12,14 @@ function denied86(callable $fn,string $name):void{
   throw new RuntimeException('FAIL '.$name);
 }
 if(!extension_loaded('pdo_sqlite'))throw new RuntimeException('ext-pdo_sqlite required');
-$db=new PDO('sqlite::memory:',null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
+$sqliteFile=tempnam(sys_get_temp_dir(),'kicom-dev86-');
+if($sqliteFile===false)throw new RuntimeException('Cannot create synthetic SQLite fixture');
+chmod($sqliteFile,0600);
+register_shutdown_function(static function()use($sqliteFile):void{
+  foreach([$sqliteFile,$sqliteFile.'-wal',$sqliteFile.'-shm'] as $path)if(is_file($path))@unlink($path);
+});
+$db=new PDO('sqlite:'.$sqliteFile,null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
+$db2=new PDO('sqlite:'.$sqliteFile,null,null,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
 $db->exec('CREATE TABLE engram_revisions(
   subject TEXT NOT NULL,namespace TEXT NOT NULL,id TEXT NOT NULL,
   revision INTEGER NOT NULL,kind TEXT NOT NULL,body TEXT NOT NULL,
@@ -47,7 +54,8 @@ $first=instance86($db,$grants);
 $g=grant86($grants,$oauth,'engram_write','nonce-0001',$now);
 $a=call86($first,$oauth,'engram_write',$g,'idem-0001',['body'=>'synthetic memory'], $now);
 check86($a['revision']===1&&strlen($a['id'])===32,'first write revision 1');
-$independent=instance86($db,$grants);
+$independent=instance86($db2,$grants);
+check86($db!==$db2,'independent PDO connections to the same private synthetic SQLite file');
 $b=call86($independent,$oauth,'engram_write',$g,'idem-0001',['body'=>'synthetic memory'],$now);
 check86($a===$b,'same grant plus exact idempotency repeats same receipt in another controller instance');
 check86((int)$db->query('SELECT COUNT(*) FROM engram_revisions')->fetchColumn()===1,'idempotent retry does not duplicate revision');
@@ -55,7 +63,7 @@ denied86(fn()=>call86($independent,$oauth,'engram_write',$g,'idem-0002',['body'=
 denied86(fn()=>call86($independent,$oauth,'engram_write',$g,'idem-0001',['body'=>'tampered content'],$now),'same idempotency with changed content rejected');
 $g2=grant86($grants,$oauth,'engram_write','nonce-0002',$now);
 denied86(fn()=>call86($independent,$oauth,'engram_write',$g2,'idem-0001',['body'=>'synthetic memory'],$now),'different grant cannot claim existing receipt');
-check86((int)$db->query('SELECT COUNT(*) FROM engram_mutation_receipts')->fetchColumn()===1,'exactly one committed nonce receipt');
+check86((int)$db2->query('SELECT COUNT(*) FROM engram_mutation_receipts')->fetchColumn()===1,'exactly one committed nonce receipt visible across connections');
 check86((int)$db->query('SELECT COUNT(*) FROM engram_mutation_audit')->fetchColumn()===1,'one audit event for idempotent write');
 $read=$oauth;$read['scopes']=['engram.read'];
 denied86(fn()=>call86($independent,$read,'engram_write',grant86($grants,$oauth,'engram_write','nonce-0003',$now),'idem-0003',['body'=>'x'],$now),'read-only OAuth token cannot write');
