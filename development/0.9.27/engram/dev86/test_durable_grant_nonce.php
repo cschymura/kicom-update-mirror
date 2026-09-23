@@ -61,6 +61,15 @@ $first=instance86($db,$grants);
 $g=grant86($grants,$oauth,'engram_write','nonce-0001',$now);
 $a=call86($first,$oauth,'engram_write',$g,'idem-0001',['body'=>'synthetic memory'], $now);
 check86($a['revision']===1&&strlen($a['id'])===32,'first write revision 1');
+$q=$db->prepare('SELECT source_kind,source_ref FROM engram_revisions WHERE subject=? AND namespace=? AND id=? AND revision=1');
+$q->execute([$oauth['owner'],$oauth['namespace'],$a['id']]);
+$storedProvenance=$q->fetch(PDO::FETCH_ASSOC);
+check86($storedProvenance===['source_kind'=>'synthetic_test','source_ref'=>'dev-test:synthetic-001'],'canonical revision persists only the server-verified test provenance');
+$spoof=grant86($grants,$oauth,'engram_write','nonce-0006',$now);
+denied86(fn()=>call86($first,$oauth,'engram_write',$spoof,'idem-0007',
+ ['body'=>'x','source_kind'=>'explicit_user','source_ref'=>'consent:'.str_repeat('a',64)],$now),
+ 'MCP input cannot override verified provenance');
+
 $independent=instance86($db2,$grants);
 check86($db!==$db2,'independent PDO connections to the same private synthetic SQLite file');
 $b=call86($independent,$oauth,'engram_write',$g,'idem-0001',['body'=>'synthetic memory'],$now);
