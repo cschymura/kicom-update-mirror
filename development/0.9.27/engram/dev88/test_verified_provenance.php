@@ -41,7 +41,16 @@ no(fn()=>KiComEngramVerifiedWriteProvenance::resolve($unbound),'synthetic test s
 $consent=$context;unset($consent['synthetic_environment']);
 $consent['server_provenance']['source_kind']='explicit_user';
 $consent['server_provenance']['source_ref']='consent:'.str_repeat('a',64);
-yes(KiComEngramVerifiedWriteProvenance::resolve($consent)['source_kind']==='explicit_user','well-formed server asserted consent reference retained (not independent proof of consent)');
+no(fn()=>KiComEngramVerifiedWriteProvenance::resolve($consent),'plausible receipt plus claimed verified flag is NOT sufficient');
+$readOnlyPrivateLedger=static function(array $claim)use($consent):bool{
+  return $claim['owner']===$consent['owner']
+    && $claim['namespace']===$consent['namespace']
+    && $claim['token_fingerprint']===$consent['token_fingerprint']
+    && $claim['source_kind']==='explicit_user'
+    && $claim['source_ref']===$consent['server_provenance']['source_ref'];
+};
+yes(KiComEngramVerifiedWriteProvenance::resolve($consent,$readOnlyPrivateLedger)['source_kind']==='explicit_user','trusted separately supplied private lookup accepts exact owner-bound receipt');
+no(fn()=>KiComEngramVerifiedWriteProvenance::resolve($consent,static fn(array $r):bool=>false),'private ledger rejects invalid or revoked consent');
 $fakeConsent=$consent;$fakeConsent['server_provenance']['source_ref']='user typed yes';
 no(fn()=>KiComEngramVerifiedWriteProvenance::resolve($fakeConsent),'user supplied text cannot impersonate consent receipt');
 $fakeConsent=$consent;$fakeConsent['synthetic_environment']=true;
