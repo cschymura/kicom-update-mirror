@@ -1,0 +1,36 @@
+--- a/modules/engram/KiComEngramOAuthTransactions.php
++++ b/modules/engram/KiComEngramOAuthTransactions.php
+@@ -283,6 +283,33 @@
+             'host_evidence_id'=>$row['host_evidence_id']];
+     }
+ 
++    /**
++     * DEV-91: a combined-scope token is not a legacy read token. This method
++     * only validates the SQL bearer row; the first-party host MUST additionally
++     * prove active owner/passkey AND private write-consent receipt, before
++     * allowing capabilities. Never infer write from a previous read token.
++     */
++    public static function verifyCombinedScope(PDO $db,string $token,int $now):?array
++    {
++        self::sqlite($db);
++        if(!self::secretFormat($token))return null;
++        try {
++            $q=$db->prepare('SELECT * FROM mirage_oauth_tokens WHERE token_hash=?');
++            $q->execute([hash('sha256',$token)]);
++            $row=$q->fetch(PDO::FETCH_ASSOC);
++        } catch(Throwable) {return null;}
++        if(!$row || (int)$row['revoked']!==0 || (int)$row['issued_at']>$now
++            || (int)$row['expires_at']<=$now
++            || $row['resource']!==self::RESOURCE
++            || $row['scope']!=='engram.read engram.write'
++            || !self::hex64($row['credential_fingerprint'])
++            || !self::hex64($row['owner_binding']))return null;
++        return ['authenticated'=>true,'connector_id'=>$row['connector_id'],
++            'credential_fingerprint'=>$row['credential_fingerprint'],
++            'owner_binding'=>$row['owner_binding'],
++            'host_evidence_id'=>$row['host_evidence_id']];
++    }
++
+     public static function revoke(PDO $db,string $token):void
+     {
+         self::sqlite($db);
