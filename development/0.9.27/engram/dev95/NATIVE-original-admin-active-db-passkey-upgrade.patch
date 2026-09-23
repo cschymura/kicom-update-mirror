@@ -1,0 +1,56 @@
+--- a/admin.php
++++ b/admin.php
+@@ -87,6 +87,53 @@
+     exit;
+ }
+ 
++/* DEV-95: prepare existing ACTIVE private OAuth/Engram databases only after
++ * original KiCom admin session, CSRF and a NEW signed owner Passkey assertion.
++ * This route performs NO activation of write scope or OAuth tokens.
++ * Neither OAuth nor MCP routes may import the upgrade procedure.
++ */
++if (isset($_GET['engram_active_upgrade'])) {
++    header('Cache-Control: no-store, private');
++    header('X-Content-Type-Options: nosniff');
++    header('X-Frame-Options: DENY');
++    header('Referrer-Policy: no-referrer');
++    try {
++        if ($_GET['engram_active_upgrade']!=='1'
++            || empty($_SESSION['admin'])
++            || ($_SERVER['HTTPS']??null)!=='on'
++            || ($_SERVER['HTTP_HOST']??null)!=='kicom.rurtalbahn.info')
++            throw new RuntimeException('UPGRADE_ADMIN_UNAVAILABLE');
++        require_once __DIR__.'/modules/dev/PasskeyBridge.php';
++        require_once __DIR__.'/modules/engram/KiComEngramActiveUpgradeAdminHttp.php';
++        $runtime=kicomEngramServerRuntime();
++        if (!is_array($runtime))throw new RuntimeException('UPGRADE_UNAVAILABLE');
++        $passkeys=new KiComPasskeyBridge(
++            (string)$runtime['passkey_store'],(string)$runtime['rp_id'],
++            (string)$runtime['expected_origin'],'KiCom'
++        );
++        $raw='';
++        if (($_SERVER['REQUEST_METHOD']??null)==='POST') {
++            $raw=file_get_contents('php://input',false,null,0,16385);
++            if (!is_string($raw)||strlen($raw)>16384)
++                throw new RuntimeException('UPGRADE_UNAVAILABLE');
++        }
++        $result=KiComEngramActiveUpgradeAdminHttp::handle(
++            $_SERVER,$raw,$_SESSION,session_id(),csrf(),
++            __DIR__,$runtime,$passkeys,time()
++        );
++        foreach (($result['headers']??[]) as $name=>$value) {
++            if (in_array($name,['Cache-Control','Content-Type',
++                    'X-Content-Type-Options','X-Frame-Options',
++                    'Referrer-Policy','Content-Security-Policy'],true)
++                && is_string($value)&&!str_contains($value,"\r")
++                &&!str_contains($value,"\n"))header($name.': '.$value);
++        }
++        $status=$result['http_status']??404;
++        http_response_code(is_int($status)&&in_array($status,[200,403,404,409],true)?$status:404);
++        $body=$result['body']??'';
++        echo is_string($body)&&strlen($body)<=16384?$body:'';
++    }catch(Throwable){http_response_code(404);}
++    exit;
++}
++
+ /* Mirage DEV-64: explicit separate ORIGINAL KiCom admin/Passkey owner approval.
