@@ -9,7 +9,7 @@ declare(strict_types=1);
 final class KiComEngramVerifiedWriteProvenance
 {
     /** @return array{source_kind:string,source_ref:string} */
-    public static function resolve(array $oauth):array
+    public static function resolve(array $oauth,?callable $trustedReceiptLookup=null):array
     {
         if (($oauth['authenticated']??null)!==true
             || !isset($oauth['scopes']) || !is_array($oauth['scopes'])
@@ -46,6 +46,17 @@ final class KiComEngramVerifiedWriteProvenance
             if (($oauth['synthetic_environment']??false)===true
                 || !preg_match('/\Aconsent:[a-f0-9]{64}\z/D',$ref))
                 throw new RuntimeException('MISSING_REAL_CONSENT_RECEIPT');
+            // A plausible consent:<hash> and 'verified=true' alone are NOT consent.
+            // Callback MUST be supplied by the authenticated first-party host,
+            // bound to an independent PRIVATE database lookup, not MCP arguments.
+            if($trustedReceiptLookup===null
+                || $trustedReceiptLookup([
+                    'owner'=>$p['owner'],
+                    'namespace'=>$p['namespace'],
+                    'token_fingerprint'=>$p['token_fingerprint'],
+                    'source_kind'=>$kind,
+                    'source_ref'=>$ref,
+                ])!==true)throw new RuntimeException('UNVERIFIED_REAL_CONSENT_RECEIPT');
         } else {
             throw new RuntimeException('UNSUPPORTED_PROVENANCE');
         }
