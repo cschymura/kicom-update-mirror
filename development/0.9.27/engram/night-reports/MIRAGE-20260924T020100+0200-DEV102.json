@@ -1,0 +1,31 @@
+{
+  "run_id": "MIRAGE-20260924T020100+0200-DEV102",
+  "started_at": "2026-09-24T02:01:00+02:00",
+  "finished_at": "2026-09-24T02:05:00+02:00",
+  "status": "PARTIAL",
+  "stage": "DEV-102 native PDO backup-retention gate correction",
+  "source_versions": {
+    "github_branch": "work/kicom-engram-dev100-one-tree-validation",
+    "github_start_head": "a271f8171220fd356bdbe27dde599114564691f9",
+    "github_code_sha": "9dd8dd471c7683b173e51924d2ee04835bfc702f",
+    "source_only_ci": "35936528573 SUCCESS on exact code SHA; not a native PDO gate",
+    "live_kicom": "0.9.37 documented proven read baseline; not re-proved or modified in this run",
+    "original_parent_zip": "not present in /mnt/data, current conversation files, or matching Library search; expected sha256 0c6e02c64d44d603cb229f562d189f1b798bd78c2188fd2907e6b5cbafdb5ea7"
+  },
+  "changes": [
+    "Reviewed the whole-tree native SQLite gate against DEV-95 retained-backup behavior.",
+    "Corrected false assumption that the backup directory must contain exactly two snapshots after upgrade.",
+    "Gate now seeds and validates a retained prior SQLite snapshot, proves denied runtime adds none, and requires exactly two newly-created private quick_check-ok snapshots while preserving the prior backup."
+  ],
+  "tests_passed": 0,
+  "tests_failed": 0,
+  "commit_sha": "9dd8dd471c7683b173e51924d2ee04835bfc702f",
+  "checkpoint_url": "https://github.com/cschymura/kicom-update-mirror/blob/work/kicom-engram-dev100-one-tree-validation/development/0.9.27/engram/CHECKPOINT-2026-09-24-ENGRAM-DEV-102-BACKUP-RETENTION-GATE.md",
+  "semantic_search": "FTS5 remains optional/default-off and unchanged.",
+  "production_changes": false,
+  "blocker": "The SHA-pinned original KiCom 0.9.37 ZIP is absent from this runtime, so the corrected whole-tree ext-pdo_sqlite gate cannot be executed honestly here. Source-only CI success is not counted as a PDO integration test.",
+  "next_step": "In the first runtime containing the verified parent ZIP, stage the current one-tree and run the corrected DEV-102 native PDO gate; then continue on that same tree with first-party Admin/WebAuthn/CSRF and HTTP/MCP OAuth mutation/refresh/replay integration regression.",
+  "persistence_status": "PERSISTED",
+  "release_candidate": null,
+  "auth_fix_attempt_status": "TESTED_LOCAL"
+}
